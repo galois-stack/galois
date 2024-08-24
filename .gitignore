@@ -1,0 +1,40 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+
+*.xcodeproj
+build
+build_debug
+build_release
+*.Makefile
+*.target.mk
+
+.*
+!.paramita
+!.gitigore
+!.clang-format
+!.editorconfig
+!build.sh
