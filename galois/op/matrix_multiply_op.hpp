@@ -86,6 +86,8 @@ class MatrixMultiplyCreator : public OperatorCreator {
 
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector3i64(
             ir_mat_a->type->shape[0], ir_mat_a->type->shape[1], ir_mat_b->type->shape[1]));
+        std::unique_ptr<ScopeGuard> pthread_block_scope;
+        ir_grid->enable_multi_thread = ir_mat_a->type->enable_multi_thread;
 
         auto ir_accessor_a = ir_builder->CreateAccessor(ir_mat_a);
         ir_accessor_a->transform_matrix(0, 0) = 1;

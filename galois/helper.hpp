@@ -30,7 +30,11 @@ class ScopeGuard {
         return self;
     }
 
-    ~ScopeGuard() { _todo(); }
+    ~ScopeGuard() {
+        if (_todo) {
+            _todo();
+        }
+    }
 
    private:
     std::function<void()> _todo;

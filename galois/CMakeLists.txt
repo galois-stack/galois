@@ -26,5 +26,4 @@ add_subdirectory(ir)
     # INTERFACE "-Werror"
 # )
 
-# add_subdirectory(ast)
-# add_subdirectory(parser)
+

@@ -67,6 +67,9 @@ set(CPUINFO_BUILD_PKG_CONFIG  OFF)
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/z3 EXCLUDE_FROM_ALL)
 
+add_library(thpool third_party/C-Thread-Pool/thpool.c)
+target_include_directories(thpool PUBLIC third_party/C-Thread-Pool)
+
 option(BUILD_SHARED_LIBS "Build shared libs" OFF) # 需要加入, 否则其并不是一个option
 # option(GALOIS_BUILD_EXAMPLES "Build Prajna examples" ON)
 # option(GALOIS_BUILD_TESTS "Build Prajna tests" ON)

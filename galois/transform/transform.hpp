@@ -1,58 +1,58 @@
 #pragma once
 
 #include <map>
+#include <set>
 
 #include "galois/helper.hpp"
+#include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
 
 namespace galois::transform {
 
-inline void EachTensor(std::shared_ptr<ir::Block> ir_grid,
+inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback);
 
 inline void EachTensor(std::shared_ptr<ir::Tensor> ir_value,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    callback(ir_value);
-    if (auto ir_instruction = Cast<ir::Instruction>(ir_value)) {
-        for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
-            EachTensor(ir_instruction->GetOperand(i), callback);
-        }
-    }
-    if (auto ir_grid = Cast<ir::Block>(ir_value)) {
-        // if (!ir_grid->is_local) {
-        EachTensor(ir_grid, callback);
-        // }
+    if (auto ir_block = Cast<ir::Block>(ir_value)) {
+        EachTensor(ir_block, callback);
+    } else {
+        callback(ir_value);
     }
 }
 
-inline void EachTensor(std::shared_ptr<ir::Block> ir_grid,
+inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    callback(ir_grid);
-    for (auto ir_value : ir_grid->values) {
+    callback(ir_block);
+    for (auto ir_value : ir_block->values) {
         EachTensor(ir_value, callback);
     }
 }
 
 template <typename Value_>
-inline void Each(std::shared_ptr<ir::Block> ir_grid,
+inline void Each(std::shared_ptr<ir::Block> ir_block,
                  std::function<void(std::shared_ptr<Value_>)> callback) {
-    EachTensor(ir_grid, [=](auto ir_e) {
+    EachTensor(ir_block, [=](auto ir_e) {
         if (auto ir_value_ = Cast<Value_>(ir_e)) {
             callback(ir_value_);
         }
     });
 }
 
-template <typename Value_>
-inline void Each(std::shared_ptr<ir::OperatorInstance> ir_operator,
-                 std::function<void(std::shared_ptr<Value_>)> callback) {
-    for (auto ir_value : ir_operator->values) {
-        if (auto ir_block = Cast<ir::Block>(ir_value)) {
-            Each<Value_>(ir_block, callback);
-        } else {
-            callback(Cast<Value_>(ir_value));
+inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
+    std::shared_ptr<ir::Block> ir_block) {
+    std::set<std::shared_ptr<ir::Tensor>> ir_captured_tensor_set;
+
+    Each<ir::Instruction>(ir_block, [&](std::shared_ptr<ir::Instruction> ir_instruction) {
+        for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
+            auto ir_operand = ir_instruction->GetOperand(i);
+            if (!ir_operand->IsInsideOf(ir_block) && !Is<ir::OperatorFunction>(ir_operand)) {
+                ir_captured_tensor_set.insert(ir_operand);
+            }
         }
-    }
+    });
+
+    return ir_captured_tensor_set;
 }
 
 template <typename Matrix_>
@@ -178,17 +178,16 @@ inline void TileWithLayout(std::shared_ptr<ir::Grid> ir_grid, Eigen::VectorXi64 
 
 inline std::shared_ptr<ir::Grid> ExtractInnerGrid(std::shared_ptr<ir::Grid> ir_grid,
                                                   std::int64_t inner_dim_size) {
-    auto ir_inner_parallel = ir::Grid::Create();
-    ir_inner_parallel->shape = ir_grid->shape.bottomRows(inner_dim_size);
+    auto ir_inner_grid = ir::Grid::Create(ir_grid->shape.bottomRows(inner_dim_size));
     ir_grid->shape = (ir_grid->shape.topRows(ir_grid->shape.size() - inner_dim_size)).eval();
 
-    ir_inner_parallel->values = ir_grid->values;
-    ir_inner_parallel->is_local = false;
-    ir_inner_parallel->parent_parallel = ir_grid;
-    ir_grid->values = {ir_inner_parallel};
-    ir_inner_parallel->name = "inner";
+    ir_inner_grid->values = ir_grid->values;
+    ir_inner_grid->is_local = false;
+    ir_inner_grid->parent_grid = ir_grid;
+    ir_grid->values = {ir_inner_grid};
+    ir_inner_grid->name = "inner";
 
-    return ir_inner_parallel;
+    return ir_inner_grid;
 }
 
 inline void Vectorize(std::shared_ptr<ir::Grid> ir_grid, std::int64_t simd_size) {
@@ -241,13 +240,13 @@ inline void ExpandInstruction(std::shared_ptr<ir::Grid> ir_grid, int64_t copy_si
     ir_grid->shape.bottomRows(1)[0] /= copy_size;
 }
 
-inline void LayerMemory(std::shared_ptr<ir::OperatorInstance> ir_operator) {
+inline void LayerMemory(std::shared_ptr<ir::OperatorFunction> ir_operator) {
     auto ir_grid = Cast<ir::Grid>(ir_operator->values.front());
-    auto ir_inner_parallel = Cast<ir::Grid>(ir_grid->values.front());
+    auto ir_inner_grid = Cast<ir::Grid>(ir_grid->values.front());
 
     std::multimap<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Accessor>>
         tensor_accessor_multimap;
-    Each<ir::Accessor>(ir_inner_parallel, [&](std::shared_ptr<ir::Accessor> ir_accessor) {
+    Each<ir::Accessor>(ir_inner_grid, [&](std::shared_ptr<ir::Accessor> ir_accessor) {
         tensor_accessor_multimap.insert({ir_accessor->Tensor(), ir_accessor});
     });
 
@@ -282,7 +281,7 @@ inline void LayerMemory(std::shared_ptr<ir::OperatorInstance> ir_operator) {
         Eigen::VectorXi64 local_tensor_shape =
             ir_accessor_tmp->transform_matrix.rightCols(ir_accessor_tmp->transform_matrix.cols() -
                                                         ir_grid->shape.size()) *
-            ir_inner_parallel->shape;
+            ir_inner_grid->shape;
 
         // Copy memory to local tensor
         auto ir_local_tensor =
@@ -291,9 +290,8 @@ inline void LayerMemory(std::shared_ptr<ir::OperatorInstance> ir_operator) {
         // TODO: 后面需要调整, 目前仅支持accessor一样的
         auto ir_accessor = accessor_range.first->second;
         if (is_readed) {
-            auto ir_load_parallel = ir::Grid::Create();
-            ir_load_parallel->is_local = false;
-            ir_load_parallel->shape = ir_inner_parallel->shape;
+            auto ir_load_grid = ir::Grid::Create(ir_inner_grid->shape);
+            ir_load_grid->is_local = false;
             auto local_accessor_a = ir_accessor->transform_matrix;
             local_accessor_a.leftCols(ir_grid->shape.size()).setZero();
             auto ir_local_accessor =
@@ -305,17 +303,16 @@ inline void LayerMemory(std::shared_ptr<ir::OperatorInstance> ir_operator) {
             ir_global_accessor->simd_size = ir_accessor->simd_size;
             ir_global_accessor->simd_shuffle = ir_accessor->simd_shuffle;
             auto ir_write_accessor = ir::Write::Create(ir_global_accessor, ir_local_accessor);
-            ir_load_parallel->values.push_back(ir_write_accessor);
-            ir_grid->values.push_front(ir_load_parallel);
-            ir_load_parallel->parent_parallel = ir_grid;
+            ir_load_grid->values.push_back(ir_write_accessor);
+            ir_grid->values.push_front(ir_load_grid);
+            ir_load_grid->parent_grid = ir_grid;
 
-            ir_load_parallel->name = "copy" + std::to_string(i);
+            ir_load_grid->name = "copy" + std::to_string(i);
         }
 
         if (is_written) {
-            auto ir_store_parallel = ir::Grid::Create();
-            ir_store_parallel->is_local = false;
-            ir_store_parallel->shape = ir_inner_parallel->shape;
+            auto ir_store_grid = ir::Grid::Create(ir_inner_grid->shape);
+            ir_store_grid->is_local = false;
             auto local_accessor_a = ir_accessor->transform_matrix;
             local_accessor_a.leftCols(ir_grid->shape.size()).setZero();
             auto ir_local_accessor =
@@ -327,11 +324,11 @@ inline void LayerMemory(std::shared_ptr<ir::OperatorInstance> ir_operator) {
             auto ir_write_accessor = ir::Write::Create(ir_local_accessor, ir_global_accessor);
             ir_global_accessor->simd_size = ir_accessor->simd_size;
             ir_global_accessor->simd_shuffle = ir_accessor->simd_shuffle;
-            ir_store_parallel->values.push_back(ir_write_accessor);
-            ir_store_parallel->parent_parallel = ir_grid;
-            ir_grid->values.push_back(ir_store_parallel);
+            ir_store_grid->values.push_back(ir_write_accessor);
+            ir_store_grid->parent_grid = ir_grid;
+            ir_grid->values.push_back(ir_store_grid);
 
-            ir_store_parallel->name = "store" + std::to_string(i);
+            ir_store_grid->name = "store" + std::to_string(i);
         }
 
         ++i;
@@ -346,13 +343,13 @@ inline void LayerMemory(std::shared_ptr<ir::OperatorInstance> ir_operator) {
     }
 }
 
-inline void LayerMemory2(std::shared_ptr<ir::OperatorInstance> ir_operator) {
-    auto ir_outer_parallel = Cast<ir::Grid>(ir_operator->values.front());
-    auto ir_inner_parallel = Cast<ir::Grid>(ir_outer_parallel->values.front());
+inline void LayerMemory2(std::shared_ptr<ir::OperatorFunction> ir_operator) {
+    auto ir_outer_grid = Cast<ir::Grid>(ir_operator->values.front());
+    auto ir_inner_grid = Cast<ir::Grid>(ir_outer_grid->values.front());
 
     std::multimap<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Accessor>>
         tensor_accessor_multimap;
-    Each<ir::Accessor>(ir_inner_parallel, [&](std::shared_ptr<ir::Accessor> ir_accessor) {
+    Each<ir::Accessor>(ir_inner_grid, [&](std::shared_ptr<ir::Accessor> ir_accessor) {
         tensor_accessor_multimap.insert({ir_accessor->Tensor(), ir_accessor});
     });
 
@@ -386,11 +383,11 @@ inline void LayerMemory2(std::shared_ptr<ir::OperatorInstance> ir_operator) {
         auto ir_accessor_tmp = accessor_range.first->second;
         Eigen::VectorXi64 local_tensor_type_shape =
             ir_accessor_tmp->transform_matrix.rightCols(ir_accessor_tmp->transform_matrix.cols() -
-                                                        ir_outer_parallel->shape.size()) *
-            ir_inner_parallel->shape;
+                                                        ir_outer_grid->shape.size()) *
+            ir_inner_grid->shape;
         Eigen::VectorXi64 local_tensor_shape =
-            (ir_accessor_tmp->transform_matrix.leftCols(ir_outer_parallel->shape.size()) *
-             ir_outer_parallel->shape)
+            (ir_accessor_tmp->transform_matrix.leftCols(ir_outer_grid->shape.size()) *
+             ir_outer_grid->shape)
                 .eval();
         local_tensor_shape.array() /= local_tensor_type_shape.array();
 
@@ -406,13 +403,12 @@ inline void LayerMemory2(std::shared_ptr<ir::OperatorInstance> ir_operator) {
 
         // TODO: 后面需要调整, 目前仅支持accessor一样的
         auto ir_accessor = accessor_range.first->second;
-        auto ir_copy_parallel_outer = ir::Grid::Create();
-        ir_copy_parallel_outer->is_local = true;
-        ir_copy_parallel_outer->shape = ir_outer_parallel->shape;
-        ir_operator->values.push_front(ir_copy_parallel_outer);
+        auto ir_copy_grid_outer = ir::Grid::Create(ir_outer_grid->shape);
+        ir_copy_grid_outer->is_local = true;
+        ir_operator->values.push_front(ir_copy_grid_outer);
         ir_operator->values.push_front(ir_local_tensor);
         Eigen::MatrixXi64 ir_accessor_outer_transform_matrix =
-            Eigen::MatrixXi64::Zero(local_tensor_shape.size(), ir_outer_parallel->shape.size());
+            Eigen::MatrixXi64::Zero(local_tensor_shape.size(), ir_outer_grid->shape.size());
         for (int64_t i = 0; i < ir_accessor_outer_transform_matrix.rows(); ++i) {
             for (int64_t j = 0; j < ir_accessor_outer_transform_matrix.cols(); ++j) {
                 if (ir_accessor->transform_matrix(i, j) != 0) {
@@ -423,19 +419,18 @@ inline void LayerMemory2(std::shared_ptr<ir::OperatorInstance> ir_operator) {
         auto ir_local_accessor_outer =
             ir::Accessor::Create(ir_local_tensor, ir_accessor_outer_transform_matrix,
                                  Eigen::VectorXi64::Zero(local_tensor_shape.size()));
-        ir_copy_parallel_outer->values.push_back(ir_local_accessor_outer);
+        ir_copy_grid_outer->values.push_back(ir_local_accessor_outer);
 
-        auto ir_copy_parallel_inner = ir::Grid::Create();
-        ir_copy_parallel_inner->is_local = false;
-        ir_copy_parallel_inner->shape = ir_inner_parallel->shape;
-        ir_copy_parallel_outer->values.push_back(ir_copy_parallel_inner);
+        auto ir_copy_grid_inner = ir::Grid::Create(ir_inner_grid->shape);
+        ir_copy_grid_inner->is_local = false;
+        ir_copy_grid_outer->values.push_back(ir_copy_grid_inner);
 
         // auto local_accessor_a = ir_accessor->transform_matrix;
-        // local_accessor_a.rightCols(ir_inner_parallel->shape.size()).setZero();
+        // local_accessor_a.rightCols(ir_inner_grid->shape.size()).setZero();
         // for (int64_t i = 0; i < )
         // local_accessor_a.leftCols(ir_grid->shape.size()).setZero();
         Eigen::MatrixXi64 ir_inner_accessor_transform_matrix = ir_accessor->transform_matrix;
-        ir_inner_accessor_transform_matrix.leftCols(ir_outer_parallel->shape.size()).setZero();
+        ir_inner_accessor_transform_matrix.leftCols(ir_outer_grid->shape.size()).setZero();
         auto ir_local_accessor_inner =
             ir::Accessor::Create(ir_local_accessor_outer, ir_inner_accessor_transform_matrix,
                                  Eigen::VectorXi64::Zero(local_tensor_type_shape.size()));
@@ -443,13 +438,13 @@ inline void LayerMemory2(std::shared_ptr<ir::OperatorInstance> ir_operator) {
         auto ir_global_accessor = ir::Accessor::Create(
             ir_accessor->Tensor(), ir_accessor->transform_matrix, ir_accessor->shift_vector);
         auto ir_write_accessor = ir::Write::Create(ir_global_accessor, ir_local_accessor_inner);
-        ir_copy_parallel_inner->values.push_back(ir_write_accessor);
+        ir_copy_grid_inner->values.push_back(ir_write_accessor);
 
         for (auto accessor_iter = accessor_range.first; accessor_iter != accessor_range.second;
              ++accessor_iter) {
             auto ir_accessor = accessor_iter->second;
             Eigen::MatrixXi64 ir_accessor_outer_transform_matrix =
-                Eigen::MatrixXi64::Zero(local_tensor_shape.size(), ir_outer_parallel->shape.size());
+                Eigen::MatrixXi64::Zero(local_tensor_shape.size(), ir_outer_grid->shape.size());
             for (int64_t i = 0; i < ir_accessor_outer_transform_matrix.rows(); ++i) {
                 for (int64_t j = 0; j < ir_accessor_outer_transform_matrix.cols(); ++j) {
                     if (ir_accessor->transform_matrix(i, j) != 0) {
@@ -461,7 +456,7 @@ inline void LayerMemory2(std::shared_ptr<ir::OperatorInstance> ir_operator) {
                 ir::Accessor::Create(ir_local_tensor, ir_accessor_outer_transform_matrix,
                                      Eigen::VectorXi64::Zero(local_tensor_shape.size()));
             ir_accessor->Tensor() = ir_local_accessor_outer;
-            ir_accessor->transform_matrix.leftCols(ir_outer_parallel->shape.size()) =
+            ir_accessor->transform_matrix.leftCols(ir_outer_grid->shape.size()) =
                 ir_accessor_outer_transform_matrix;
         }
     }
@@ -496,17 +491,59 @@ inline void RemoveUselessDim(std::shared_ptr<ir::Grid> ir_grid) {
     }
 }
 
-inline void Repeat(std::shared_ptr<ir::OperatorInstance> ir_operator, int64_t times) {
-    auto ir_repeat_parallel = ir::Grid::Create();
-    ir_repeat_parallel->shape.resize(1);
-    ir_repeat_parallel->shape[0] = times;
+inline void Repeat(std::shared_ptr<ir::OperatorFunction> ir_operator, int64_t times) {
+    Eigen::VectorXi64 grid_shape(1);
+    grid_shape[0] = times;
+    auto ir_repeat_grid = ir::Grid::Create(grid_shape);
 
     for (auto ir_value : ir_operator->values) {
-        ir_repeat_parallel->values.push_back(ir_value);
+        ir_repeat_grid->values.push_back(ir_value);
     }
 
     ir_operator->values.clear();
-    ir_operator->values.push_back(ir_repeat_parallel);
+    ir_operator->values.push_back(ir_repeat_grid);
+}
+
+inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
+    auto ir_captured_tensor_set = CaptureExternalTensors(ir_block);
+    std::vector<std::shared_ptr<ir::TensorType>> input_types;
+    std::transform(RANGE(ir_captured_tensor_set), std::back_inserter(input_types),
+                   [](std::shared_ptr<ir::Tensor> ir_tensor) {
+                       GALOIS_ASSERT(ir_tensor->type);
+                       return ir_tensor->type;
+                   });
+    std::vector<std::shared_ptr<ir::TensorType>> output_types;
+    auto ir_operator_function = ir::OperatorFunction::Create(input_types, output_types);
+    ir_operator_function->name = "__tmp_todo";
+    ir_operator_function->fullname = ir_operator_function->name;
+    std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>>
+        captured_tensor_dict;
+    auto ir_captured_tensor_set_iter = ir_captured_tensor_set.begin();
+    for (int64_t i = 0; i < ir_captured_tensor_set.size(); ++i, ++ir_captured_tensor_set_iter) {
+        captured_tensor_dict[*ir_captured_tensor_set_iter] = ir_operator_function->inputs[i];
+    }
+
+    ir_operator_function->values = std::move(ir_block->values);
+    EachTensor(Cast<ir ::Block>(ir_operator_function), [=](std::shared_ptr<ir::Tensor> ir_tensor) {
+        if (auto ir_instruction = Cast<ir::Instruction>(ir_tensor)) {
+            for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
+                auto ir_operand = ir_instruction->GetOperand(i);
+                if (ir_captured_tensor_set.count(ir_operand)) {
+                    ir_instruction->SetOperand(i, captured_tensor_dict.at(ir_operand));
+                }
+            }
+        }
+    });
+
+    auto ir_builder = ir::Builder::Create();
+    ir_block->values.clear();
+    ir_block->values.push_back(ir_operator_function);
+    ir_builder->block_stack.push(ir_block);
+    ir_builder->iterator_stack.push(ir_block->values.end());
+    std::vector<std::shared_ptr<ir::Tensor>> ir_captured_tensor_vec(RANGE(ir_captured_tensor_set));
+    auto ir_call = ir_builder->Create<ir::Call>(ir_operator_function, ir_captured_tensor_vec,
+                                                std::vector<std::shared_ptr<ir::Tensor>>{});
+    ir_call->annotation_dict["enable_multi_thread"] = {};
 }
 
 // inline void CombineElementwiseOperators(std::shared_ptr<ir::Model> ir_model) {

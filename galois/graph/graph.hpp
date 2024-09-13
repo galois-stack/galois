@@ -37,15 +37,6 @@ class OperatorTag {
     virtual ~OperatorTag() {}
 };
 
-class Add : public OperatorTag {};
-
-class Sub : public OperatorTag {};
-class Div : public OperatorTag {};
-class Mul : public OperatorTag {};
-class Slice : public OperatorTag {};
-class Pack : public OperatorTag {};
-class Copy : public OperatorTag {};
-
 class MatrixMultiply {};
 
 // static op::AddCreator add_creator;

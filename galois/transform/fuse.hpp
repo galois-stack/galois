@@ -4,6 +4,6 @@
 
 namespace galois::transform {
 
-// void Fuse(ir::OperatorInstance op0, ir::OperatorInstance op1) {}
+// void Fuse(ir::OperatorFunction op0, ir::OperatorFunction op1) {}
 
 }  // namespace galois::transform
