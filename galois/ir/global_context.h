@@ -25,5 +25,7 @@ class GlobalContext {
 
 extern GlobalContext global_context;
 extern TensorTypePointer f32;
+extern TensorTypePointer i64;
+extern TensorTypePointer bool_;
 
 }  // namespace galois::ir

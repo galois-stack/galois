@@ -3,11 +3,12 @@
 
 #include "galois/galois.hpp"
 #include "galois/graph/graph.hpp"
-#include "galois/lowering/lowering.hpp"
 #include "galois/op/affine_convertor.hpp"
 #include "galois/op/op.hpp"
 #include "gtest/gtest.h"
 #include "prajna/bindings/core.hpp"
+#include "prajna/jit/execution_engine.h"
+#include "thpool.h"
 
 using namespace galois;
 using namespace galois::ir;
@@ -17,10 +18,24 @@ namespace Eigen {
 typedef Matrix<float, -1, -1, Eigen::RowMajor || Eigen::Aligned16> MatrixRXf;
 }
 
+std::shared_ptr<prajna::Compiler> CreateCompiler() {
+    auto prajna_compiler = prajna::Compiler::Create();
+    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_init),
+                                               "thpool_init");
+    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_add_work),
+                                               "thpool_add_work");
+    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_wait),
+                                               "thpool_wait");
+    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_destroy),
+                                               "thpool_destroy");
+    return prajna_compiler;
+}
+
 TEST(GaloisTests, TestMatrixMultiply) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(4, 1)(2, 1)(1, 1024)(128, 1);
-    auto ir_ts_type_b = f32(1, 4)(1, 2)(1024, 1)(1, 128);
+    auto ir_ts_type_a = f32(4, 1)(2, 1)(1, 1024)(128, 1)(4, 1);
+    ir_ts_type_a->enable_multi_thread = true;
+    auto ir_ts_type_b = f32(1, 4)(1, 2)(1024, 1)(1, 128)(1, 4);
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
 
@@ -32,10 +47,16 @@ TEST(GaloisTests, TestMatrixMultiply) {
 
     auto ir_affine_convertor = graph::AffineConvertor::Create();
     auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
-    auto prajna_compiler = prajna::Compiler::Create();
+    transform::Each<ir::Grid>(ir_operator, [](std::shared_ptr<ir::Grid> ir_grid) {
+        if (ir_grid->enable_multi_thread) {
+            transform::AsyncInvokeByThreadPool(ir_grid);
+        }
+    });
+
+    auto prajna_compiler = CreateCompiler();
     auto llvm_codegen = std::make_shared<codegen::cpu::LlvmCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorInstance(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->prajna_ir_builder->module);
+    llvm_codegen->EmitOperatorFunction(ir_operator);
+    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
         prajna_compiler->GetSymbolValue("::tmp_module"));
 
@@ -54,8 +75,9 @@ TEST(GaloisTests, TestMatrixMultiply) {
 
 TEST(GaloisTests, TestGemm) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(4, 1)(2, 1)(1, 1024)(128, 1);
-    auto ir_ts_type_b = f32(1, 4)(1, 2)(1024, 1)(1, 128);
+    auto ir_ts_type_a = f32(4, 1)(2, 1)(1, 1024)(128, 1)(4, 1);
+    ir_ts_type_a->enable_multi_thread = true;
+    auto ir_ts_type_b = f32(1, 4)(1, 2)(1024, 1)(1, 128)(1, 4);
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -74,10 +96,16 @@ TEST(GaloisTests, TestGemm) {
 
     auto ir_affine_convertor = graph::AffineConvertor::Create();
     auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
-    auto prajna_compiler = prajna::Compiler::Create();
+    transform::Each<ir::Grid>(ir_operator, [](std::shared_ptr<ir::Grid> ir_grid) {
+        if (ir_grid->enable_multi_thread) {
+            transform::AsyncInvokeByThreadPool(ir_grid);
+        }
+    });
+
+    auto prajna_compiler = CreateCompiler();
     auto llvm_codegen = std::make_shared<codegen::cpu::LlvmCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorInstance(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->prajna_ir_builder->module);
+    llvm_codegen->EmitOperatorFunction(ir_operator);
+    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
         prajna_compiler->GetSymbolValue("::tmp_module"));
 

@@ -37,7 +37,9 @@ typedef Eigen::RowVector<std::shared_ptr<prajna::ir::Value>, -1> RowVectorXprajn
 
 namespace galois::ir {
 
-class OperatorInstance;
+namespace pir = prajna::ir;
+
+class OperatorFunction;
 
 class TensorType;
 
@@ -54,7 +56,7 @@ class Type : public Named {
     // @ref https://llvm.org/docs/LangRef.html#langref-datalayout
     // bytes是多少可参阅datalyout的描述
     int64_t bytes = 0;
-    std::shared_ptr<prajna::ir::Type> prajna_ir_type;
+    std::shared_ptr<pir::Type> pir_type;
 };
 
 class Instruction;
@@ -108,7 +110,7 @@ class IntType : public RealNumberType {
     IntType() = default;
 
    public:
-    static std::shared_ptr<IntType> Create(int64_t bits, bool is_signed) {
+    static std::shared_ptr<IntType> CreateImp(int64_t bits, bool is_signed) {
         for (auto ir_type : global_context.created_types) {
             if (auto ir_int_type = Cast<IntType>(ir_type)) {
                 // if (Is<ir::CharType>(ir_type) || Is<ir::BoolType>(ir_type)) {
@@ -253,14 +255,6 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         return TensorType::Create(value_type, shape, layout);
     }
 
-    template <typename... Dims>
-    std::shared_ptr<TensorType> Tensor(Dims... dims) {
-        std::array<int64_t, std::tuple_size<std::tuple<Dims...>>::value> shape_array = {dims...};
-        Eigen::VectorXi64 shape(shape_array.size());
-        std::copy(RANGE(shape_array), shape.begin());
-        return TensorType::Create(this->shared_from_this(), shape);
-    }
-
     std::shared_ptr<TensorType> operator()(Eigen::VectorXi64 shape) {
         return TensorType::Create(this->shared_from_this(), shape);
     }
@@ -284,7 +278,10 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     MemoryType memory_type = MemoryType::Host;
     int64_t bytes = 0;
 
-    std::shared_ptr<prajna::ir::Type> prajna_ir_type;
+    std::vector<std::shared_ptr<TensorType>> input_types;
+    bool enable_multi_thread = false;
+
+    std::shared_ptr<pir::Type> pir_type;
 };
 
 class TensorTypePointer : public std::shared_ptr<TensorType> {
@@ -305,6 +302,7 @@ class TensorTypePointer : public std::shared_ptr<TensorType> {
 };
 
 class Viewer;
+class Block;
 
 class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
    protected:
@@ -338,15 +336,30 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
         this->is_finalized = true;
     }
 
-    std::shared_ptr<TensorType> GetTensorType() {
-        auto ir_tensor_type = Cast<TensorType>(this->type);
-        GALOIS_ASSERT(ir_tensor_type);
-        return ir_tensor_type;
-    }
-
     bool IsTensor() { return Is<TensorType>(this->type); }
 
     bool IsContinous() { return this->IsTensor() && !Is<Viewer>(this->shared_from_this()); }
+
+    std::shared_ptr<Block> ParentBlock() {
+        if (!this->parent_block) {
+            // GALOIS_ASSERT(Is<Block>(this->shared_from_this()));
+            return Cast<Block>(this->shared_from_this());
+        } else {
+            return Cast<Tensor>(this->parent_block)->ParentBlock();
+        }
+    }
+
+    bool IsInsideOf(std::shared_ptr<Block> ir_block) {
+        if (this->parent_block == ir_block) {
+            return true;
+        }
+
+        if (this->parent_block) {
+            return Cast<Tensor>(this->parent_block)->IsInsideOf(ir_block);
+        }
+
+        return false;
+    }
 
    private:
     bool is_finalized = false;
@@ -355,12 +368,12 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::shared_ptr<ir::TensorType> type = nullptr;
     std::unordered_map<std::string, std::list<std::string>> annotation_dict;
     std::list<InstructionAndOperandIndex> instruction_with_index_list;
+    std::shared_ptr<Block> parent_block = nullptr;
 
-    std::shared_ptr<prajna::ir::Value> prajna_ir_value = nullptr;
+    std::shared_ptr<pir::Value> pir_value = nullptr;
 
-    std::shared_ptr<OperatorInstance> inputted_operator = nullptr;
-    std::shared_ptr<OperatorInstance> outputted_operator = nullptr;
-
+    std::shared_ptr<OperatorFunction> inputted_operator = nullptr;
+    std::shared_ptr<OperatorFunction> outputted_operator = nullptr;
     std::string tag = "Value";
 };
 
@@ -505,13 +518,23 @@ class AffineIndex : public Tensor {
     Eigen::VectorXi64 shift_vector;
 };
 
+class GridIndexVector : public Tensor {
+   public:
+    static std::shared_ptr<GridIndexVector> Create(int64_t rank) {
+        std::shared_ptr<GridIndexVector> self(new GridIndexVector);
+        self->type = i64(rank);
+        self->tag = "GridIndexVector";
+        return self;
+    }
+};
+
 class Accessor : public Instruction {
    public:
     static std::shared_ptr<Accessor> Create(std::shared_ptr<Tensor> ir_tensor,
                                             Eigen::MatrixXi64 transform_matrix,
                                             Eigen::VectorXi64 shift_vector) {
         std::shared_ptr<Accessor> self(new Accessor);
-        self->OperandResize(1);
+        self->OperandResize(2);
         self->Tensor(ir_tensor);
         self->transform_matrix = transform_matrix;
         self->shift_vector = shift_vector;
@@ -542,6 +565,9 @@ class Accessor : public Instruction {
 
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    std::shared_ptr<class Tensor> Indices() { return this->GetOperand(1); }
+    void Indices(std::shared_ptr<class Tensor> ir_indices) { this->SetOperand(1, ir_indices); }
 
     std::shared_ptr<ir::Tensor> Clone() override {
         std::shared_ptr<Accessor> ir_new(new Accessor(*this));
@@ -777,12 +803,12 @@ class Block : public Tensor {
 };
 
 /// @brief An operator of tensors, which is liked as a node of ComputingGraph
-class OperatorInstance : public Block {
+class OperatorFunction : public Block {
    public:
-    static std::shared_ptr<OperatorInstance> Create(
+    static std::shared_ptr<OperatorFunction> Create(
         std::vector<std::shared_ptr<TensorType>> ir_input_types,
         std::vector<std::shared_ptr<TensorType>> ir_output_types) {
-        std::shared_ptr<OperatorInstance> self(new OperatorInstance);
+        std::shared_ptr<OperatorFunction> self(new OperatorFunction);
         self->input_types = ir_input_types;
         self->output_types = ir_output_types;
         std::transform(RANGE(self->input_types), std::back_inserter(self->inputs),
@@ -791,7 +817,7 @@ class OperatorInstance : public Block {
         std::transform(RANGE(self->output_types), std::back_inserter(self->outputs),
                        [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
 
-        self->tag = "OperatorInstance";
+        self->tag = "OperatorFunction";
         return self;
     }
 
@@ -800,37 +826,44 @@ class OperatorInstance : public Block {
     std::vector<std::shared_ptr<TensorType>> output_types;
     std::vector<std::shared_ptr<Tensor>> inputs;
     std::vector<std::shared_ptr<Tensor>> outputs;
-    std::shared_ptr<prajna::ir::Function> prajna_ir_function = nullptr;
+    std::shared_ptr<pir::Function> pir_function = nullptr;
 };
 
 class Grid : public Block {
    public:
-    static std::shared_ptr<Grid> Create() {
-        std::shared_ptr<Grid> self(new Grid);
-        self->tag = "Grid";
-        return self;
-    }
-
     static std::shared_ptr<Grid> Create(Eigen::VectorXi64 shape) {
         std::shared_ptr<Grid> self(new Grid);
+        self->indices = GridIndexVector::Create(shape.size());
         self->shape = shape;
         self->tag = "Grid";
         return self;
     }
 
     int64_t GetAffineDimSize() const {
-        if (this->parent_parallel && !this->is_local) {
-            return this->shape.size() + this->parent_parallel->GetAffineDimSize();
+        if (this->parent_grid && !this->is_local) {
+            return this->shape.size() + this->parent_grid->GetAffineDimSize();
         } else {
             return this->shape.size();
         }
     }
 
     Eigen::VectorXi64 shape;
-    std::shared_ptr<OperatorInstance> parent_operator = nullptr;
-    std::shared_ptr<Grid> parent_parallel = nullptr;
-    VectorXprajna prajna_ir_index_vector;
+    std::shared_ptr<GridIndexVector> indices = nullptr;
+    std::shared_ptr<OperatorFunction> parent_operator = nullptr;
+    std::shared_ptr<Grid> parent_grid = nullptr;
+    bool enable_multi_thread = false;
+
+    // VectorXprajna pir_index_vector;
     bool is_local = true;
+};
+
+class PthreadBlock : public Block {
+   public:
+    static std::shared_ptr<PthreadBlock> Create() {
+        std::shared_ptr<PthreadBlock> self(new PthreadBlock);
+        self->tag = "PthreadBlock";
+        return self;
+    }
 };
 
 class BitCast : public Instruction {
@@ -874,14 +907,14 @@ class Call : public Instruction {
     Call() = default;
 
    public:
-    static std::shared_ptr<Call> Create(std::shared_ptr<OperatorInstance> ir_operator,
+    static std::shared_ptr<Call> Create(std::shared_ptr<OperatorFunction> ir_operator,
                                         std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                                         std::vector<std::shared_ptr<ir::Tensor>> ir_outputs) {
         std::shared_ptr<Call> self(new Call);
         self->input_size = ir_inputs.size();
         self->output_size = ir_outputs.size();
         self->OperandResize(1 + self->input_size + self->output_size);
-        self->OperatorInstance(ir_operator);
+        self->OperatorFunction(ir_operator);
         auto iter_inputs = ir_inputs.begin();
         for (int64_t i = 0; i < self->InputSize(); ++i, ++iter_inputs) {
             self->Input(i, *iter_inputs);
@@ -896,10 +929,10 @@ class Call : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::OperatorInstance> OperatorInstance() {
-        return Cast<class OperatorInstance>(this->GetOperand(0));
+    std::shared_ptr<ir::OperatorFunction> OperatorFunction() {
+        return Cast<class OperatorFunction>(this->GetOperand(0));
     }
-    void OperatorInstance(std::shared_ptr<ir::OperatorInstance> ir_operator) {
+    void OperatorFunction(std::shared_ptr<ir::OperatorFunction> ir_operator) {
         this->SetOperand(0, ir_operator);
     }
 
@@ -950,6 +983,21 @@ class Free : public Instruction {
 
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+};
+
+class SparseType : public TensorType {
+   public:
+    std::shared_ptr<SparseType> Create(std::shared_ptr<TensorType> ir_tensor_type) {
+        std::shared_ptr<SparseType> self(new SparseType);
+        self->value_type = ir_tensor_type->value_type;
+        self->data_type = ir_tensor_type->data_type;
+
+        auto ir_mask_type = TensorType::Create(bool_, ir_tensor_type->shape);
+        self->mask_tensor = Tensor::Create(ir_mask_type);
+        return self;
+    }
+
+    std::shared_ptr<Tensor> mask_tensor;
 };
 
 class Builder;
@@ -1014,6 +1062,27 @@ inline std::shared_ptr<TensorType> FloatType::Create(int64_t bits) {
 
     self->name = self->data_type->name + "[]";
     self->fullname = self->name;
+    self->bytes = self->data_type->bytes;
+    global_context.created_types.push_back(self);
+    return self;
+}
+
+template <typename DataType, typename... Args>
+inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
+    auto ir_data_type = DataType::CreateImp(args...);
+    auto fullname = ir_data_type->name + "[]";
+    for (auto ir_type : global_context.created_types) {
+        if (ir_type->fullname == fullname) {
+            return Cast<TensorType>(ir_type);
+        }
+    }
+
+    std::shared_ptr<TensorType> self(new TensorType);
+    self->value_type = nullptr;
+    self->data_type = ir_data_type;
+    self->shape.resize(0);
+    self->stride.resize(0);
+    self->fullname = fullname;
     self->bytes = self->data_type->bytes;
     global_context.created_types.push_back(self);
     return self;

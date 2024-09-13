@@ -18,7 +18,7 @@ class AffineConvertor {
         return self;
     }
 
-    std::shared_ptr<OperatorInstance> EmitModule(std::shared_ptr<ComputeGraph> ir_module) {
+    std::shared_ptr<OperatorFunction> EmitModule(std::shared_ptr<ComputeGraph> ir_module) {
         /// TODO: 名字还需要进一步细化
         std::vector<std::shared_ptr<TensorType>> ir_input_types;
         /// TODO: output 需要处理
@@ -76,7 +76,7 @@ class AffineConvertor {
         std::vector<std::shared_ptr<TensorType>> ir_output_types = {ir_compute->type};
         std::transform(RANGE(ir_compute->inputs), std::back_inserter(ir_input_types),
                        [](std::shared_ptr<ComputeNode> ir_compute) { return ir_compute->type; });
-        std::shared_ptr<OperatorInstance> ir_operator_tmp;
+        std::shared_ptr<OperatorFunction> ir_operator_tmp;
         {
             auto [ir_operator, scope_guard] =
                 this->ir_builder->CreateOperator(ir_input_types, ir_output_types, name);
@@ -94,7 +94,7 @@ class AffineConvertor {
     }
 
    public:
-    std::shared_ptr<OperatorInstance> ir_entry_operator;
+    std::shared_ptr<OperatorFunction> ir_entry_operator;
     std::shared_ptr<Builder> ir_builder;
     std::map<std::shared_ptr<ComputeNode>, std::shared_ptr<ir::Tensor>> tensor_map;
     std::int64_t compute_count = 0;

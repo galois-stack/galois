@@ -1,9 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 #include "galois/helper.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/transform/transform.hpp"
 #include "prajna/ir/ir.hpp"
 #include "prajna/lowering/ir_builder.hpp"
 
@@ -15,87 +17,105 @@ class LlvmCodegen {
    public:
     LlvmCodegen(std::shared_ptr<prajna::lowering::SymbolTable> prajna_symbol_table) {
         // auto ir_symbol_table = prajna::lowering::SymbolTable::Create(nullptr);
-        auto prajna_ir_module = prajna::ir::Module::Create();
-        auto prajna_ir_logger = prajna::Logger::Create("");
-        prajna_ir_module->symbol_table = prajna_symbol_table;
-        this->prajna_ir_builder = prajna::lowering::IrBuilder::Create(
-            prajna_symbol_table, prajna_ir_module, prajna_ir_logger);
+        auto pir_module = pir::Module::Create();
+        auto pir_logger = prajna::Logger::Create("");
+        pir_module->symbol_table = prajna_symbol_table;
+        this->pir_builder =
+            prajna::lowering::IrBuilder::Create(prajna_symbol_table, pir_module, pir_logger);
 
         this->BindIntrinsics();
     }
 
     void DeclareIntrinsic() {
-        auto prajna_ir_i32_type = this->prajna_ir_builder->GetInt32Type();
-        auto prajna_ir_i32_pointer_type = prajna::ir::PointerType::Create(prajna_ir_i32_type);
-        auto prajna_ir_llvm_prefetch_function_type = prajna::ir::FunctionType::Create(
-            {prajna_ir_i32_pointer_type, prajna_ir_i32_type, prajna_ir_i32_type},
-            prajna::ir::VoidType::Create());
-        this->prajna_ir_builder->CreateFunction(prajna::ast::Identifier("llvm.prefetch"),
-                                                prajna_ir_llvm_prefetch_function_type);
+        auto pir_i32_type = pir_builder->GetInt32Type();
+        auto pir_i32_pointer_type = pir::PointerType::Create(pir_i32_type);
+        auto pir_llvm_prefetch_function_type = pir::FunctionType::Create(
+            {pir_i32_pointer_type, pir_i32_type, pir_i32_type}, pir::VoidType::Create());
+        pir_builder->CreateFunction(prajna::ast::Identifier("llvm.prefetch"),
+                                    pir_llvm_prefetch_function_type);
     }
 
-    std::shared_ptr<prajna::ir::Type> EmitType(std::shared_ptr<ir::TensorType> ir_type) {
-        if (ir_type->prajna_ir_type) {
-            return ir_type->prajna_ir_type;
+    std::shared_ptr<pir::Type> EmitType(std::shared_ptr<ir::TensorType> ir_type) {
+        if (ir_type->pir_type) {
+            return ir_type->pir_type;
         }
 
         if (ir_type->IsScalar()) {
             if (auto ir_float_type = Cast<ir::FloatType>(ir_type->data_type)) {
-                ir_type->prajna_ir_type = prajna::ir::FloatType::Create(ir_float_type->bits);
-                return ir_type->prajna_ir_type;
+                ir_type->pir_type = pir::FloatType::Create(ir_float_type->bits);
+                return ir_type->pir_type;
             }
+
+            if (auto ir_int_type = Cast<ir::IntType>(ir_type->data_type)) {
+                ir_type->pir_type = pir::IntType::Create(ir_int_type->bits, ir_int_type->is_signed);
+                return ir_type->pir_type;
+            }
+
+            GALOIS_TODO;
         }
 
         if (ir_type->shape.size() == 1 && ir_type->value_type->IsScalar() &&
             IsPowerOfTwo(ir_type->shape[0])) {
-            ir_type->prajna_ir_type = prajna::ir::VectorType::Create(
-                this->EmitType(ir_type->value_type), ir_type->Size());
-            return ir_type->prajna_ir_type;
+            ir_type->pir_type =
+                pir::VectorType::Create(this->EmitType(ir_type->value_type), ir_type->Size());
+            return ir_type->pir_type;
         } else {
-            ir_type->prajna_ir_type =
-                prajna::ir::ArrayType::Create(this->EmitType(ir_type->value_type), ir_type->Size());
-            return ir_type->prajna_ir_type;
+            ir_type->pir_type =
+                pir::ArrayType::Create(this->EmitType(ir_type->value_type), ir_type->Size());
+            return ir_type->pir_type;
         }
 
         GALOIS_TODO;
         return nullptr;
     }
 
+    void EmitGridIndexVector(std::shared_ptr<GridIndexVector> ir_indices) {
+        this->EmitType(ir_indices->type);
+        ir_indices->pir_value = pir_builder->Create<pir::LocalVariable>(ir_indices->type->pir_type);
+    }
+
     void EmitGrid(std::shared_ptr<ir::Grid> ir_grid) {
-        GALOIS_ASSERT(!ir_grid->prajna_ir_value);
-        if (this->parallel_stack.size()) {
-            ir_grid->parent_parallel = this->parallel_stack.top();
+        GALOIS_ASSERT(!ir_grid->pir_value);
+        if (this->grid_stack.size()) {
+            ir_grid->parent_grid = this->grid_stack.top();
         }
-        this->parallel_stack.push(ir_grid);
-        auto guard = ScopeGuard::Create([=]() { this->parallel_stack.pop(); });
+        this->grid_stack.push(ir_grid);
+        auto guard = ScopeGuard::Create([=]() { this->grid_stack.pop(); });
 
-        int64_t parent_index_size = 0;
-        if (!ir_grid->is_local) {
-            parent_index_size = ir_grid->parent_parallel->prajna_ir_index_vector.size();
-            ir_grid->prajna_ir_index_vector =
-                VectorXprajna::Zero(parent_index_size + ir_grid->shape.size());
-            ir_grid->prajna_ir_index_vector.topRows(parent_index_size) =
-                ir_grid->parent_parallel->prajna_ir_index_vector;
-
-        } else {
-            ir_grid->prajna_ir_index_vector = VectorXprajna::Zero(ir_grid->shape.size());
+        std::unique_ptr<ScopeGuard> thread_guard;
+        if (ir_grid->enable_multi_thread) {
+            auto pir_thread_num = pir_builder->GetInt32Constant(12);
+            auto pir_thread_pool = pir_builder->Create<pir::Call>(
+                this->pir_function_dict["thpool_init"], pir_thread_num);
+            this->pir_thpool = pir_thread_pool;
+            thread_guard = std::move(ScopeGuard::Create([=]() {
+                pir_builder->Create<pir::Call>(this->pir_function_dict["thpool_wait"],
+                                               pir_thread_pool);
+                pir_builder->Create<pir::Call>(this->pir_function_dict["thpool_destroy"],
+                                               pir_thread_pool);
+            }));
         }
+
+        this->EmitGridIndexVector(ir_grid->indices);
+
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
-            auto prajna_ir_first_value = this->prajna_ir_builder->GetInt64Constant(0);
-            auto prajna_ir_last_value =
-                this->prajna_ir_builder->GetInt64Constant(ir_grid->shape[i]);
-            auto ir_loop_block = prajna::ir::Block::Create();
-            auto prajna_ir_scalar_index =
-                this->prajna_ir_builder->Create<prajna::ir::LocalVariable>(
-                    this->prajna_ir_builder->GetInt64Type());
-            prajna_ir_scalar_index->fullname = "idx";
-            auto ir_for = this->prajna_ir_builder->Create<prajna::ir::For>(
-                prajna_ir_scalar_index, prajna_ir_first_value, prajna_ir_last_value, ir_loop_block);
-            if (!ir_grid->prajna_ir_value) {
-                ir_grid->prajna_ir_value = ir_for;
+            auto pir_first_value = pir_builder->GetInt64Constant(0);
+            auto pir_last_value = pir_builder->GetInt64Constant(ir_grid->shape[i]);
+            auto ir_loop_block = pir::Block::Create();
+            auto pir_scalar_index =
+                pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
+            pir_scalar_index->fullname = "idx";
+            auto ir_for = pir_builder->Create<pir::For>(pir_scalar_index, pir_first_value,
+                                                        pir_last_value, ir_loop_block);
+            if (!ir_grid->pir_value) {
+                ir_grid->pir_value = ir_for;
             }
-            this->prajna_ir_builder->PushBlock(ir_loop_block);
-            ir_grid->prajna_ir_index_vector[i + parent_index_size] = prajna_ir_scalar_index;
+            pir_builder->PushBlock(ir_loop_block);
+
+            pir_builder->Create<pir::WriteVariableLiked>(
+                pir_scalar_index,
+                pir_builder->Create<pir::IndexArray>(ir_grid->indices->pir_value,
+                                                     pir_builder->GetInt64Constant(i)));
         }
 
         for (auto ir_tensor : ir_grid->values) {
@@ -103,79 +123,68 @@ class LlvmCodegen {
         }
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
-            this->prajna_ir_builder->PopBlock();
+            pir_builder->PopBlock();
         }
     }
 
-    void EmitOperatorInstance(std::shared_ptr<ir::OperatorInstance> ir_operator) {
-        if (ir_operator->prajna_ir_value) {
-            return;
-        }
-
+    void EmitOperatorFunction(std::shared_ptr<ir::OperatorFunction> ir_operator) {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
-        std::list<std::shared_ptr<prajna::ir::Type>> prajna_ir_parameter_types;
+        std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
         for (auto ir_input_type : ir_operator->input_types) {
-            prajna_ir_parameter_types.push_back(
-                prajna::ir::PointerType::Create(this->EmitType(ir_input_type)));
+            pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_input_type)));
         }
 
         for (auto ir_output_type : ir_operator->output_types) {
-            prajna_ir_parameter_types.push_back(
-                prajna::ir::PointerType::Create(this->EmitType(ir_output_type)));
+            pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_output_type)));
         }
 
-        auto prajna_ir_function_type = prajna::ir::FunctionType::Create(
-            prajna_ir_parameter_types, prajna::ir::VoidType::Create());
+        auto pir_function_type =
+            pir::FunctionType::Create(pir_parameter_types, pir::VoidType::Create());
 
-        ir_operator->prajna_ir_function =
-            this->prajna_ir_builder->CreateFunction(ir_operator->name, prajna_ir_function_type);
-        ir_operator->prajna_ir_value = ir_operator->prajna_ir_function;
+        ir_operator->pir_function =
+            pir_builder->CreateFunction(ir_operator->name, pir_function_type);
+        ir_operator->pir_value = ir_operator->pir_function;
 
-        this->prajna_ir_builder->CreateTopBlockForFunction(ir_operator->prajna_ir_function);
+        pir_builder->CreateTopBlockForFunction(ir_operator->pir_function);
         auto prajna_guard = ScopeGuard::Create([=]() {
-            this->prajna_ir_builder->PopBlock();
-            this->prajna_ir_builder->function_stack.pop();
+            pir_builder->PopBlock();
+            pir_builder->function_stack.pop();
         });
 
-        auto prajna_ir_function_parameters_iter =
-            ir_operator->prajna_ir_function->parameters.begin();
+        auto pir_function_parameters_iter = ir_operator->pir_function->parameters.begin();
         for (int64_t i = 0; i < ir_operator->input_types.size(); ++i) {
-            ir_operator->inputs[i]->prajna_ir_value =
-                this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(
-                    *prajna_ir_function_parameters_iter);
-            (*prajna_ir_function_parameters_iter)->no_alias = true;
-            (*prajna_ir_function_parameters_iter)->no_capture = true;
-            (*prajna_ir_function_parameters_iter)->no_undef = true;
-            (*prajna_ir_function_parameters_iter)->readonly = true;
-            ++prajna_ir_function_parameters_iter;
+            ir_operator->inputs[i]->pir_value =
+                pir_builder->Create<pir::DeferencePointer>(*pir_function_parameters_iter);
+            (*pir_function_parameters_iter)->no_alias = true;
+            (*pir_function_parameters_iter)->no_capture = true;
+            (*pir_function_parameters_iter)->no_undef = true;
+            // (*pir_function_parameters_iter)->readonly = true;
+            ++pir_function_parameters_iter;
         }
 
         for (int64_t i = 0; i < ir_operator->output_types.size();
-             ++i, ++prajna_ir_function_parameters_iter) {
-            ir_operator->outputs[i]->prajna_ir_value =
-                this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(
-                    *prajna_ir_function_parameters_iter);
-            (*prajna_ir_function_parameters_iter)->no_alias = true;
-            (*prajna_ir_function_parameters_iter)->no_capture = true;
-            (*prajna_ir_function_parameters_iter)->no_undef = true;
+             ++i, ++pir_function_parameters_iter) {
+            ir_operator->outputs[i]->pir_value =
+                pir_builder->Create<pir::DeferencePointer>(*pir_function_parameters_iter);
+            (*pir_function_parameters_iter)->no_alias = true;
+            (*pir_function_parameters_iter)->no_capture = true;
+            (*pir_function_parameters_iter)->no_undef = true;
         }
 
         for (auto ir_tensor : ir_operator->values) {
             this->EmitTensor(ir_tensor);
         }
 
-        this->prajna_ir_builder->Create<prajna::ir::Return>(
-            this->prajna_ir_builder->Create<prajna::ir::VoidValue>());
+        pir_builder->Create<pir::Return>(pir_builder->Create<pir::VoidValue>());
     }
 
     void EmitWrite(std::shared_ptr<ir::Write> ir_write_accessor) {
         this->EmitTensor(ir_write_accessor->Variable());
         this->EmitTensor(ir_write_accessor->Tensor());
-        this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            ir_write_accessor->Tensor()->prajna_ir_value,
-            prajna::Cast<prajna::ir::VariableLiked>(
-                ir_write_accessor->Variable()->prajna_ir_value));
+        pir_builder->Create<pir::WriteVariableLiked>(
+            ir_write_accessor->Tensor()->pir_value,
+            prajna::Cast<pir::VariableLiked>(ir_write_accessor->Variable()->pir_value));
     }
 
     void EmitArithmeticInstruction(
@@ -186,54 +195,52 @@ class LlvmCodegen {
         auto ir_value_type = ir_arithmetic_instruction->type->data_type;
         GALOIS_ASSERT(Is<RealNumberType>(ir_value_type));
 
-        auto prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::None;
+        auto pir_binary_operation = pir::BinaryOperator::Operation::None;
         if (auto ir_add = Cast<ir::Add>(ir_arithmetic_instruction)) {
             if (Is<ir::FloatType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::FAdd;
+                pir_binary_operation = pir::BinaryOperator::Operation::FAdd;
             }
             if (Is<ir::IntType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::Add;
+                pir_binary_operation = pir::BinaryOperator::Operation::Add;
             }
         }
         if (auto ir_sub = Cast<ir::Sub>(ir_arithmetic_instruction)) {
             if (Is<ir::FloatType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::FSub;
+                pir_binary_operation = pir::BinaryOperator::Operation::FSub;
             }
             if (Is<ir::IntType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::Sub;
+                pir_binary_operation = pir::BinaryOperator::Operation::Sub;
             }
         }
         if (auto ir_mul = Cast<ir::Mul>(ir_arithmetic_instruction)) {
             if (Is<ir::FloatType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::FMul;
+                pir_binary_operation = pir::BinaryOperator::Operation::FMul;
             }
             if (Is<ir::IntType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::Mul;
+                pir_binary_operation = pir::BinaryOperator::Operation::Mul;
             }
         }
         if (auto ir_div = Cast<ir::Div>(ir_arithmetic_instruction)) {
             if (Is<FloatType>(ir_value_type)) {
-                prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::FDiv;
+                pir_binary_operation = pir::BinaryOperator::Operation::FDiv;
             }
             if (auto ir_int_type = Cast<IntType>(ir_value_type)) {
                 if (ir_int_type->is_signed) {
-                    prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::SDiv;
+                    pir_binary_operation = pir::BinaryOperator::Operation::SDiv;
                 } else {
-                    prajna_ir_binary_operation = prajna::ir::BinaryOperator::Operation::UDiv;
+                    pir_binary_operation = pir::BinaryOperator::Operation::UDiv;
                 }
             }
         }
-        GALOIS_ASSERT(prajna_ir_binary_operation != prajna::ir::BinaryOperator::Operation::None);
+        GALOIS_ASSERT(pir_binary_operation != pir::BinaryOperator::Operation::None);
 
-        ir_arithmetic_instruction->prajna_ir_value =
-            this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-                prajna_ir_binary_operation,
-                ir_arithmetic_instruction->GetOperand(0)->prajna_ir_value,
-                ir_arithmetic_instruction->GetOperand(1)->prajna_ir_value);
+        ir_arithmetic_instruction->pir_value = pir_builder->Create<pir::BinaryOperator>(
+            pir_binary_operation, ir_arithmetic_instruction->GetOperand(0)->pir_value,
+            ir_arithmetic_instruction->GetOperand(1)->pir_value);
     }
 
     void EmitTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
-        if (ir_tensor->prajna_ir_value) {
+        if (ir_tensor->pir_value) {
             return;
         }
 
@@ -241,6 +248,10 @@ class LlvmCodegen {
         //     this->EmitAffineIndex(ir_affine_index);
         //     return;
         // }
+
+        if (auto ir_pthread_block = Cast<ir::PthreadBlock>(ir_tensor)) {
+            this->EmitPthreadBlock(ir_pthread_block);
+        }
 
         if (auto ir_slice = Cast<ir::Slice>(ir_tensor)) {
             this->EmitSlice(ir_slice);
@@ -252,8 +263,8 @@ class LlvmCodegen {
             return;
         }
 
-        if (auto ir_operator = Cast<ir::OperatorInstance>(ir_tensor)) {
-            this->EmitOperatorInstance(ir_operator);
+        if (auto ir_operator = Cast<ir::OperatorFunction>(ir_tensor)) {
+            this->EmitOperatorFunction(ir_operator);
             return;
         }
 
@@ -266,9 +277,20 @@ class LlvmCodegen {
             this->EmitGrid(ir_grid);
             return;
         }
+
+        if (Is<ir::GridIndexVector>(ir_tensor)) {
+            // 在EmitGrid中处理
+            return;
+        }
+
+        GALOIS_UNREACHABLE;
     }
 
     void EmitInstruction(std::shared_ptr<ir::Instruction> ir_instruction) {
+        for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
+            this->EmitTensor(ir_instruction->GetOperand(i));
+        }
+
         if (auto ir_arithmetic_instruction = Cast<ir::ArithmeticInstruction>(ir_instruction)) {
             this->EmitArithmeticInstruction(ir_arithmetic_instruction);
             return;
@@ -324,15 +346,14 @@ class LlvmCodegen {
 
     void EmitConstant(std::shared_ptr<ir::Constant> ir_constant) {
         if (auto ir_constant_float = Cast<ir::ConstantFloat>(ir_constant)) {
-            ir_constant->prajna_ir_value =
-                this->prajna_ir_builder->Create<prajna::ir::ConstantFloat>(
-                    ir_constant->type->prajna_ir_type, ir_constant_float->value);
+            ir_constant->pir_value = pir_builder->Create<pir::ConstantFloat>(
+                ir_constant->type->pir_type, ir_constant_float->value);
             return;
         }
 
         if (auto ir_constant_int = Cast<ir::ConstantInt>(ir_constant)) {
-            ir_constant->prajna_ir_value = this->prajna_ir_builder->Create<prajna::ir::ConstantInt>(
-                ir_constant->type->prajna_ir_type, ir_constant_int->value);
+            ir_constant->pir_value = pir_builder->Create<pir::ConstantInt>(
+                ir_constant->type->pir_type, ir_constant_int->value);
             return;
         }
 
@@ -342,163 +363,150 @@ class LlvmCodegen {
     void EmitAccessor(std::shared_ptr<ir::Accessor> ir_accessor) {
         this->EmitTensor(ir_accessor->Tensor());
 
-        auto prajna_ir_linear_index = this->prajna_ir_builder->Create<prajna::ir::LocalVariable>(
-            this->prajna_ir_builder->GetInt64Type());
+        auto pir_linear_index =
+            pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
         auto s_product_b = ir_accessor->Tensor()->type->stride * ir_accessor->shift_vector;
 
         auto s_product_a = ir_accessor->Tensor()->type->stride * ir_accessor->transform_matrix;
 
-        RowVectorXprajna prajna_ir_s_product_a(s_product_a.size());
-        std::transform(RANGE(s_product_a), prajna_ir_s_product_a.begin(), [=](int64_t value) {
-            return this->prajna_ir_builder->Create<prajna::ir::ConstantInt>(
-                this->prajna_ir_builder->GetInt64Type(), value);
+        RowVectorXprajna pir_s_product_a(s_product_a.size());
+        std::transform(RANGE(s_product_a), pir_s_product_a.begin(), [=](int64_t value) {
+            return pir_builder->Create<pir::ConstantInt>(pir_builder->GetInt64Type(), value);
         });
 
-        this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            this->prajna_ir_builder->GetInt64Constant(0), prajna_ir_linear_index);
-        for (int64_t i = 0; i < prajna_ir_s_product_a.size(); ++i) {
+        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetInt64Constant(0),
+                                                     pir_linear_index);
+        for (int64_t i = 0; i < pir_s_product_a.size(); ++i) {
             if (s_product_a[i] == 0) {
                 continue;
             }
+            auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
+                ir_accessor->Indices()->pir_value, pir_builder->GetInt64Constant(i));
             if (s_product_a[i] == 1) {
-                auto prajna_ir_sum_tmp =
-                    this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-                        prajna::ir::BinaryOperator::Operation::Add,
-                        this->parallel_stack.top()->prajna_ir_index_vector[i],
-                        prajna_ir_linear_index);
-                this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-                    prajna_ir_sum_tmp, prajna_ir_linear_index);
+                auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
+                    pir::BinaryOperator::Operation::Add, pir_scalar_index, pir_linear_index);
+                pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
                 continue;
             }
-            auto prajna_ir_mul_tmp = this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-                prajna::ir::BinaryOperator::Operation::Mul, prajna_ir_s_product_a[i],
-                this->parallel_stack.top()->prajna_ir_index_vector[i]);
-            auto prajna_ir_sum_tmp = this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-                prajna::ir::BinaryOperator::Operation::Add, prajna_ir_mul_tmp,
-                prajna_ir_linear_index);
-            this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(prajna_ir_sum_tmp,
-                                                                            prajna_ir_linear_index);
+            GALOIS_ASSERT(ir_accessor->Indices());
+
+            auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
+                pir::BinaryOperator::Operation::Mul, pir_s_product_a[i], pir_scalar_index);
+            auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
+                pir::BinaryOperator::Operation::Add, pir_mul_tmp, pir_linear_index);
+            pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
         }
 
-        this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-                prajna::ir::BinaryOperator::Operation::Add, prajna_ir_linear_index,
-                this->prajna_ir_builder->GetInt64Constant(s_product_b)),
-            prajna_ir_linear_index);
+        pir_builder->Create<pir::WriteVariableLiked>(
+            pir_builder->Create<pir::BinaryOperator>(pir::BinaryOperator::Operation::Add,
+                                                     pir_linear_index,
+                                                     pir_builder->GetInt64Constant(s_product_b)),
+            pir_linear_index);
 
-        auto prajna_ir_tensor_value_type = this->EmitType(ir_accessor->Tensor()->type->value_type);
-        auto prajna_ir_tensor_pointer = this->prajna_ir_builder->Create<prajna::ir::BitCast>(
-            prajna::Cast<prajna::ir::DeferencePointer>(ir_accessor->Tensor()->prajna_ir_value)
-                ->Pointer(),
-            prajna::ir::PointerType::Create(prajna_ir_tensor_value_type));
+        auto pir_tensor_value_type = this->EmitType(ir_accessor->Tensor()->type->value_type);
+        auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
+            prajna::Cast<pir::DeferencePointer>(ir_accessor->Tensor()->pir_value)->Pointer(),
+            pir::PointerType::Create(pir_tensor_value_type));
         ;
         GALOIS_ASSERT(ir_accessor->Tensor()->type->value_type == ir_accessor->type);
 
-        auto prajna_ir_tensor_pointer_var =
-            this->prajna_ir_builder->Create<prajna::ir::LocalVariable>(
-                prajna_ir_tensor_pointer->type);
-        this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            prajna_ir_tensor_pointer, prajna_ir_tensor_pointer_var);
+        auto pir_tensor_pointer_var =
+            pir_builder->Create<pir::LocalVariable>(pir_tensor_pointer->type);
+        pir_builder->Create<pir::WriteVariableLiked>(pir_tensor_pointer, pir_tensor_pointer_var);
 
-        auto prajna_ir_value_poitner =
-            this->prajna_ir_builder->Create<prajna::ir::GetPointerElementPointer>(
-                this->prajna_ir_builder->Create<prajna::ir::GetAddressOfVariableLiked>(
-                    prajna_ir_tensor_pointer_var),
-                prajna_ir_linear_index);
+        auto pir_value_poitner = pir_builder->Create<pir::GetPointerElementPointer>(
+            pir_builder->Create<pir::GetAddressOfVariableLiked>(pir_tensor_pointer_var),
+            pir_linear_index);
 
-        // std::shared_ptr<prajna::ir::Value> prajna_ir_i64_value_address =
-        //     this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-        //         prajna::ir::BinaryOperator::Operation::Add,
-        //         this->prajna_ir_builder->Create<prajna::ir::CastInstruction>(
-        //             prajna::ir::CastInstruction::Operation::PtrToInt,
-        //             prajna_ir_tensor_pointer, this->prajna_ir_builder->GetInt64Type()),
-        //         this->prajna_ir_builder->Create<prajna::ir::BinaryOperator>(
-        //             prajna::ir::BinaryOperator::Operation::Mul,
-        //             this->prajna_ir_builder->GetInt64Constant(prajna_ir_tensor_value_type->bytes),
-        //             prajna_ir_linear_index));
+        // std::shared_ptr<pir::Value> pir_i64_value_address =
+        //     pir_builder->Create<pir::BinaryOperator>(
+        //         pir::BinaryOperator::Operation::Add,
+        //         pir_builder->Create<pir::CastInstruction>(
+        //             pir::CastInstruction::Operation::PtrToInt,
+        //             pir_tensor_pointer, pir_builder->GetInt64Type()),
+        //         pir_builder->Create<pir::BinaryOperator>(
+        //             pir::BinaryOperator::Operation::Mul,
+        //             pir_builder->GetInt64Constant(pir_tensor_value_type->bytes),
+        //             pir_linear_index));
 
-        // std::shared_ptr<prajna::ir::Tensor> prajna_ir_value_poitner = nullptr;
+        // std::shared_ptr<pir::Tensor> pir_value_poitner = nullptr;
         if (ir_accessor->simd_size == 1) {
-            // prajna_ir_value_poitner =
-            // this->prajna_ir_builder->Create<prajna::ir::CastInstruction>(
-            //     prajna::ir::CastInstruction::Operation::IntToPtr,
-            //     prajna_ir_i64_value_address,
-            //     prajna::ir::PointerType::Create(prajna_ir_tensor_value_type));
+            // pir_value_poitner =
+            // pir_builder->Create<pir::CastInstruction>(
+            //     pir::CastInstruction::Operation::IntToPtr,
+            //     pir_i64_value_address,
+            //     pir::PointerType::Create(pir_tensor_value_type));
         } else {
             GALOIS_TODO;
             // if (!ir_accessor->simd_shuffle) {
-            //     auto prajna_ir_simd_type =
-            //         prajna::ir::VectorType::CreateImp(prajna::Cast<prajna::ir::PointerType>(
-            //                                            ir_accessor->Tensor()->prajna_ir_value->type)
+            //     auto pir_simd_type =
+            //         pir::VectorType::CreateImp(prajna::Cast<pir::PointerType>(
+            //                                            ir_accessor->Tensor()->pir_value->type)
             //                                            ->value_type,
             //                                        ir_accessor->simd_size);
-            //     prajna_ir_data_ptr =
-            //     this->prajna_ir_builder->Create<prajna::ir::CastInstruction>(
-            //         prajna::ir::CastInstruction::Operation::IntToPtr, prajna_ir_data_address,
-            //         prajna::ir::PointerType::Create(prajna_ir_simd_type));
+            //     pir_data_ptr =
+            //     pir_builder->Create<pir::CastInstruction>(
+            //         pir::CastInstruction::Operation::IntToPtr, pir_data_address,
+            //         pir::PointerType::Create(pir_simd_type));
             // } else {
-            //     auto prajna_ir_simd_type =
-            //         prajna::ir::VectorType::CreateImp(prajna::Cast<prajna::ir::PointerType>(
-            //                                            ir_accessor->Tensor()->prajna_ir_value->type)
+            //     auto pir_simd_type =
+            //         pir::VectorType::CreateImp(prajna::Cast<pir::PointerType>(
+            //                                            ir_accessor->Tensor()->pir_value->type)
             //                                            ->value_type,
             //                                        ir_accessor->simd_size);
-            //     std::list<std::shared_ptr<prajna::ir::Constant>> prajna_constant_zero_list;
+            //     std::list<std::shared_ptr<pir::Constant>> prajna_constant_zero_list;
             //     for (int64_t i = 0; i < ir_accessor->simd_size; ++i) {
             //         prajna_constant_zero_list.push_back(
-            //             this->prajna_ir_builder->GetInt32Constant(0));
+            //             pir_builder->GetInt32Constant(0));
             //     }
-            //     auto prajna_ir_constant_vector_zero_mask =
-            //         this->prajna_ir_builder->Create<prajna::ir::ConstantVector>(
-            //             prajna_ir_simd_type, prajna_constant_zero_list);
-            //     prajna_ir_data_ptr =
-            //     this->prajna_ir_builder->Create<prajna::ir::CastInstruction>(
-            //         prajna::ir::CastInstruction::Operation::IntToPtr, prajna_ir_data_address,
-            //         ir_accessor->Tensor()->prajna_ir_value->type);
-            //     auto prajna_ir_vector =
-            //         this->prajna_ir_builder->Create<prajna::ir::LocalVariable>(prajna_ir_simd_type);
-            //     this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            //         this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(
-            //             prajna_ir_data_ptr),
-            //         this->prajna_ir_builder->Create<prajna::ir::IndexArray>(
-            //             prajna_ir_vector, this->prajna_ir_builder->GetInt64Constant(0)));
-            //     this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            //         this->prajna_ir_builder->Create<prajna::ir::ShuffleVector>(
-            //             prajna_ir_vector, prajna_ir_constant_vector_zero_mask),
-            //         prajna_ir_vector);
-            //     ir_accessor->prajna_ir_value = prajna_ir_vector;
+            //     auto pir_constant_vector_zero_mask =
+            //         pir_builder->Create<pir::ConstantVector>(
+            //             pir_simd_type, prajna_constant_zero_list);
+            //     pir_data_ptr =
+            //     pir_builder->Create<pir::CastInstruction>(
+            //         pir::CastInstruction::Operation::IntToPtr, pir_data_address,
+            //         ir_accessor->Tensor()->pir_value->type);
+            //     auto pir_vector =
+            //         pir_builder->Create<pir::LocalVariable>(pir_simd_type);
+            //     pir_builder->Create<pir::WriteVariableLiked>(
+            //         pir_builder->Create<pir::DeferencePointer>(
+            //             pir_data_ptr),
+            //         pir_builder->Create<pir::IndexArray>(
+            //             pir_vector, pir_builder->GetInt64Constant(0)));
+            //     pir_builder->Create<pir::WriteVariableLiked>(
+            //         pir_builder->Create<pir::ShuffleVector>(
+            //             pir_vector, pir_constant_vector_zero_mask),
+            //         pir_vector);
+            //     ir_accessor->pir_value = pir_vector;
             //     PRAJNA_ASSERT(!ir_accessor->IsWritten());
             //     return;
             //     GALOIS_TODO;
             // }
         }
 
-        ir_accessor->prajna_ir_value =
-            this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(prajna_ir_value_poitner);
+        ir_accessor->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
     }
 
     void EmitPrefetch(std::shared_ptr<ir::Prefetch> ir_prefetch) {
         this->EmitAccessor(ir_prefetch->Address());
-        auto prajna_ir_address =
-            this->prajna_ir_builder->GetAddressOf(ir_prefetch->Address()->prajna_ir_value);
+        auto pir_address = pir_builder->GetAddressOf(ir_prefetch->Address()->pir_value);
 
-        static std::shared_ptr<prajna::ir::Function> prajna_ir_prefetch_function = nullptr;
-        auto prajna_ir_i32_type = this->prajna_ir_builder->GetInt32Type();
-        auto prajna_ir_i32_pointer_type = prajna::ir::PointerType::Create(prajna_ir_i32_type);
-        if (!prajna_ir_prefetch_function) {
-            auto prajna_ir_llvm_prefetch_function_type =
-                prajna::ir::FunctionType::Create({prajna_ir_i32_pointer_type, prajna_ir_i32_type,
-                                                  prajna_ir_i32_type, prajna_ir_i32_type},
-                                                 prajna::ir::VoidType::Create());
-            prajna_ir_prefetch_function =
-                prajna::ir::Function::Create(prajna_ir_llvm_prefetch_function_type);
-            prajna_ir_prefetch_function->fullname = "llvm.prefetch";
-            prajna_ir_prefetch_function->parent_module = this->prajna_ir_builder->module;
-            this->prajna_ir_builder->module->functions.push_back(prajna_ir_prefetch_function);
+        static std::shared_ptr<pir::Function> pir_prefetch_function = nullptr;
+        auto pir_i32_type = pir_builder->GetInt32Type();
+        auto pir_i32_pointer_type = pir::PointerType::Create(pir_i32_type);
+        if (!pir_prefetch_function) {
+            auto pir_llvm_prefetch_function_type = pir::FunctionType::Create(
+                {pir_i32_pointer_type, pir_i32_type, pir_i32_type, pir_i32_type},
+                pir::VoidType::Create());
+            pir_prefetch_function = pir::Function::Create(pir_llvm_prefetch_function_type);
+            pir_prefetch_function->fullname = "llvm.prefetch";
+            pir_prefetch_function->parent_module = pir_builder->module;
+            pir_builder->module->functions.push_back(pir_prefetch_function);
         }
 
-        std::list<std::shared_ptr<prajna::ir::Value>> prajna_ir_arguments;
-        prajna_ir_arguments.push_back(this->prajna_ir_builder->Create<prajna::ir::BitCast>(
-            prajna_ir_address, prajna_ir_i32_pointer_type));
+        std::list<std::shared_ptr<pir::Value>> pir_arguments;
+        pir_arguments.push_back(
+            pir_builder->Create<pir::BitCast>(pir_address, pir_i32_pointer_type));
         /*``address`` is the address to be prefetched, ``rw`` is the specifier
         determining if the fetch should be for a read (0) or write (1), and
         ``locality`` is a temporal locality specifier ranging from (0) - no
@@ -506,113 +514,132 @@ class LlvmCodegen {
         specifies whether the prefetch is performed on the data (1) or
         instruction (0) cache. The ``rw``, ``locality`` and ``cache type``
         arguments must be constant integers.*/
-        prajna_ir_arguments.push_back(this->prajna_ir_builder->GetInt32Constant(0));
-        prajna_ir_arguments.push_back(this->prajna_ir_builder->GetInt32Constant(0));
-        prajna_ir_arguments.push_back(this->prajna_ir_builder->GetInt32Constant(1));
-        this->prajna_ir_builder->Create<prajna::ir::Call>(prajna_ir_prefetch_function,
-                                                          prajna_ir_arguments);
+        pir_arguments.push_back(pir_builder->GetInt32Constant(0));
+        pir_arguments.push_back(pir_builder->GetInt32Constant(0));
+        pir_arguments.push_back(pir_builder->GetInt32Constant(1));
+        pir_builder->Create<pir::Call>(pir_prefetch_function, pir_arguments);
     }
 
     void EmitBroadcast(std::shared_ptr<ir::Broadcast> ir_broadcast) {
         this->EmitTensor(ir_broadcast->Tensor());
         this->EmitType(ir_broadcast->type);
 
-        std::list<std::shared_ptr<prajna::ir::Constant>> prajna_constant_zero_list;
+        std::list<std::shared_ptr<pir::Constant>> prajna_constant_zero_list;
         for (int64_t i = 0; i < ir_broadcast->type->Size(); ++i) {
-            prajna_constant_zero_list.push_back(this->prajna_ir_builder->GetInt32Constant(0));
+            prajna_constant_zero_list.push_back(pir_builder->GetInt32Constant(0));
         }
-        auto prajna_ir_constant_vector_zero_mask =
-            this->prajna_ir_builder->Create<prajna::ir::ConstantVector>(
-                prajna::Cast<prajna::ir::VectorType>(ir_broadcast->type->prajna_ir_type),
-                prajna_constant_zero_list);
+        auto pir_constant_vector_zero_mask = pir_builder->Create<pir::ConstantVector>(
+            prajna::Cast<pir::VectorType>(ir_broadcast->type->pir_type), prajna_constant_zero_list);
 
-        auto prajna_ir_vector_tmp = this->prajna_ir_builder->Create<prajna::ir::LocalVariable>(
-            ir_broadcast->type->prajna_ir_type);
-        this->prajna_ir_builder->Create<prajna::ir::WriteVariableLiked>(
-            ir_broadcast->Tensor()->prajna_ir_value,
-            this->prajna_ir_builder->Create<prajna::ir::IndexArray>(
-                prajna_ir_vector_tmp, this->prajna_ir_builder->GetInt64Constant(0)));
+        auto pir_vector_tmp = pir_builder->Create<pir::LocalVariable>(ir_broadcast->type->pir_type);
+        pir_builder->Create<pir::WriteVariableLiked>(
+            ir_broadcast->Tensor()->pir_value,
+            pir_builder->Create<pir::IndexArray>(pir_vector_tmp, pir_builder->GetInt64Constant(0)));
 
-        ir_broadcast->prajna_ir_value = this->prajna_ir_builder->Create<prajna::ir::ShuffleVector>(
-            prajna_ir_vector_tmp, prajna_ir_constant_vector_zero_mask);
+        ir_broadcast->pir_value =
+            pir_builder->Create<pir::ShuffleVector>(pir_vector_tmp, pir_constant_vector_zero_mask);
     }
 
     void EmitVectorBroadcast(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) {
         this->EmitTensor(ir_vector_broadcast->Vector());
         this->EmitType(ir_vector_broadcast->type);
 
-        std::list<std::shared_ptr<prajna::ir::Constant>> prajna_constant_lane_id_list;
+        std::list<std::shared_ptr<pir::Constant>> prajna_constant_lane_id_list;
         GALOIS_ASSERT(ir_vector_broadcast->type->shape.size() == 1);
         for (int64_t i = 0; i < ir_vector_broadcast->type->shape[0]; ++i) {
             prajna_constant_lane_id_list.push_back(
-                this->prajna_ir_builder->GetInt32Constant(ir_vector_broadcast->lane_id));
+                pir_builder->GetInt32Constant(ir_vector_broadcast->lane_id));
         }
-        auto prajna_ir_constant_vector_lane_id_mask =
-            this->prajna_ir_builder->Create<prajna::ir::ConstantVector>(
-                prajna::Cast<prajna::ir::VectorType>(ir_vector_broadcast->type->prajna_ir_type),
-                prajna_constant_lane_id_list);
+        auto pir_constant_vector_lane_id_mask = pir_builder->Create<pir::ConstantVector>(
+            prajna::Cast<pir::VectorType>(ir_vector_broadcast->type->pir_type),
+            prajna_constant_lane_id_list);
 
-        ir_vector_broadcast->prajna_ir_value =
-            this->prajna_ir_builder->Create<prajna::ir::ShuffleVector>(
-                ir_vector_broadcast->Vector()->prajna_ir_value,
-                prajna_ir_constant_vector_lane_id_mask);
+        ir_vector_broadcast->pir_value = pir_builder->Create<pir::ShuffleVector>(
+            ir_vector_broadcast->Vector()->pir_value, pir_constant_vector_lane_id_mask);
     }
 
     void EmitBitCast(std::shared_ptr<ir::BitCast> ir_bit_cast) {
         this->EmitTensor(ir_bit_cast->Tensor());
         this->EmitType(ir_bit_cast->type);
-        ir_bit_cast->prajna_ir_value =
-            this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(
-                this->prajna_ir_builder->Create<prajna::ir::BitCast>(
-                    this->prajna_ir_builder->Create<prajna::ir::GetAddressOfVariableLiked>(
-                        prajna::Cast<prajna::ir::DeferencePointer>(
-                            ir_bit_cast->Tensor()->prajna_ir_value)),
-                    prajna::ir::PointerType::Create(ir_bit_cast->type->prajna_ir_type)));
+        ir_bit_cast->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
+                pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::DeferencePointer>(ir_bit_cast->Tensor()->pir_value)),
+                pir::PointerType::Create(ir_bit_cast->type->pir_type)));
+    }
+
+    void BindThreadPoolFunctions() {
+        auto pir_i64_type = pir::IntType::Create(64, true);
+        {
+            auto pir_function_type =
+                pir::FunctionType::Create({pir::IntType::Create(32, true)}, pir_i64_type);
+            auto pir_function = pir_builder->CreateFunction(prajna::ast::Identifier("thpool_init"),
+                                                            pir_function_type);
+            pir_function->annotation_dict["intrinsic"].push_back("thpool_init");
+            this->pir_function_dict["thpool_init"] = pir_function;
+        }
+        {
+            auto pir_function_type = pir::FunctionType::Create(
+                {pir_i64_type, pir_i64_type, pir_i64_type}, pir::VoidType::Create());
+            auto pir_function = pir_builder->CreateFunction(
+                prajna::ast::Identifier("thpool_add_work"), pir_function_type);
+            pir_function->annotation_dict["intrinsic"].push_back("thpool_add_work");
+            this->pir_function_dict["thpool_add_work"] = pir_function;
+        }
+        {
+            auto pir_function_type =
+                pir::FunctionType::Create({pir_i64_type}, pir::VoidType::Create());
+            auto pir_function = pir_builder->CreateFunction(prajna::ast::Identifier("thpool_wait"),
+                                                            pir_function_type);
+            pir_function->annotation_dict["intrinsic"].push_back("thpool_wait");
+            this->pir_function_dict["thpool_wait"] = pir_function;
+        }
+        {
+            auto pir_function_type =
+                pir::FunctionType::Create({pir_i64_type}, pir::VoidType::Create());
+            auto pir_function = pir_builder->CreateFunction(
+                prajna::ast::Identifier("thpool_destroy"), pir_function_type);
+            pir_function->annotation_dict["intrinsic"].push_back("thpool_destroy");
+            this->pir_function_dict["thpool_destroy"] = pir_function;
+        }
     }
 
     void BindIntrinsics() {
         {
-            auto function_type = prajna::ir::FunctionType::Create(
-                {prajna::ir::IntType::Create(64, true)},
-                prajna::ir::PointerType::Create(prajna::ir::IntType::Create(8, false)));
-            this->prajna_ir_malloc_function = this->prajna_ir_builder->CreateFunction(
-                prajna::ast::Identifier("malloc"), function_type);
-            this->prajna_ir_malloc_function->annotation_dict["intrinsic"].push_back("malloc");
+            auto function_type =
+                pir::FunctionType::Create({pir::IntType::Create(64, true)},
+                                          pir::PointerType::Create(pir::IntType::Create(8, false)));
+            this->pir_function_dict["malloc"] =
+                pir_builder->CreateFunction(prajna::ast::Identifier("malloc"), function_type);
+            this->pir_function_dict["malloc"]->annotation_dict["intrinsic"].push_back("malloc");
         }
         {
-            auto function_type = prajna::ir::FunctionType::Create(
-                {prajna::ir::PointerType::Create(prajna::ir::IntType::Create(8, false))},
-                prajna::ir::VoidType::Create());
-            this->prajna_ir_free_function = this->prajna_ir_builder->CreateFunction(
-                prajna::ast::Identifier("free"), function_type);
-            this->prajna_ir_free_function->annotation_dict["intrinsic"].push_back("free");
+            auto function_type = pir::FunctionType::Create(
+                {pir::PointerType::Create(pir::IntType::Create(8, false))},
+                pir::VoidType::Create());
+            this->pir_function_dict["free"] =
+                pir_builder->CreateFunction(prajna::ast::Identifier("free"), function_type);
+            this->pir_function_dict["free"]->annotation_dict["intrinsic"].push_back("free");
         }
+
+        this->BindThreadPoolFunctions();
     }
 
     void EmitAlloca(std::shared_ptr<ir::Alloca> ir_alloca) {
-        if (ir_alloca->prajna_ir_value) {
-            return;
-        }
-
         auto ir_tensor_type = ir_alloca->type;
         if (ir_alloca->type->memory_type == ir::MemoryType::Host) {
             auto tensor_bytes = ir_tensor_type->Size() * ir_tensor_type->value_type->bytes;
-            auto prajna_ir_tensor_pointer = this->prajna_ir_builder->Create<prajna::ir::BitCast>(
-                this->prajna_ir_builder->Create<prajna::ir::Call>(
-                    this->prajna_ir_malloc_function,
-                    this->prajna_ir_builder->GetInt64Constant(tensor_bytes)),
-                prajna::ir::PointerType::Create(this->EmitType(ir_tensor_type)));
-            ir_alloca->prajna_ir_value =
-                this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(
-                    prajna_ir_tensor_pointer);
+            auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
+                pir_builder->Create<pir::Call>(this->pir_function_dict["malloc"],
+                                               pir_builder->GetInt64Constant(tensor_bytes)),
+                pir::PointerType::Create(this->EmitType(ir_tensor_type)));
+            ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
             return;
         }
         if (ir_alloca->type->memory_type == ir::MemoryType::Stack) {
-            auto prajna_ir_tensor_pointer = this->prajna_ir_builder->Create<prajna::ir::Alloca>(
-                this->EmitType(ir_alloca->type), this->prajna_ir_builder->GetInt64Constant(1));
-            ir_alloca->prajna_ir_value =
-                this->prajna_ir_builder->Create<prajna::ir::DeferencePointer>(
-                    prajna_ir_tensor_pointer);
+            auto pir_tensor_pointer = pir_builder->Create<pir::Alloca>(
+                this->EmitType(ir_alloca->type), pir_builder->GetInt64Constant(1));
+            ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
             return;
         }
 
@@ -621,19 +648,14 @@ class LlvmCodegen {
 
     void EmitFree(std::shared_ptr<ir::Free> ir_free) {
         this->EmitTensor(ir_free->Tensor());
-        ir_free->prajna_ir_value = this->prajna_ir_builder->Create<prajna::ir::Call>(
-            this->prajna_ir_free_function,
-            this->prajna_ir_builder->Create<prajna::ir::BitCast>(
-                prajna::Cast<prajna::ir::DeferencePointer>(ir_free->Tensor()->prajna_ir_value)
-                    ->Pointer(),
-                prajna::ir::PointerType::Create(prajna::ir::IntType::Create(8, false))));
+        ir_free->pir_value = pir_builder->Create<pir::Call>(
+            this->pir_function_dict["free"],
+            pir_builder->Create<pir::BitCast>(
+                prajna::Cast<pir::DeferencePointer>(ir_free->Tensor()->pir_value)->Pointer(),
+                pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
 
     void EmitSlice(std::shared_ptr<ir::Slice> ir_slice) {
-        if (ir_slice->prajna_ir_value) {
-            return;
-        }
-
         this->EmitAccessor(ir_slice->origin);
 
         // stride使用被slice的tensor
@@ -646,47 +668,137 @@ class LlvmCodegen {
         }
         ir_slice->type->layout = ir_slice->origin->Tensor()->type->layout;
         // 偏移地址
-        ir_slice->prajna_ir_value =
-            prajna::Cast<prajna::ir::VariableLiked>(ir_slice->origin->prajna_ir_value);
+        ir_slice->pir_value = prajna::Cast<pir::VariableLiked>(ir_slice->origin->pir_value);
     }
 
     void EmitCall(std::shared_ptr<Call> ir_call) {
-        if (ir_call->prajna_ir_value) {
-            return;
-        }
+        if (!ir_call->annotation_dict.count("enable_multi_thread")) {
+            std::list<std::shared_ptr<pir::Value>> pir_arguments;
+            for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
+                pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
+            }
+            for (int64_t i = 0; i < ir_call->OutputSize(); ++i) {
+                pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::VariableLiked>(ir_call->Output(i)->pir_value)));
+            }
 
-        for (int64_t i = 0; i < ir_call->OperandSize(); ++i) {
-            this->EmitTensor(ir_call->GetOperand(i));
-        }
+            ir_call->pir_value = pir_builder->Create<pir::Call>(
+                ir_call->OperatorFunction()->pir_value, pir_arguments);
+        } else {  // async invoke
+            std::list<std::shared_ptr<pir::Value>> pir_arguments;
+            int64_t grid_argument_index;
+            for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
+                pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
+                if (ir_call->Input(i) == this->grid_stack.top()->indices) {
+                    grid_argument_index = i;
+                }
+            }
+            for (int64_t i = 0; i < ir_call->OutputSize(); ++i) {
+                pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::VariableLiked>(ir_call->Output(i)->pir_value)));
+            }
 
-        std::list<std::shared_ptr<prajna::ir::Value>> prajna_ir_parameters;
-        for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
-            prajna_ir_parameters.push_back(
-                prajna::Cast<prajna::ir::DeferencePointer>(ir_call->Input(i)->prajna_ir_value)
-                    ->Pointer());
-        }
-        for (int64_t i = 0; i < ir_call->OutputSize(); ++i) {
-            prajna_ir_parameters.push_back(
-                prajna::Cast<prajna::ir::DeferencePointer>(ir_call->Output(i)->prajna_ir_value)
-                    ->Pointer());
-        }
+            std::list<std::shared_ptr<pir::Field>> pir_fields;
+            int64_t num = 0;
+            std::transform(RANGE(pir_arguments), std::back_inserter(pir_fields),
+                           [&num](std::shared_ptr<pir::Value> pir_value) {
+                               return pir::Field::Create("__field" + std::to_string(num),
+                                                         pir_value->type);
+                           });
+            auto pir_async_args_struct_type = prajna ::ir::StructType::Create(pir_fields);
+            auto pir_async_args_type = pir::PointerType::Create(pir_async_args_struct_type);
+            auto pir_async_function_type =
+                pir::FunctionType::Create({pir_async_args_type}, pir::VoidType::Create());
+            auto pir_async_function = pir_builder->CreateFunction(
+                prajna::ast::Identifier("__todo_async_call"), pir_async_function_type);
+            // begin prajna_async_function
+            {
+                pir_builder->CreateTopBlockForFunction(pir_async_function);
+                std::list<std::shared_ptr<pir::Value>> pir_inner_arguments;
+                auto pir_async_parameter_deference = pir_builder->Create<pir::DeferencePointer>(
+                    pir_async_function->parameters.front());
+                std::transform(RANGE(pir_fields), std::back_inserter(pir_inner_arguments),
+                               [=](std::shared_ptr<pir::Field> pir_field) {
+                                   return pir_builder->Create<pir::AccessField>(
+                                       pir_async_parameter_deference, pir_field);
+                               });
+                pir_builder->Create<pir::Call>(ir_call->OperatorFunction()->pir_value,
+                                               pir_inner_arguments);
+                this->PirFree(pir_builder->Create<pir::AccessField>(
+                    pir_async_parameter_deference,
+                    *std::next(pir_fields.begin(), grid_argument_index)));
+                this->PirFree(pir_async_function->parameters.front());
+                pir_builder->ReturnVoid();
+                pir_builder->PopBlock();
+                pir_builder->function_stack.pop();
+            }
+            // end prajna_async_function
+            auto pir_async_args_struct =
+                pir_builder->Create<pir::LocalVariable>(pir_async_args_type);
+            pir_builder->Create<pir::WriteVariableLiked>(
+                this->PirNew(pir_async_args_type->value_type), pir_async_args_struct);
 
-        ir_call->prajna_ir_value = this->prajna_ir_builder->Create<prajna::ir::Call>(
-            ir_call->OperatorInstance()->prajna_ir_value, prajna_ir_parameters);
+            int64_t i = 0;
+            for (auto [pir_field, pir_argument] : boost::combine(pir_fields, pir_arguments)) {
+                if (i != grid_argument_index) {
+                    pir_builder->Create<pir::WriteVariableLiked>(
+                        pir_argument,
+                        pir_builder->Create<pir::AccessField>(
+                            pir_builder->Create<pir::DeferencePointer>(pir_async_args_struct),
+                            pir_field));
+                } else {
+                    auto ir_new_indices = this->PirNew(ir_call->Input(i)->pir_value->type);
+                    pir_builder->Create<pir::WriteVariableLiked>(
+                        ir_call->Input(i)->pir_value,
+                        pir_builder->Create<pir::DeferencePointer>(ir_new_indices));
+                    pir_builder->Create<pir::WriteVariableLiked>(
+                        ir_new_indices,
+                        pir_builder->Create<pir::AccessField>(
+                            pir_builder->Create<pir::DeferencePointer>(pir_async_args_struct),
+                            pir_field));
+                }
+                ++i;
+            }
+            auto pir_i64_type = pir::IntType::Create(64, true);
+            pir_builder->Create<pir::Call>(this->pir_function_dict["thpool_add_work"],
+                                           std::list<std::shared_ptr<pir::Value>>{
+                                               this->pir_thpool,
+                                               pir_builder->Create<pir::CastInstruction>(
+                                                   pir::CastInstruction::Operation::PtrToInt,
+                                                   pir_async_function, pir_i64_type),
+                                               pir_builder->Create<pir::CastInstruction>(
+                                                   pir::CastInstruction::Operation::PtrToInt,
+                                                   pir_async_args_struct, pir_i64_type)});
+        }
     }
 
-   private:
-    void SetPrajnaIrIndex() {}
+    void EmitPthreadBlock(std::shared_ptr<PthreadBlock> ir_pthread_block) {
+        auto ir_captured_tensors = transform::CaptureExternalTensors(ir_pthread_block);
+    }
+
+    std::shared_ptr<pir::Value> PirNew(std::shared_ptr<pir::Type> pir_type) {
+        return pir_builder->Create<pir::BitCast>(
+            pir_builder->Create<pir::Call>(this->pir_function_dict["malloc"],
+                                           pir_builder->GetInt64Constant(pir_type->bytes)),
+            pir::PointerType::Create(pir_type));
+    }
+
+    void PirFree(std::shared_ptr<pir::Value> pir_value) {
+        pir_builder->Create<pir::Call>(
+            this->pir_function_dict["free"],
+            pir_builder->Create<pir::BitCast>(
+                pir_value, pir::PointerType::Create(pir::IntType::Create(8, false))));
+    }
 
    public:
-    std::shared_ptr<prajna::lowering::IrBuilder> prajna_ir_builder = nullptr;
+    std::stack<std::shared_ptr<ir::Grid>> grid_stack;
+    std::stack<std::shared_ptr<ir::OperatorFunction>> operator_stack;
 
-   private:
-    std::stack<std::shared_ptr<ir::Grid>> parallel_stack;
-    std::stack<std::shared_ptr<ir::OperatorInstance>> operator_stack;
-
-    std::shared_ptr<prajna::ir::Function> prajna_ir_malloc_function = nullptr;
-    std::shared_ptr<prajna::ir::Function> prajna_ir_free_function = nullptr;
+    std::shared_ptr<pir::Value> pir_thpool = nullptr;
+    std::shared_ptr<prajna::lowering::IrBuilder> pir_builder = nullptr;
+    std::unordered_map<std::string, std::shared_ptr<pir::Function>> pir_function_dict;
 };
 
 }  // namespace galois::codegen::cpu
