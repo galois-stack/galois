@@ -74,15 +74,17 @@ class MatrixMultiplyCreator : public OperatorCreator {
         auto ir_mat_a = ir_inputs[0];
         auto ir_mat_b = ir_inputs[1];
         auto ir_mat_c = ir_outputs[0];
-        GALOIS_ASSERT(ir_mat_a->type->shape[1] == ir_mat_b->type->shape[0]);
-        GALOIS_ASSERT(ir_mat_c->type->shape[0] == ir_mat_a->type->shape[0]);
-        GALOIS_ASSERT(ir_mat_c->type->shape[1] == ir_mat_b->type->shape[1]);
 
         if (ir_mat_a->type->IsScalar()) {
             auto ir_re =
                 ir_builder->Create<Add>(ir_builder->Create<Mul>(ir_mat_a, ir_mat_b), ir_mat_c);
             ir_builder->Create<Write>(ir_re, ir_mat_c);
+            return;
         }
+
+        GALOIS_ASSERT(ir_mat_a->type->shape[1] == ir_mat_b->type->shape[0]);
+        GALOIS_ASSERT(ir_mat_c->type->shape[0] == ir_mat_a->type->shape[0]);
+        GALOIS_ASSERT(ir_mat_c->type->shape[1] == ir_mat_b->type->shape[1]);
 
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector3i64(
             ir_mat_a->type->shape[0], ir_mat_a->type->shape[1], ir_mat_b->type->shape[1]));
