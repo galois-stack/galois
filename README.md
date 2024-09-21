@@ -268,10 +268,49 @@ class MatrixMultiplyCreator : public OperatorCreator {
 };
 ```
 
+## 如何使用
+
+
+### 下载源码
+
+首先我们下载源码, 下载的库会比较多, 如果没有报错请耐心等待, 建议配置git的https.proxy(自行查阅资料), 以便能流畅下载github的代码
+
+```bash
+# 下载代码
+git clone --recursive https://github.com/galois-stack/galois --jobs=16
+```
+
+"--jobs=16"表示同时下载submodule的任务数, 可自行设定. "--recursive"表示下载内部的submodules, 如果这里省略的话, 得自行下载submodules.
+
+如果在下载的代码中出现错误频繁出现错误,  可查阅[git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
+
+
+### Ubuntu 20.04 需要安装的一些依赖库
+
+```bash
+apt install git clang wget libgnutls28-dev libsodium-dev uuid-dev build-essential libssl-dev cmake
+```
+
+也可以参考"dockerfiles/ubuntu_dev.dockerfile"来配置
+
+### 编译
+
+可以使用docker的环境来编译代码, 也可以自行参阅[dockerfile](../dockerfiles/ubuntu_dev.dockerfile)来配置环境.
+值得注意的是目前Prajna只支持Clang的编译器, 若使用GCC或其他编译器可能需要自己适配.
+
+```bash
+./scripts/configure.sh release # 配置为release模式
+./scripts/build.sh release
+./scripts/test.sh release # 我们可以通过改指令来运行测试, 这是非必须的步骤
+```
+
+例子里使用了"release"模式, 当然我们也可以使用"debug"模式.
+
+
 ## 期待更多开发者加入社区
 
 galois项目处于起步阶段, 欢迎对AI基础设施,编译器优化和LLM相关技术感兴趣的朋友加入到项目中来. 并不需要志愿者有什么相关基础, galois期待和大家一块学习成长.
 
-感兴趣的朋友可以先star在github上的项目<https://github.com/galois-stack/galois>, 即将开源
-
 关注"玄青矩阵"微信公众号获取更多资讯, 后续会发布更多相关分享
+
+欢迎加作者微信"zhangzhimin-tju", 一起交流学习.
