@@ -14,6 +14,7 @@
 #include "galois/helper.hpp"
 #include "galois/ir/global_context.h"
 #include "galois/named.hpp"
+#include <unordered_map>
 
 namespace prajna::ir {
 class Value;

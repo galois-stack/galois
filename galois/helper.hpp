@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <vector>
 
 #include "galois/assert.hpp"
 
