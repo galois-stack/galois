@@ -112,7 +112,9 @@ class Builder {
             Eigen::MatrixXi64 ::Zero(ir_tensor_type->shape.size(), grid_rank);
         auto ir_accessor = this->Create<Accessor>(
             ir_tensor, transform_matrix, Eigen::VectorXi64::Zero(ir_tensor_type->shape.size()));
-        ir_accessor->Indices(this->grid_stack.top()->indices);
+        if (!this->grid_stack.empty()) {
+            ir_accessor->Indices(this->grid_stack.top()->indices);
+        }
         return ir_accessor;
     }
 

@@ -46,6 +46,45 @@ class ProductKernel : public Kernel {
     }
 };
 
+class ProductKernel256 : public Kernel {
+   public:
+    bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
+               std::vector<std::shared_ptr<Tensor>> ir_outputs, std::shared_ptr<Builder>) override {
+        auto ir_mat_a = ir_inputs[0];
+        auto ir_mat_b = ir_inputs[1];
+        if ((ir_mat_a->type == TensorType::CreateMatrixType(FloatType::Create(32), 8, 1)) &&
+            ir_mat_b->type == TensorType::CreateMatrixType(FloatType::Create(32), 1, 8)) {
+            return true;
+        }
+        return false;
+    }
+
+    void Build(std::vector<std::shared_ptr<Tensor>> ir_inputs,
+               std::vector<std::shared_ptr<Tensor>> ir_outputs,
+               std::shared_ptr<Builder> ir_builder) override {
+        auto ir_mat_a = ir_inputs[0];
+        auto ir_mat_b = ir_inputs[1];
+        auto ir_mat_c = ir_outputs[0];
+        Eigen::VectorXi64 v8(1);
+        v8[0] = 8;
+        auto ir_f32x8_type = TensorType::Create(FloatType::Create(32), v8);
+        auto ir_bit_cast_a = ir_builder->Create<BitCast>(ir_mat_a, ir_f32x8_type);
+        auto ir_bit_cast_b = ir_builder->Create<BitCast>(ir_mat_b, ir_f32x8_type);
+        auto ir_bit_cast_c =
+            ir_builder->Create<BitCast>(ir_mat_c, TensorType::Create(ir_f32x8_type, v8));
+
+        for (int64_t i = 0; i < 8; ++i) {
+            auto ir_vector_broadcast_a = ir_builder->Create<VectorBroadcast>(ir_bit_cast_a, i);
+            auto ir_mul = ir_builder->Create<Mul>(ir_vector_broadcast_a, ir_bit_cast_b);
+            auto ir_accessor_c = ir_builder->CreateAccessor(ir_bit_cast_c);
+            ir_accessor_c->shift_vector[0] = i;
+            auto ir_sum = ir_builder->Create<Add>(ir_mul, ir_accessor_c);
+            auto ir_write =
+                ir_builder->Create<Write>(ir_sum, Cast<Accessor>(ir_accessor_c->Clone()));
+        }
+    }
+};
+
 class MatrixMultiplyCreator : public OperatorCreator {
    public:
     std::shared_ptr<TensorType> InferType(
