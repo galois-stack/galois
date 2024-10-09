@@ -1,4 +1,5 @@
 # add_executable(galois_test main.cpp matrix_multiply.cpp)
 add_executable(galois_test  main.cpp matrix_multiply_test.cpp)
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest_main thpool)
-target_compile_options(galois_test PRIVATE -mavx)
+target_compile_definitions(galois_ir PRIVATE  EIGEN_MAX_ALIGN_BYTES=32)
+target_compile_definitions(galois_test PRIVATE  EIGEN_MAX_ALIGN_BYTES=32)

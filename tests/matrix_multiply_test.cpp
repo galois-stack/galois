@@ -1,5 +1,3 @@
-#define EIGEN_DEFAULT_ALIGN_BYTES = 32
-
 #include <chrono>
 
 #include "galois/galois.hpp"
@@ -157,6 +155,8 @@ TEST(GaloisTests, TestGemm) {
     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
         prajna_compiler->GetSymbolValue("::tmp_module"));
+
+    std::cout << "eigen alignment " << EIGEN_DEFAULT_ALIGN_BYTES << std::endl;
 
     Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
     Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
