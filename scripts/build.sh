@@ -15,5 +15,5 @@ fi
 
 build_dir=build_$1
 cd $build_dir
-make galois_test  -j $threads $2
+ninja galois_test  -j $threads $2
 cd ..
