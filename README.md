@@ -159,7 +159,7 @@ TEST(galoisTests, TestGemm) {
     auto ir_affine_convertor = graph::AffineConvertor::Create();
     // 将计算图->galois IR
     auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
-    auto prajna_compiler = prajna::Compiler::Create();
+    auto prajna_compiler = prajna::Compiler::Create(false);
     auto llvm_codegen = std::make_shared<codegen::cpu::LlvmCodegen>(prajna_compiler->_symbol_table);
     // 将galois IR -> Prajna IR
     llvm_codegen->EmitOperatorInstance(ir_operator);
@@ -270,7 +270,6 @@ class MatrixMultiplyCreator : public OperatorCreator {
 
 ## 如何使用
 
-
 ### 下载源码
 
 首先我们下载源码, 下载的库会比较多, 如果没有报错请耐心等待, 建议配置git的https.proxy(自行查阅资料), 以便能流畅下载github的代码
@@ -283,7 +282,6 @@ git clone --recursive https://github.com/galois-stack/galois --jobs=16
 "--jobs=16"表示同时下载submodule的任务数, 可自行设定. "--recursive"表示下载内部的submodules, 如果这里省略的话, 得自行下载submodules.
 
 如果在下载的代码中出现错误频繁出现错误,  可查阅[git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
-
 
 ### Ubuntu 20.04 需要安装的一些依赖库
 
@@ -305,7 +303,6 @@ apt install git clang wget libgnutls28-dev libsodium-dev uuid-dev build-essentia
 ```
 
 例子里使用了"release"模式, 当然我们也可以使用"debug"模式.
-
 
 ## 期待更多开发者加入社区
 
