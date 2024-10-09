@@ -20,7 +20,7 @@ typedef Matrix<float, -1, -1, Eigen::RowMajor || Eigen::Aligned16> MatrixRXf;
 }
 
 std::shared_ptr<prajna::Compiler> CreateCompiler() {
-    auto prajna_compiler = prajna::Compiler::Create();
+    auto prajna_compiler = prajna::Compiler::Create(false);
     prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_init),
                                                "thpool_init");
     prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_add_work),

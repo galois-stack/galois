@@ -10,10 +10,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)  # 使用 -std=c++17而不是 -std=gnu++17
 # 在mac平台下， 因为llvm设置为hidden，所以避免编译warning这里全局设置为hidden
 # 之所以不用target_link_options设置，是因为其不能设置第三方项目
 if (NOT BUILD_SHARED_LIBS)
-   set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-   set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+    set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+    set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 else()
-# 没有找到动态库的warning消除方法
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
