@@ -7,6 +7,8 @@ namespace galois::op {
 
 class PaddingCreator : public OperatorCreator {
    public:
+    PaddingCreator(Eigen::VectorXi64 padding_shape) { this->padding_shape = padding_shape; }
+
     std::shared_ptr<TensorType> InferType(
         std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
         GALOIS_ASSERT(ir_input_types.size() == 1);

@@ -4,6 +4,7 @@
 #include "galois/graph/graph.hpp"
 #include "galois/op/affine_convertor.hpp"
 #include "galois/op/op.hpp"
+#include "galois/optimization/gemm_optimizer.hpp"
 #include "gtest/gtest.h"
 #include "prajna/bindings/core.hpp"
 #include "prajna/jit/execution_engine.h"
@@ -36,11 +37,11 @@ std::shared_ptr<prajna::Compiler> CreateCompiler() {
     return prajna_compiler;
 }
 
-TEST(GaloisTests, TestMatrixMultiply) {
+TEST(GaloisTests, TestMatrixMultiply1) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(8, 1)(1, 1024)(128, 1)(4, 1);
-    auto ir_ts_type_b = f32(1, 8)(1024, 1)(1, 128)(1, 4);
-    // ir_ts_type_a->enable_multi_thread = true;
+    auto ir_ts_type_a = f32(4, 1)(2, 1)(1, 1024)(64, 1)(2, 1)(10, 10);
+    auto ir_ts_type_b = f32(1, 4)(1, 2)(1024, 1)(1, 64)(1, 2)(10, 10);  // 一个比较合理的设计
+    ir_ts_type_a->value_type->enable_multi_thread = true;
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
 
@@ -107,8 +108,8 @@ TEST(GaloisTests, TestMatrixMultiply256) {
     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
         prajna_compiler->GetSymbolValue("::tmp_module"));
 
-    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
-    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Random(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Random(shape_b[0], shape_b[1]);
     Eigen::MatrixRXf eigen_matrix_f32_c = Eigen::MatrixRXf::Random(shape_a[0], shape_b[1]);
 
     // eigen_matrix_f32_c.setZero();
@@ -122,9 +123,9 @@ TEST(GaloisTests, TestMatrixMultiply256) {
 
 TEST(GaloisTests, TestGemm) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(8, 1)(1, 512)(128, 1)(4, 1);
-    auto ir_ts_type_b = f32(1, 8)(512, 1)(1, 128)(1, 4);
-    ir_ts_type_a->enable_multi_thread = false;
+    auto ir_ts_type_a = f32(8, 1)(1, 512)(64, 1);
+    auto ir_ts_type_b = f32(1, 8)(512, 1)(1, 64);
+    // ir_ts_type_a->enable_multi_thread = false;
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -156,15 +157,86 @@ TEST(GaloisTests, TestGemm) {
     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
         prajna_compiler->GetSymbolValue("::tmp_module"));
 
-    std::cout << "eigen alignment " << EIGEN_DEFAULT_ALIGN_BYTES << std::endl;
-
-    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
-    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Random(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Random(shape_b[0], shape_b[1]);
     auto shape_c = Cast<TensorType>(ir_module->type)->shape;
     Eigen::MatrixRXf eigen_matrix_f32_c = Eigen::MatrixRXf::Random(shape_c[0], shape_c[1]);
     Eigen::MatrixRXf eigen_matrix_f32_expect = Eigen::MatrixRXf::Random(shape_c[0], shape_c[1]);
 
     Eigen::setNbThreads(1);
+    auto t0_eigen = std::chrono::high_resolution_clock::now();
+    eigen_matrix_f32_expect = (eigen_matrix_f32_a * eigen_matrix_f32_b).eval();
+    auto t1_eigen = std::chrono::high_resolution_clock::now();
+    fmt::print("cost time: {}ns, eigen gemm flops: {}gflops\n", (t1_eigen - t0_eigen).count(),
+               shape_a[0] * shape_a[1] * shape_b[1] * 2 /
+                   static_cast<double>((t1_eigen - t0_eigen).count()));
+
+    // eigen_matrix_f32_c.setZero();
+    auto t0 = std::chrono::high_resolution_clock::now();
+    tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), eigen_matrix_f32_c.data());
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    fmt::print("cost time: {}ns, galois gemm flops: {}gflops\n", (t1 - t0).count(),
+               shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
+
+    int64_t error_count = 0;
+    for (int64_t i = 0; i < shape_c[0]; ++i) {
+        for (int64_t j = 0; j < shape_c[1]; ++j) {
+            if ((std::abs(eigen_matrix_f32_c(i, j) - eigen_matrix_f32_expect(i, j))) /
+                    std::max(std::abs(eigen_matrix_f32_expect(i, j)),
+                             std::abs(eigen_matrix_f32_c(i, j))) >
+                0.1f) {
+                fmt::print("err pos: {},{}; {}, {}\n", i, j, eigen_matrix_f32_c(i, j),
+                           eigen_matrix_f32_expect(i, j));
+                ++error_count;
+                if (error_count > 100) {
+                    std::terminate();
+                }
+                std::cout << std::endl;
+            }
+        }
+    }
+}
+
+TEST(GaloisTests, TestGemm0) {
+    //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
+    auto ir_ts_type_a = f32(512, 512);
+    auto ir_ts_type_b = f32(512, 512);
+
+    auto ir_input_a = graph::Input::Create(ir_ts_type_a);
+    auto ir_input_b = graph::Input::Create(ir_ts_type_b);
+    auto ir_matrix_multiply_op = std::make_shared<op::MatrixMultiplyCreator>();
+    auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_input_a, ir_input_b});
+    auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_mat_mul, "tmp_module");
+
+    auto ir_affine_convertor = graph::AffineConvertor::Create();
+    auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
+
+    // transform::Each<ir::Grid>(ir_operator, [](std::shared_ptr<ir::Grid> ir_grid) {
+    //     if (ir_grid->enable_multi_thread) {
+    //         transform::AsyncInvokeByThreadPool(ir_grid);
+    //     }
+    // });
+
+    auto gemm_optimizer = optimization::GemmOptimizer::Create();
+    gemm_optimizer->Optimize(ir_operator);
+
+    auto prajna_compiler = CreateCompiler();
+    auto llvm_codegen = std::make_shared<codegen::cpu::LlvmCodegen>(prajna_compiler->_symbol_table);
+    llvm_codegen->EmitOperatorFunction(ir_operator);
+    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
+    auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
+        prajna_compiler->GetSymbolValue("::tmp_module"));
+
+    auto shape_a = ir_ts_type_a->NormalizeShape();
+    auto shape_b = ir_ts_type_b->NormalizeShape();
+
+    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Random(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Random(shape_b[0], shape_b[1]);
+    auto shape_c = Cast<TensorType>(ir_module->type)->shape;
+    Eigen::MatrixRXf eigen_matrix_f32_c = Eigen::MatrixRXf::Random(shape_c[0], shape_c[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_expect = Eigen::MatrixRXf::Random(shape_c[0], shape_c[1]);
+
     auto t0_eigen = std::chrono::high_resolution_clock::now();
     eigen_matrix_f32_expect = (eigen_matrix_f32_a * eigen_matrix_f32_b).eval();
     auto t1_eigen = std::chrono::high_resolution_clock::now();

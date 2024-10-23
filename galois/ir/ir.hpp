@@ -7,6 +7,7 @@
 #include <memory>
 #include <numeric>
 #include <regex>
+#include <unordered_map>
 #include <vector>
 
 #include "Eigen/Dense"
@@ -14,7 +15,6 @@
 #include "galois/helper.hpp"
 #include "galois/ir/global_context.h"
 #include "galois/named.hpp"
-#include <unordered_map>
 
 namespace prajna::ir {
 class Value;

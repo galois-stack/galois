@@ -34,11 +34,15 @@ class PackKernel : public Kernel {
 
 class PackCreator : public OperatorCreator {
    public:
+    PackCreator() = default;
+
     static std::shared_ptr<PackCreator> Create(std::shared_ptr<TensorType> ir_pack_type) {
         std::shared_ptr<PackCreator> self(new PackCreator);
         self->pack_type = ir_pack_type;
         return self;
     }
+
+    PackCreator(std::shared_ptr<TensorType> ir_pack_type) { this->pack_type = ir_pack_type; }
 
     std::shared_ptr<TensorType> InferType(
         std::vector<std::shared_ptr<TensorType>> ir_input_types) override {

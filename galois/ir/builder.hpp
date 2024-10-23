@@ -7,7 +7,7 @@
 
 namespace galois::ir {
 
-class Builder {
+class Builder : public std::enable_shared_from_this<Builder> {
    public:
     static std::shared_ptr<Builder> Create() {
         std::shared_ptr<Builder> self(new Builder);
@@ -103,6 +103,19 @@ class Builder {
         });
         return {ir_operator, std::move(scope_guard)};
     }
+
+    template <typename OperatorCreator, typename... CreatorArgs>
+    std::shared_ptr<Tensor> Express(std::vector<std::shared_ptr<Tensor>> inputs,
+                                    CreatorArgs... creator_args) {
+        auto sp_creator = std::make_shared<OperatorCreator>(creator_args...);
+        std::vector<std::shared_ptr<TensorType>> input_types;
+        std::transform(RANGE(inputs), std::back_inserter(input_types),
+                       [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });
+        auto ir_output_type = sp_creator->InferType(input_types);
+        auto ir_output = this->Create<Alloca>(ir_output_type);
+        sp_creator->AffineExpress(inputs, {ir_output}, this->shared_from_this());
+        return ir_output;
+    };
 
     std::shared_ptr<Accessor> CreateAccessor(std::shared_ptr<Tensor> ir_tensor) {
         auto ir_tensor_type = ir_tensor->type;
