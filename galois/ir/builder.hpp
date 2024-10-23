@@ -184,33 +184,4 @@ class CopyOperatorCreator : public OperatorCreator {
     }
 };
 
-// class AddOperatorCreator : public OperatorCreator {
-//    public:
-//     std::vector<std::shared_ptr<Tensor>> GetOutputs(std::vector<std::shared_ptr<Tensor>>
-//     ir_inputs,
-//                                                    std::shared_ptr<Builder> ir_builder) override
-//                                                    {
-//         auto input = ir_inputs.front();
-//         auto ir_tensor = ir_builder->Create<Tensor>(input->type);
-//         return {ir_tensor};
-//     }
-
-//     void AffineExpress(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-//                        std::vector<std::shared_ptr<Tensor>> ir_outputs,
-//                        std::shared_ptr<Builder> ir_builder) override {
-//         if (ir_inputs[0]->type->IsScalar()) {
-//             ir_builder->Create<Write>(ir_builder->Create<Add>(ir_inputs[0], ir_inputs[1]),
-//                                       ir_outputs[0]);
-//         }
-
-//         auto [ir_grid, scope_guard] =
-//             ir_builder->CreateGrid(ir_inputs[0]->type->shape);
-//         auto ir_input_accessor0 = ir_builder->CreateIdentityAccessor(ir_inputs[0]);
-//         auto ir_input_accessor1 = ir_builder->CreateIdentityAccessor(ir_inputs[1]);
-//         auto ir_output_accessor = ir_builder->CreateIdentityAccessor(ir_outputs[0]);
-//         this->AffineExpress({ir_input_accessor0, ir_input_accessor1}, {ir_output_accessor},
-//                             ir_builder);
-//     }
-// };
-
 }  // namespace galois::ir
