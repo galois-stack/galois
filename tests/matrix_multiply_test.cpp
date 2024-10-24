@@ -47,7 +47,7 @@ TEST(GaloisTests, TestMatrixMultiply1) {
 
     auto ir_input_a = graph::Input::Create(ir_ts_type_a);
     auto ir_input_b = graph::Input::Create(ir_ts_type_b);
-    auto ir_matrix_multiply_op = std::make_shared<op::MatrixMultiplyCreator>();
+    auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_input_a, ir_input_b});
     auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_mat_mul, "tmp_module");
 
@@ -89,7 +89,7 @@ TEST(GaloisTests, TestMatrixMultiply256) {
 
     auto ir_input_a = graph::Input::Create(ir_ts_type_a);
     auto ir_input_b = graph::Input::Create(ir_ts_type_b);
-    auto ir_matrix_multiply_op = std::make_shared<op::MatrixMultiplyCreator>();
+    auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_input_a, ir_input_b});
     auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_mat_mul, "tmp_module");
 
@@ -136,9 +136,9 @@ TEST(GaloisTests, TestGemm) {
     auto ir_pack_a = graph::ComputeNode::Create(ir_pack_op_a, {ir_input_a});
     auto ir_pack_op_b = op::PackCreator::Create(ir_ts_type_b);
     auto ir_pack_b = graph::ComputeNode::Create(ir_pack_op_b, {ir_input_b});
-    auto ir_matrix_multiply_op = std::make_shared<op::MatrixMultiplyCreator>();
+    auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_pack_a, ir_pack_b});
-    auto ir_unpack_op_c = std::make_shared<op::UnpackCreator>();
+    auto ir_unpack_op_c = op::UnpackCreator::Create();
     auto ir_unpack_c = graph::ComputeNode::Create(ir_unpack_op_c, {ir_mat_mul});
     auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_unpack_c, "tmp_module");
 
@@ -205,7 +205,7 @@ TEST(GaloisTests, TestGemm0) {
 
     auto ir_input_a = graph::Input::Create(ir_ts_type_a);
     auto ir_input_b = graph::Input::Create(ir_ts_type_b);
-    auto ir_matrix_multiply_op = std::make_shared<op::MatrixMultiplyCreator>();
+    auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_input_a, ir_input_b});
     auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_mat_mul, "tmp_module");
 

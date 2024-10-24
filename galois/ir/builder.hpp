@@ -107,7 +107,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
     template <typename OperatorCreator, typename... CreatorArgs>
     std::shared_ptr<Tensor> Express(std::vector<std::shared_ptr<Tensor>> inputs,
                                     CreatorArgs... creator_args) {
-        auto sp_creator = std::make_shared<OperatorCreator>(creator_args...);
+        auto sp_creator = OperatorCreator::Create(creator_args...);
         std::vector<std::shared_ptr<TensorType>> input_types;
         std::transform(RANGE(inputs), std::back_inserter(input_types),
                        [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });

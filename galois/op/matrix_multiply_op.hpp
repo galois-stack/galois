@@ -9,6 +9,8 @@ using namespace ir;
 
 class ProductKernel : public Kernel {
    public:
+    static std::shared_ptr<ProductKernel> Create() { return std::make_shared<ProductKernel>(); }
+
     bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
                std::vector<std::shared_ptr<Tensor>> ir_outputs, std::shared_ptr<Builder>) override {
         auto ir_mat_a = ir_inputs[0];
@@ -48,6 +50,10 @@ class ProductKernel : public Kernel {
 
 class ProductKernel256 : public Kernel {
    public:
+    static std::shared_ptr<ProductKernel256> Create() {
+        return std::make_shared<ProductKernel256>();
+    }
+
     bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
                std::vector<std::shared_ptr<Tensor>> ir_outputs, std::shared_ptr<Builder>) override {
         auto ir_mat_a = ir_inputs[0];
@@ -87,6 +93,10 @@ class ProductKernel256 : public Kernel {
 
 class MatrixMultiplyCreator : public OperatorCreator {
    public:
+    static std::shared_ptr<MatrixMultiplyCreator> Create() {
+        return std::make_shared<MatrixMultiplyCreator>();
+    }
+
     std::shared_ptr<TensorType> InferType(
         std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
         if (ir_input_types[0]->IsScalar() && ir_input_types[1]->IsScalar()) {

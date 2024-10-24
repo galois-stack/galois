@@ -12,9 +12,9 @@ class AffineConvertor {
     static std::shared_ptr<AffineConvertor> Create() {
         std::shared_ptr<AffineConvertor> self(new AffineConvertor);
         self->ir_builder = Builder::Create();
-        self->ir_builder->kernel_queue.push_back(std::make_shared<op::ProductKernel>());
-        self->ir_builder->kernel_queue.push_back(std::make_shared<op::ProductKernel256>());
-        // self->ir_builder->kernel_queue.push_back(std::make_shared<op::ProductKernel2>());
+        self->ir_builder->kernel_queue.push_back(op::ProductKernel::Create());
+        self->ir_builder->kernel_queue.push_back(op::ProductKernel256::Create());
+        // self->ir_builder->kernel_queue.push_back(op::ProductKernel2::Create());
 
         return self;
     }

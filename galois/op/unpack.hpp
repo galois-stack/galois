@@ -7,6 +7,8 @@ namespace galois::op {
 
 class UnpackCreator : public OperatorCreator {
    public:
+    static std::shared_ptr<UnpackCreator> Create() { return std::make_shared<UnpackCreator>(); }
+
     std::shared_ptr<TensorType> InferType(
         std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
         auto ir_scalar_type = ir_input_types.front()->ScalarType();

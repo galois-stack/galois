@@ -7,7 +7,11 @@ namespace galois::op {
 
 class PaddingCreator : public OperatorCreator {
    public:
-    PaddingCreator(Eigen::VectorXi64 padding_shape) { this->padding_shape = padding_shape; }
+    static std::shared_ptr<PaddingCreator> Create(Eigen::VectorXi64 padding_shape) {
+        std::shared_ptr<PaddingCreator> self(new PaddingCreator);
+        self->padding_shape = padding_shape;
+        return self;
+    }
 
     std::shared_ptr<TensorType> InferType(
         std::vector<std::shared_ptr<TensorType>> ir_input_types) override {

@@ -44,7 +44,7 @@ class GemmOptimizer {
 
         ir_matrix_multiply->values.clear();
         auto ir_builder = ir::Builder::Create();
-        ir_builder->kernel_queue.push_back(std::make_shared<op::ProductKernel>());
+        ir_builder->kernel_queue.push_back(op::ProductKernel::Create());
         ir_builder->block_stack.push(ir_matrix_multiply);
         ir_builder->iterator_stack.push(ir_matrix_multiply->values.end());
 
@@ -57,7 +57,7 @@ class GemmOptimizer {
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
 
-        auto sp_padding_creator = std::make_shared<op::PaddingCreator>(ir_mat_c->type->shape);
+        auto sp_padding_creator = op::PaddingCreator::Create(ir_mat_c->type->shape);
         sp_padding_creator->AffineExpress({ir_unpacked_mat_c}, {ir_mat_c}, ir_builder);
     }
 };
