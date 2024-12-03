@@ -244,7 +244,7 @@ TEST(GaloisTests, TestGemm0) {
                shape_a[0] * shape_a[1] * shape_b[1] * 2 /
                    static_cast<double>((t1_eigen - t0_eigen).count()));
 
-    // eigen_matrix_f32_c.setZero();
+    eigen_matrix_f32_c.setZero();
     auto t0 = std::chrono::high_resolution_clock::now();
     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), eigen_matrix_f32_c.data());
     auto t1 = std::chrono::high_resolution_clock::now();

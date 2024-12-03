@@ -37,7 +37,7 @@ class GemmOptimizer {
     void Optimize(std::shared_ptr<ir::OperatorFunction> ir_matrix_multiply) {
         auto ir_mat_type_a = ir_matrix_multiply->input_types[0];
         auto ir_mat_type_b = ir_matrix_multiply->input_types[1];
-        auto ir_mat_type_c = ir_matrix_multiply->output_types[2];
+        auto ir_mat_type_c = ir_matrix_multiply->output_types[0];
         auto ir_mat_a = ir_matrix_multiply->inputs[0];
         auto ir_mat_b = ir_matrix_multiply->inputs[1];
         auto ir_mat_c = ir_matrix_multiply->outputs[0];
