@@ -94,7 +94,7 @@ pipeline{
 
                 stage('aarch64-osx-release') {
                     agent {
-                        label 'MacM1'
+                        label 'Mac'
                     }
                     environment {
                         CXX = 'clang++'

@@ -32,7 +32,7 @@ class PackKernel : public Kernel {
     }
 };
 
-class PackCreator : public OperatorCreator {
+class PackCreator : public UnaryOperatorCreator {
    public:
     PackCreator() = default;
 
@@ -44,16 +44,13 @@ class PackCreator : public OperatorCreator {
 
     PackCreator(std::shared_ptr<TensorType> ir_pack_type) { this->pack_type = ir_pack_type; }
 
-    std::shared_ptr<TensorType> InferType(
-        std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
+    std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_input_type) override {
         return pack_type;
     };
 
-    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<ir::Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) override {
-        auto ir_input = ir_inputs.front();
-        auto ir_output = ir_outputs.front();
+    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
+                           std::shared_ptr<ir::Tensor> ir_output,
+                           std::shared_ptr<Builder> ir_builder) override {
         auto ir_output_normalize_shape = ir_output->type->NormalizeShape();
         GALOIS_ASSERT(ir_input->type->shape == ir_output_normalize_shape);
 
@@ -66,7 +63,7 @@ class PackCreator : public OperatorCreator {
         auto ir_output_block = ir_builder->CreateIdentityAccessor(ir_output);
         if (ir_output_block->type->IsScalar()) {
             auto ir_input_block = ir_builder->CreateIdentityAccessor(ir_input);
-            this->AffineExpress({ir_input_block}, {ir_output_block}, ir_builder);
+            this->AffineExpressImpl(ir_input_block, ir_output_block, ir_builder);
         } else {
             auto output_block_normalize_shape = ir_output_block->type->NormalizeShape();
             auto ir_input_block_origin = ir_builder->CreateIdentityAccessor(ir_input);
@@ -74,7 +71,7 @@ class PackCreator : public OperatorCreator {
                 output_block_normalize_shape.array();
             auto ir_input_block =
                 ir_builder->Create<Slice>(ir_input_block_origin, output_block_normalize_shape);
-            this->AffineExpress({ir_input_block}, {ir_output_block}, ir_builder);
+            this->AffineExpressImpl(ir_input_block, ir_output_block, ir_builder);
         }
     }
 

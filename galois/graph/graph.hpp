@@ -20,16 +20,61 @@ class OperatorCreator {
     virtual std::shared_ptr<ir::TensorType> InferType(
         std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) = 0;
     virtual void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
-                               std::vector<std::shared_ptr<ir::Tensor>> ir_outputs,
                                std::shared_ptr<ir::Builder> ir_builder) = 0;
 
     ~OperatorCreator() {}
 };
 
+class UnaryOperatorCreator : public OperatorCreator {
+   public:
+    virtual std::shared_ptr<ir::TensorType> InferTypeImpl(
+        std::shared_ptr<ir::TensorType> ir_input_type) = 0;
+
+    std::shared_ptr<ir::TensorType> InferType(
+        std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) override {
+        return this->InferTypeImpl(ir_input_types.front());
+    }
+
+    virtual void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
+                                   std::shared_ptr<ir::Tensor> ir_output,
+                                   std::shared_ptr<ir::Builder> ir_builder) = 0;
+
+    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
+        auto ir_output = ir_builder->Create<ir::Alloca>(this->InferTypeImpl(ir_inputs[0]->type));
+        this->AffineExpressImpl(ir_inputs[0], ir_output, ir_builder);
+        ir_builder->Create<ir::Return>(ir_output);
+    }
+};
+
+class BinaryOperatorCreator : public OperatorCreator {
+   public:
+    virtual std::shared_ptr<ir::TensorType> InferTypeImpl(
+        std::shared_ptr<ir::TensorType> ir_input_type0,
+        std::shared_ptr<ir::TensorType> ir_input_type1) = 0;
+
+    std::shared_ptr<ir::TensorType> InferType(
+        std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) override {
+        return this->InferTypeImpl(ir_input_types.front(), ir_input_types.back());
+    }
+
+    virtual void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input0,
+                                   std::shared_ptr<ir::Tensor> ir_input1,
+                                   std::shared_ptr<ir::Tensor> ir_output,
+                                   std::shared_ptr<ir::Builder> ir_builder) = 0;
+
+    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
+        auto ir_output = ir_builder->Create<ir::Alloca>(
+            this->InferTypeImpl(ir_inputs[0]->type, ir_inputs[1]->type));
+        this->AffineExpressImpl(ir_inputs[0], ir_inputs[1], ir_output, ir_builder);
+        ir_builder->Create<ir::Return>(ir_output);
+    }
+};
+
 }  // namespace galois::op
 
 namespace galois::graph {
-
 using namespace ir;
 
 class OperatorTag {
@@ -65,9 +110,10 @@ class ComputeNode : public Instruction {
     virtual ~ComputeNode() {}
 
    public:
-    // std::string operator_name;
     std::shared_ptr<op::OperatorCreator> operator_creator;
     std::vector<std::shared_ptr<ComputeNode>> inputs;
+
+    std::shared_ptr<ir::Tensor> ir_tensor;
 };
 
 class Input : public ComputeNode {

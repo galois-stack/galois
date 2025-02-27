@@ -2,6 +2,7 @@
 
 #include "galois/graph/graph.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/op/binary_operator.hpp"
 
 namespace galois::op {
 
@@ -91,38 +92,35 @@ class ProductKernel256 : public Kernel {
     }
 };
 
-class MatrixMultiplyCreator : public OperatorCreator {
+class MatrixMultiplyCreator : public BinaryOperatorCreator {
    public:
     static std::shared_ptr<MatrixMultiplyCreator> Create() {
         return std::make_shared<MatrixMultiplyCreator>();
     }
 
-    std::shared_ptr<TensorType> InferType(
-        std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
-        if (ir_input_types[0]->IsScalar() && ir_input_types[1]->IsScalar()) {
-            GALOIS_ASSERT(ir_input_types[0] == ir_input_types[1]);
-            return ir_input_types[0];
+    std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_mat_a_type,
+                                              std::shared_ptr<TensorType> ir_mat_b_type) override {
+        if (ir_mat_a_type->IsScalar() && ir_mat_b_type->IsScalar()) {
+            GALOIS_ASSERT(ir_mat_a_type == ir_mat_a_type);
+            return ir_mat_a_type;
         }
 
         auto ir_value_type =
-            this->InferType({ir_input_types[0]->value_type, ir_input_types[1]->value_type});
-        return TensorType::CreateMatrixType(ir_value_type, ir_input_types[0]->shape[0],
-                                            ir_input_types[1]->shape[1]);
+            this->InferType({ir_mat_a_type->value_type, ir_mat_b_type->value_type});
+        return TensorType::CreateMatrixType(ir_value_type, ir_mat_a_type->shape[0],
+                                            ir_mat_b_type->shape[1]);
     }
 
-    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<ir::Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) override {
-        for (auto ir_kernel : ir_builder->kernel_queue) {
-            if (ir_kernel->Match(ir_inputs, ir_outputs, ir_builder)) {
-                ir_kernel->Build(ir_inputs, ir_outputs, ir_builder);
-                return;
-            }
-        }
-
-        auto ir_mat_a = ir_inputs[0];
-        auto ir_mat_b = ir_inputs[1];
-        auto ir_mat_c = ir_outputs[0];
+    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_mat_a,
+                           std::shared_ptr<ir::Tensor> ir_mat_b,
+                           std::shared_ptr<ir::Tensor> ir_mat_c,
+                           std::shared_ptr<Builder> ir_builder) override {
+        // for (auto ir_kernel : ir_builder->kernel_queue) {
+        //     if (ir_kernel->Match(ir_inputs, ir_outputs, ir_builder)) {
+        //         ir_kernel->Build(ir_inputs, ir_outputs, ir_builder);
+        //         return;
+        //     }
+        // }
 
         if (ir_mat_a->type->IsScalar()) {
             auto ir_re =
@@ -137,8 +135,8 @@ class MatrixMultiplyCreator : public OperatorCreator {
 
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector3i64(
             ir_mat_a->type->shape[0], ir_mat_a->type->shape[1], ir_mat_b->type->shape[1]));
-        std::unique_ptr<ScopeGuard> pthread_block_scope;
-        ir_grid->enable_multi_thread = ir_mat_a->type->enable_multi_thread;
+        // std::unique_ptr<ScopeGuard> pthread_block_scope;
+        // ir_grid->enable_multi_thread = ir_mat_a->type->enable_multi_thread;
 
         auto ir_accessor_a = ir_builder->CreateAccessor(ir_mat_a);
         ir_accessor_a->transform_matrix(0, 0) = 1;
@@ -150,8 +148,11 @@ class MatrixMultiplyCreator : public OperatorCreator {
         ir_accessor_c->transform_matrix(0, 0) = 1;
         ir_accessor_c->transform_matrix(1, 2) = 1;
 
-        this->AffineExpress({ir_accessor_a, ir_accessor_b}, {ir_accessor_c}, ir_builder);
+        this->AffineExpressImpl(ir_accessor_a, ir_accessor_b, ir_accessor_c, ir_builder);
     }
+
+   private:
+    std::shared_ptr<SetZeroCreator> set_zero_creator = SetZeroCreator::Create();
 };
 
 }  // namespace galois::op

@@ -34,22 +34,21 @@ class GemmOptimizer {
         return ir_packed_mat;
     }
 
-    void Optimize(std::shared_ptr<ir::OperatorFunction> ir_matrix_multiply) {
-        auto ir_mat_type_a = ir_matrix_multiply->input_types[0];
-        auto ir_mat_type_b = ir_matrix_multiply->input_types[1];
-        auto ir_mat_type_c = ir_matrix_multiply->output_types[0];
-        auto ir_mat_a = ir_matrix_multiply->inputs[0];
-        auto ir_mat_b = ir_matrix_multiply->inputs[1];
-        auto ir_mat_c = ir_matrix_multiply->outputs[0];
-
+    std::shared_ptr<ir::OperatorFunction> Optimize(
+        std::shared_ptr<ir::OperatorFunction> ir_matrix_multiply) {
         ir_matrix_multiply->values.clear();
         auto ir_builder = ir::Builder::Create();
+        auto [ir_gemm_operator, scope] = ir_builder->CreateOperator(
+            ir_matrix_multiply->GetOperatorType(), ir_matrix_multiply->name + "_gemm");
+
         ir_builder->kernel_queue.push_back(op::ProductKernel::Create());
-        ir_builder->block_stack.push(ir_matrix_multiply);
-        ir_builder->iterator_stack.push(ir_matrix_multiply->values.end());
 
         auto ir_ts_type_a = ir::f32(4, 1)(2, 1)(1, 512)(64, 1);
         auto ir_ts_type_b = ir::f32(1, 4)(1, 2)(512, 1)(1, 64);
+
+        auto ir_mat_a = ir_gemm_operator->inputs[0];
+        auto ir_mat_b = ir_gemm_operator->inputs[1];
+        // auto ir_mat_c = ir_builder->Create<ir::Alloca>(ir_ts_type_c);
 
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_ts_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_ts_type_b, ir_builder);
@@ -57,8 +56,13 @@ class GemmOptimizer {
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
 
-        auto sp_padding_creator = op::PaddingCreator::Create(ir_mat_c->type->shape);
-        sp_padding_creator->AffineExpress({ir_unpacked_mat_c}, {ir_mat_c}, ir_builder);
+        auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->out_type;
+        auto sp_padding_creator = op::SliceCreator::Create(ir_mat_c_type->shape);
+        auto ir_mat_c =
+            ir_builder->Express<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
+        ir_builder->Create<ir::Return>(ir_mat_c);
+
+        return ir_gemm_operator;
     }
 };
 
