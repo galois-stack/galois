@@ -425,45 +425,48 @@ inline void Repeat(std::shared_ptr<ir::OperatorFunction> ir_operator, int64_t ti
 }
 
 inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
-    auto ir_captured_tensor_set = CaptureExternalTensors(ir_block);
-    std::vector<std::shared_ptr<ir::TensorType>> input_types;
-    std::transform(RANGE(ir_captured_tensor_set), std::back_inserter(input_types),
-                   [](std::shared_ptr<ir::Tensor> ir_tensor) {
-                       GALOIS_ASSERT(ir_tensor->type);
-                       return ir_tensor->type;
-                   });
-    std::vector<std::shared_ptr<ir::TensorType>> output_types;
-    auto ir_operator_function = ir::OperatorFunction::Create(input_types, output_types);
-    ir_operator_function->name = "__tmp_todo";
-    ir_operator_function->fullname = ir_operator_function->name;
-    std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>>
-        captured_tensor_dict;
-    auto ir_captured_tensor_set_iter = ir_captured_tensor_set.begin();
-    for (int64_t i = 0; i < ir_captured_tensor_set.size(); ++i, ++ir_captured_tensor_set_iter) {
-        captured_tensor_dict[*ir_captured_tensor_set_iter] = ir_operator_function->inputs[i];
-    }
+    //     auto ir_captured_tensor_set = CaptureExternalTensors(ir_block);
+    //     std::vector<std::shared_ptr<ir::TensorType>> input_types;
+    //     std::transform(RANGE(ir_captured_tensor_set), std::back_inserter(input_types),
+    //                    [](std::shared_ptr<ir::Tensor> ir_tensor) {
+    //                        GALOIS_ASSERT(ir_tensor->type);
+    //                        return ir_tensor->type;
+    //                    });
+    //     std::vector<std::shared_ptr<ir::TensorType>> output_types;
+    //     auto ir_operator_function = ir::OperatorFunction::Create(input_types, output_types);
+    //     ir_operator_function->name = "__tmp_todo";
+    //     ir_operator_function->fullname = ir_operator_function->name;
+    //     std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>>
+    //         captured_tensor_dict;
+    //     auto ir_captured_tensor_set_iter = ir_captured_tensor_set.begin();
+    //     for (int64_t i = 0; i < ir_captured_tensor_set.size(); ++i,
+    //     ++ir_captured_tensor_set_iter) {
+    //         captured_tensor_dict[*ir_captured_tensor_set_iter] = ir_operator_function->inputs[i];
+    //     }
 
-    ir_operator_function->values = std::move(ir_block->values);
-    EachTensor(Cast<ir ::Block>(ir_operator_function), [=](std::shared_ptr<ir::Tensor> ir_tensor) {
-        if (auto ir_instruction = Cast<ir::Instruction>(ir_tensor)) {
-            for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
-                auto ir_operand = ir_instruction->GetOperand(i);
-                if (ir_captured_tensor_set.count(ir_operand)) {
-                    ir_instruction->SetOperand(i, captured_tensor_dict.at(ir_operand));
-                }
-            }
-        }
-    });
+    //     ir_operator_function->values = std::move(ir_block->values);
+    //     EachTensor(Cast<ir ::Block>(ir_operator_function), [=](std::shared_ptr<ir::Tensor>
+    //     ir_tensor) {
+    //         if (auto ir_instruction = Cast<ir::Instruction>(ir_tensor)) {
+    //             for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
+    //                 auto ir_operand = ir_instruction->GetOperand(i);
+    //                 if (ir_captured_tensor_set.count(ir_operand)) {
+    //                     ir_instruction->SetOperand(i, captured_tensor_dict.at(ir_operand));
+    //                 }
+    //             }
+    //         }
+    //     });
 
-    auto ir_builder = ir::Builder::Create();
-    ir_block->values.clear();
-    ir_block->values.push_back(ir_operator_function);
-    ir_builder->block_stack.push(ir_block);
-    ir_builder->iterator_stack.push(ir_block->values.end());
-    std::vector<std::shared_ptr<ir::Tensor>> ir_captured_tensor_vec(RANGE(ir_captured_tensor_set));
-    auto ir_call = ir_builder->Create<ir::Call>(ir_operator_function, ir_captured_tensor_vec,
-                                                std::vector<std::shared_ptr<ir::Tensor>>{});
-    ir_call->annotation_dict["enable_multi_thread"] = {};
+    //     auto ir_builder = ir::Builder::Create();
+    //     ir_block->values.clear();
+    //     ir_block->values.push_back(ir_operator_function);
+    //     ir_builder->block_stack.push(ir_block);
+    //     ir_builder->iterator_stack.push(ir_block->values.end());
+    //     std::vector<std::shared_ptr<ir::Tensor>>
+    //     ir_captured_tensor_vec(RANGE(ir_captured_tensor_set)); auto ir_call =
+    //     ir_builder->Create<ir::Call>(ir_operator_function, ir_captured_tensor_vec,
+    //                                                 std::vector<std::shared_ptr<ir::Tensor>>{});
+    //     ir_call->annotation_dict["enable_multi_thread"] = {};
 }
 
 // inline void CombineElementwiseOperators(std::shared_ptr<ir::Model> ir_model) {

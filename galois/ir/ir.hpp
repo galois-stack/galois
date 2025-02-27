@@ -279,7 +279,6 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     MemoryType memory_type = MemoryType::Host;
     int64_t bytes = 0;
 
-    std::vector<std::shared_ptr<TensorType>> input_types;
     bool enable_multi_thread = false;
 
     std::shared_ptr<pir::Type> pir_type;
@@ -803,30 +802,69 @@ class Block : public Tensor {
     std::list<std::shared_ptr<Tensor>> values;
 };
 
+class VoidType : public TensorType {
+   protected:
+    VoidType() = default;
+
+   public:
+    static std::shared_ptr<VoidType> Create() {
+        for (auto ir_type : global_context.created_types) {
+            if (auto ir_void_type = Cast<VoidType>(ir_type)) {
+                return ir_void_type;
+            }
+        }
+
+        std::shared_ptr<VoidType> self(new VoidType);
+        self->name = "void";
+        self->fullname = "void";
+        global_context.created_types.push_back(self);
+        return self;
+    }
+};
+
+class OperatorType : public TensorType {
+   public:
+    static std::shared_ptr<OperatorType> Create(
+        std::vector<std::shared_ptr<TensorType>> ir_in_types,
+        std::shared_ptr<TensorType> ir_out_types) {
+        std::shared_ptr<OperatorType> self(new OperatorType);
+        self->in_types = ir_in_types;
+        self->out_type = ir_out_types;
+        self->name = "(";
+        for (auto ir_in_type : ir_in_types) {
+            self->name += ir_in_type->name + ",";
+        }
+
+        self->name += ") -> " + ir_out_types->name;
+        self->fullname = self->name;
+        return self;
+    }
+
+   public:
+    std::vector<std::shared_ptr<TensorType>> in_types;
+    std::shared_ptr<TensorType> out_type;
+};
+
 /// @brief An operator of tensors, which is liked as a node of ComputingGraph
 class OperatorFunction : public Block {
    public:
     static std::shared_ptr<OperatorFunction> Create(
-        std::vector<std::shared_ptr<TensorType>> ir_input_types,
-        std::vector<std::shared_ptr<TensorType>> ir_output_types) {
+        std::shared_ptr<OperatorType> ir_operator_type) {
         std::shared_ptr<OperatorFunction> self(new OperatorFunction);
-        self->input_types = ir_input_types;
-        self->output_types = ir_output_types;
-        std::transform(RANGE(self->input_types), std::back_inserter(self->inputs),
-                       [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
+        self->type = ir_operator_type;
 
-        std::transform(RANGE(self->output_types), std::back_inserter(self->outputs),
+        std::transform(RANGE(ir_operator_type->in_types), std::back_inserter(self->inputs),
                        [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
 
         self->tag = "OperatorFunction";
         return self;
     }
 
+    std::shared_ptr<OperatorType> GetOperatorType() { return Cast<OperatorType>(this->type); }
+
    public:
-    std::vector<std::shared_ptr<TensorType>> input_types;
-    std::vector<std::shared_ptr<TensorType>> output_types;
     std::vector<std::shared_ptr<Tensor>> inputs;
-    std::vector<std::shared_ptr<Tensor>> outputs;
+
     std::shared_ptr<pir::Function> pir_function = nullptr;
 };
 
@@ -909,23 +947,16 @@ class Call : public Instruction {
 
    public:
     static std::shared_ptr<Call> Create(std::shared_ptr<OperatorFunction> ir_operator,
-                                        std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
-                                        std::vector<std::shared_ptr<ir::Tensor>> ir_outputs) {
+                                        std::vector<std::shared_ptr<ir::Tensor>> ir_inputs) {
         std::shared_ptr<Call> self(new Call);
         self->input_size = ir_inputs.size();
-        self->output_size = ir_outputs.size();
-        self->OperandResize(1 + self->input_size + self->output_size);
+        self->OperandResize(1 + self->input_size);
         self->OperatorFunction(ir_operator);
         auto iter_inputs = ir_inputs.begin();
         for (int64_t i = 0; i < self->InputSize(); ++i, ++iter_inputs) {
             self->Input(i, *iter_inputs);
         }
-        auto iter_outputs = ir_outputs.begin();
-        for (int64_t i = 0; i < self->OutputSize(); ++i, ++iter_outputs) {
-            self->Output(i, *iter_outputs);
-        }
-        // TODO: 需要进一步处理
-        self->type = nullptr;
+        self->type = ir_operator->GetOperatorType()->out_type;
         self->tag = "Call";
         return self;
     }
@@ -942,14 +973,6 @@ class Call : public Instruction {
         this->SetOperand(1 + i, ir_argument);
     }
     int64_t InputSize() { return this->input_size; }
-
-    std::shared_ptr<ir::Tensor> Output(int64_t i) {
-        return this->GetOperand(1 + this->input_size + i);
-    }
-    void Output(int64_t i, std::shared_ptr<ir::Tensor> ir_argument) {
-        this->SetOperand(1 + this->input_size + i, ir_argument);
-    }
-    int64_t OutputSize() { return this->output_size; }
 
    private:
     int64_t input_size;
@@ -979,6 +1002,24 @@ class Free : public Instruction {
         self->OperandResize(1);
         self->Tensor(ir_tensor);
         self->tag = "Free";
+        return self;
+    }
+
+    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+};
+
+class Return : public Instruction {
+   protected:
+    Return() = default;
+
+   public:
+    static std::shared_ptr<Return> Create(std::shared_ptr<Tensor> ir_value) {
+        std::shared_ptr<Return> self(new Return);
+        self->OperandResize(1);
+        self->type = ir_value->type;
+        self->Tensor(ir_value);
+        self->tag = "Return";
         return self;
     }
 
@@ -1087,6 +1128,15 @@ inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
     self->bytes = self->data_type->bytes;
     global_context.created_types.push_back(self);
     return self;
+}
+
+inline std::vector<std::shared_ptr<TensorType>> GetTensorTypes(
+    std::vector<std::shared_ptr<Tensor>> ir_tensors) {
+    std::vector<std::shared_ptr<TensorType>> ir_types;
+    for (auto ir_tensor : ir_tensors) {
+        ir_types.push_back(ir_tensor->type);
+    }
+    return ir_types;
 }
 
 }  // namespace galois::ir

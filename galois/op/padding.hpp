@@ -5,7 +5,7 @@
 
 namespace galois::op {
 
-class PaddingCreator : public OperatorCreator {
+class PaddingCreator : public UnaryOperatorCreator {
    public:
     static std::shared_ptr<PaddingCreator> Create(Eigen::VectorXi64 padding_shape) {
         std::shared_ptr<PaddingCreator> self(new PaddingCreator);
@@ -13,18 +13,13 @@ class PaddingCreator : public OperatorCreator {
         return self;
     }
 
-    std::shared_ptr<TensorType> InferType(
-        std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
-        GALOIS_ASSERT(ir_input_types.size() == 1);
-        return TensorType::Create(Cast<TensorType>(ir_input_types.front())->value_type,
-                                  padding_shape);
+    std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_input_type) override {
+        return TensorType::Create(Cast<TensorType>(ir_input_type)->value_type, padding_shape);
     };
 
-    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<ir::Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) override {
-        auto ir_input = ir_inputs.front();
-        auto ir_output = ir_outputs.front();
+    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
+                           std::shared_ptr<ir::Tensor> ir_output,
+                           std::shared_ptr<Builder> ir_builder) override {
         auto input_shape = ir_input->type->shape;
         auto output_shape = ir_output->type->shape;
 
@@ -56,7 +51,7 @@ class PaddingCreator : public OperatorCreator {
             }
             auto ir_output_slice =
                 ir_builder->Create<Slice>(ir_output_left_origin, output_slice_shape);
-            AffineExpress({ir_input_slice}, {ir_output_slice}, ir_builder);
+            this->AffineExpressImpl(ir_input_slice, ir_output_slice, ir_builder);
         }
         {
             Eigen::VectorXi64 remainder_shape = output_shape;
@@ -65,7 +60,7 @@ class PaddingCreator : public OperatorCreator {
             ir_output_left_origin->shift_vector[0] = input_shape[0];
             auto ir_output_slice =
                 ir_builder->Create<Slice>(ir_output_left_origin, remainder_shape);
-            set_zero_creator.AffineExpress({ir_output_slice}, {}, ir_builder);
+            set_zero_creator.AffineExpress({ir_output_slice}, ir_builder);
         }
     }
 

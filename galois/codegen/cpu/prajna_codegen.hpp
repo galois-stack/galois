@@ -13,9 +13,9 @@ namespace galois::codegen::cpu {
 
 using namespace ir;
 
-class LlvmCodegen {
+class PrajnaCodegen {
    public:
-    LlvmCodegen(std::shared_ptr<prajna::lowering::SymbolTable> prajna_symbol_table) {
+    PrajnaCodegen(std::shared_ptr<prajna::lowering::SymbolTable> prajna_symbol_table) {
         // auto ir_symbol_table = prajna::lowering::SymbolTable::Create(nullptr);
         auto pir_module = pir::Module::Create();
         auto pir_logger = prajna::Logger::Create("");
@@ -37,6 +37,11 @@ class LlvmCodegen {
 
     std::shared_ptr<pir::Type> EmitType(std::shared_ptr<ir::TensorType> ir_type) {
         if (ir_type->pir_type) {
+            return ir_type->pir_type;
+        }
+
+        if (Is<VoidType>(ir_type)) {
+            ir_type->pir_type = pir::VoidType::Create();
             return ir_type->pir_type;
         }
 
@@ -131,16 +136,26 @@ class LlvmCodegen {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
-        for (auto ir_input_type : ir_operator->input_types) {
+        for (auto ir_input_type : ir_operator->GetOperatorType()->in_types) {
             pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_input_type)));
         }
 
-        for (auto ir_output_type : ir_operator->output_types) {
-            pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_output_type)));
+        std::list<std::shared_ptr<pir::Type>> pir_output_types;
+        auto pir_out_type = this->EmitType(ir_operator->GetOperatorType()->out_type);
+        if (prajna::Is<pir::VoidType>(pir_out_type)) {
+            pir_output_types.push_back(pir_out_type);
+        } else {
+            pir_output_types.push_back(pir::PointerType::Create(pir_out_type));
         }
 
-        auto pir_function_type =
-            pir::FunctionType::Create(pir_parameter_types, pir::VoidType::Create());
+        std::shared_ptr<pir::FunctionType> pir_function_type;
+        if (pir_output_types.size() == 1) {
+            pir_function_type =
+                pir::FunctionType::Create(pir_parameter_types, pir_output_types.front());
+        } else {
+            pir_function_type =
+                pir::FunctionType::Create(pir_parameter_types, pir::VoidType::Create());
+        }
 
         ir_operator->pir_function =
             pir_builder->CreateFunction(ir_operator->name, pir_function_type);
@@ -153,7 +168,7 @@ class LlvmCodegen {
         });
 
         auto pir_function_parameters_iter = ir_operator->pir_function->parameters.begin();
-        for (int64_t i = 0; i < ir_operator->input_types.size(); ++i) {
+        for (int64_t i = 0; i < ir_operator->inputs.size(); ++i) {
             ir_operator->inputs[i]->pir_value =
                 pir_builder->Create<pir::DeferencePointer>(*pir_function_parameters_iter);
             (*pir_function_parameters_iter)->no_alias = true;
@@ -163,20 +178,20 @@ class LlvmCodegen {
             ++pir_function_parameters_iter;
         }
 
-        for (int64_t i = 0; i < ir_operator->output_types.size();
-             ++i, ++pir_function_parameters_iter) {
-            ir_operator->outputs[i]->pir_value =
-                pir_builder->Create<pir::DeferencePointer>(*pir_function_parameters_iter);
-            (*pir_function_parameters_iter)->no_alias = true;
-            (*pir_function_parameters_iter)->no_capture = true;
-            (*pir_function_parameters_iter)->no_undef = true;
-        }
+        // for (int64_t i = 0; i < ir_operator->output_types.size();
+        //      ++i, ++pir_function_parameters_iter) {
+        //     ir_operator->outputs[i]->pir_value =
+        //         pir_builder->Create<pir::DeferencePointer>(*pir_function_parameters_iter);
+        //     (*pir_function_parameters_iter)->no_alias = true;
+        //     (*pir_function_parameters_iter)->no_capture = true;
+        //     (*pir_function_parameters_iter)->no_undef = true;
+        // }
 
         for (auto ir_tensor : ir_operator->values) {
             this->EmitTensor(ir_tensor);
         }
 
-        pir_builder->Create<pir::Return>(pir_builder->Create<pir::VoidValue>());
+        pir_builder->ReturnVoid();
     }
 
     void EmitWrite(std::shared_ptr<ir::Write> ir_write_accessor) {
@@ -345,6 +360,11 @@ class LlvmCodegen {
             return;
         }
 
+        if (auto ir_return = Cast<ir::Return>(ir_instruction)) {
+            this->EmitReturn(ir_return);
+            return;
+        }
+
         GALOIS_UNREACHABLE;
     }
 
@@ -362,6 +382,14 @@ class LlvmCodegen {
         }
 
         GALOIS_UNREACHABLE;
+    }
+
+    std::shared_ptr<pir::Value> GetPrajnaPointerFromTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
+        if (auto pir_deference = prajna::Cast<pir::DeferencePointer>(ir_tensor->pir_value)) {
+            return pir_deference->Pointer();
+        } else {
+            return ir_tensor->pir_value;
+        }
     }
 
     void EmitAccessor(std::shared_ptr<ir::Accessor> ir_accessor) {
@@ -408,8 +436,9 @@ class LlvmCodegen {
             pir_linear_index);
 
         auto pir_tensor_value_type = this->EmitType(ir_accessor->Tensor()->type->value_type);
+
         auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            prajna::Cast<pir::DeferencePointer>(ir_accessor->Tensor()->pir_value)->Pointer(),
+            this->GetPrajnaPointerFromTensor(ir_accessor->Tensor()),
             pir::PointerType::Create(pir_tensor_value_type));
         ;
         GALOIS_ASSERT(ir_accessor->Tensor()->type->value_type == ir_accessor->type);
@@ -669,6 +698,20 @@ class LlvmCodegen {
         GALOIS_TODO;
     }
 
+    std::shared_ptr<pir::Value> GetPirValueOfTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
+        if (auto pir_deference_pointer =
+                prajna::Cast<pir::DeferencePointer>(ir_tensor->pir_value)) {
+            return pir_deference_pointer->Pointer();
+        } else {
+            return ir_tensor->pir_value;
+        }
+    }
+
+    void EmitReturn(std::shared_ptr<ir::Return> ir_return) {
+        auto pir_pointer_value = GetPirValueOfTensor(ir_return->Tensor());
+        pir_builder->Create<pir::Return>(pir_pointer_value);
+    }
+
     void EmitFree(std::shared_ptr<ir::Free> ir_free) {
         this->EmitTensor(ir_free->Tensor());
         ir_free->pir_value = pir_builder->Create<pir::Call>(
@@ -701,13 +744,15 @@ class LlvmCodegen {
                 pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
                     prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
             }
-            for (int64_t i = 0; i < ir_call->OutputSize(); ++i) {
-                pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
-                    prajna::Cast<pir::VariableLiked>(ir_call->Output(i)->pir_value)));
-            }
 
             ir_call->pir_value = pir_builder->Create<pir::Call>(
                 ir_call->OperatorFunction()->pir_value, pir_arguments);
+
+            // TODO: warlaround
+            auto ir_operator_type = ir_call->OperatorFunction()->GetOperatorType();
+            if (!Is<VoidType>(ir_operator_type->out_type)) {
+                ir_call->pir_value = pir_builder->Create<pir::DeferencePointer>(ir_call->pir_value);
+            }
         } else {  // async invoke
             std::list<std::shared_ptr<pir::Value>> pir_arguments;
             int64_t grid_argument_index;
@@ -717,10 +762,6 @@ class LlvmCodegen {
                 if (ir_call->Input(i) == this->grid_stack.top()->indices) {
                     grid_argument_index = i;
                 }
-            }
-            for (int64_t i = 0; i < ir_call->OutputSize(); ++i) {
-                pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
-                    prajna::Cast<pir::VariableLiked>(ir_call->Output(i)->pir_value)));
             }
 
             std::list<std::shared_ptr<pir::Field>> pir_fields;

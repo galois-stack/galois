@@ -26,9 +26,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
         auto ir_tensor = Tensor_::Create(std::forward<Args_>(args)...);
         static_assert(std::is_base_of<Tensor, Tensor_>::value);
         this->Insert(ir_tensor);
-        if (auto ir_grid = Cast<Grid>(ir_tensor)) {
-            this->Insert(ir_grid->indices);
-        }
         return ir_tensor;
     }
 
@@ -79,9 +76,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
     }
 
     std::tuple<std::shared_ptr<OperatorFunction>, std::unique_ptr<ScopeGuard>> CreateOperator(
-        std::vector<std::shared_ptr<TensorType>> ir_input_types,
-        std::vector<std::shared_ptr<TensorType>> ir_output_types, std::string name) {
-        auto ir_operator = OperatorFunction::Create(ir_input_types, ir_output_types);
+        std::shared_ptr<OperatorType> ir_operator_type, std::string name) {
+        auto ir_operator = OperatorFunction::Create(ir_operator_type);
         ir_operator->name = name;
         ir_operator->fullname = this->operator_stack.size()
                                     ? ir_operator->name + this->operator_stack.top()->fullname
@@ -112,9 +108,16 @@ class Builder : public std::enable_shared_from_this<Builder> {
         std::transform(RANGE(inputs), std::back_inserter(input_types),
                        [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });
         auto ir_output_type = sp_creator->InferType(input_types);
-        auto ir_output = this->Create<Alloca>(ir_output_type);
-        sp_creator->AffineExpress(inputs, {ir_output}, this->shared_from_this());
-        return ir_output;
+        auto ir_operator_type = OperatorType::Create(input_types, ir_output_type);
+        std::shared_ptr<OperatorFunction> ir_operator;
+        {
+            // TODO: give a valid name
+            auto [ir_tmp_operator, op_scope] =
+                this->CreateOperator(ir_operator_type, "unname" + std::to_string(this->id++));
+            ir_operator = ir_tmp_operator;
+            sp_creator->AffineExpress(ir_tmp_operator->inputs, this->shared_from_this());
+        }
+        return this->Create<Call>(ir_operator, inputs);
     };
 
     std::shared_ptr<Accessor> CreateAccessor(std::shared_ptr<Tensor> ir_tensor) {
@@ -147,6 +150,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
     std::stack<std::shared_ptr<Block>> block_stack;
     std::stack<std::list<std::shared_ptr<Tensor>>::iterator> iterator_stack;
     std::stack<std::vector<std::shared_ptr<Tensor>>> temp_tensors_stack;
+
+    size_t id = 0;
 
     std::list<std::shared_ptr<Kernel>> kernel_queue;
 };
