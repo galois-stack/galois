@@ -8,27 +8,32 @@ namespace galois::op {
 
 using namespace ir;
 
-class ProductKernel : public Kernel {
+class MatrixMultiplyKernel {
    public:
-    static std::shared_ptr<ProductKernel> Create() { return std::make_shared<ProductKernel>(); }
+    virtual bool Match(std::shared_ptr<TensorType> ir_mat_type_a,
+                       std::shared_ptr<TensorType> ir_mat_type_b) = 0;
 
-    bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-               std::vector<std::shared_ptr<Tensor>> ir_outputs, std::shared_ptr<Builder>) override {
-        auto ir_mat_a = ir_inputs[0];
-        auto ir_mat_b = ir_inputs[1];
-        if ((ir_mat_a->type == TensorType::CreateMatrixType(FloatType::Create(32), 4, 1)) &&
-            ir_mat_b->type == TensorType::CreateMatrixType(FloatType::Create(32), 1, 4)) {
+    virtual void Express(std::shared_ptr<Tensor> ir_mat_a, std::shared_ptr<Tensor> ir_mat_b,
+                         std::shared_ptr<Tensor> ir_mat_c, std::shared_ptr<Builder> ir_builder) = 0;
+};
+
+class MatrixMultiplyKernel4x1x4 : public MatrixMultiplyKernel {
+   public:
+    static std::shared_ptr<MatrixMultiplyKernel4x1x4> Create() {
+        return std::make_shared<MatrixMultiplyKernel4x1x4>();
+    }
+
+    bool Match(std::shared_ptr<TensorType> ir_mat_type_a,
+               std::shared_ptr<TensorType> ir_mat_type_b) override {
+        if ((ir_mat_type_a == TensorType::CreateMatrixType(FloatType::Create(32), 4, 1)) &&
+            ir_mat_type_b == TensorType::CreateMatrixType(FloatType::Create(32), 1, 4)) {
             return true;
         }
         return false;
     }
 
-    void Build(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-               std::vector<std::shared_ptr<Tensor>> ir_outputs,
-               std::shared_ptr<Builder> ir_builder) override {
-        auto ir_mat_a = ir_inputs[0];
-        auto ir_mat_b = ir_inputs[1];
-        auto ir_mat_c = ir_outputs[0];
+    void Express(std::shared_ptr<Tensor> ir_mat_a, std::shared_ptr<Tensor> ir_mat_b,
+                 std::shared_ptr<Tensor> ir_mat_c, std::shared_ptr<Builder> ir_builder) override {
         Eigen::VectorXi64 v4(1);
         v4[0] = 4;
         auto ir_f32x4_type = TensorType::Create(FloatType::Create(32), v4);
@@ -49,29 +54,23 @@ class ProductKernel : public Kernel {
     }
 };
 
-class ProductKernel256 : public Kernel {
+class MatrixMultiplyKernel8x1x8 : public MatrixMultiplyKernel {
    public:
-    static std::shared_ptr<ProductKernel256> Create() {
-        return std::make_shared<ProductKernel256>();
+    static std::shared_ptr<MatrixMultiplyKernel8x1x8> Create() {
+        return std::make_shared<MatrixMultiplyKernel8x1x8>();
     }
 
-    bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-               std::vector<std::shared_ptr<Tensor>> ir_outputs, std::shared_ptr<Builder>) override {
-        auto ir_mat_a = ir_inputs[0];
-        auto ir_mat_b = ir_inputs[1];
-        if ((ir_mat_a->type == TensorType::CreateMatrixType(FloatType::Create(32), 8, 1)) &&
-            ir_mat_b->type == TensorType::CreateMatrixType(FloatType::Create(32), 1, 8)) {
+    bool Match(std::shared_ptr<TensorType> ir_mat_type_a,
+               std::shared_ptr<TensorType> ir_mat_type_b) override {
+        if ((ir_mat_type_a == TensorType::CreateMatrixType(FloatType::Create(32), 8, 1)) &&
+            ir_mat_type_b == TensorType::CreateMatrixType(FloatType::Create(32), 1, 8)) {
             return true;
         }
         return false;
     }
 
-    void Build(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-               std::vector<std::shared_ptr<Tensor>> ir_outputs,
-               std::shared_ptr<Builder> ir_builder) override {
-        auto ir_mat_a = ir_inputs[0];
-        auto ir_mat_b = ir_inputs[1];
-        auto ir_mat_c = ir_outputs[0];
+    void Express(std::shared_ptr<Tensor> ir_mat_a, std::shared_ptr<Tensor> ir_mat_b,
+                 std::shared_ptr<Tensor> ir_mat_c, std::shared_ptr<Builder> ir_builder) override {
         Eigen::VectorXi64 v8(1);
         v8[0] = 8;
         auto ir_f32x8_type = TensorType::Create(FloatType::Create(32), v8);
@@ -115,12 +114,12 @@ class MatrixMultiplyCreator : public BinaryOperatorCreator {
                            std::shared_ptr<ir::Tensor> ir_mat_b,
                            std::shared_ptr<ir::Tensor> ir_mat_c,
                            std::shared_ptr<Builder> ir_builder) override {
-        // for (auto ir_kernel : ir_builder->kernel_queue) {
-        //     if (ir_kernel->Match(ir_inputs, ir_outputs, ir_builder)) {
-        //         ir_kernel->Build(ir_inputs, ir_outputs, ir_builder);
-        //         return;
-        //     }
-        // }
+        for (auto ir_kernel : ir_builder->kernel_queue) {
+            if (ir_kernel->Match(ir_mat_a->type, ir_mat_b->type)) {
+                ir_kernel->Express(ir_mat_a, ir_mat_b, ir_mat_c, ir_builder);
+                return;
+            }
+        }
 
         if (ir_mat_a->type->IsScalar()) {
             auto ir_re =

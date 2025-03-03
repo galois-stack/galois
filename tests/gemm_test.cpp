@@ -4,13 +4,12 @@
 
 TEST(GaloisTests, TestPackedMatrixMultiply) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(4, 4);
-    auto ir_ts_type_b = f32(4, 4);  // 一个比较合理的设计
+    auto ir_ts_type_a = ir::f32(4, 1)(2, 1)(1, 1024)(64, 1);
+    auto ir_ts_type_b = ir::f32(1, 4)(1, 3)(1024, 1)(1, 64);
     ir_ts_type_a->value_type->enable_multi_thread = true;
-    auto shape_a = ir_ts_type_a->NormalizeShape();
-    auto shape_b = ir_ts_type_b->NormalizeShape();
 
     auto ir_builder = ir::Builder::Create();
+    ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel4x1x4::Create());
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
     auto ir_ts_type_c =
         ir_packed_matrix_multiply_op_creator->InferType({ir_ts_type_a, ir_ts_type_b});
@@ -29,18 +28,19 @@ TEST(GaloisTests, TestPackedMatrixMultiply) {
     auto tmp_fun = reinterpret_cast<float *(*)(float *, float *)>(
         prajna_compiler->GetSymbolValue("::packed_matrix_multiply"));
 
-    // Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
-    // Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
-    // Eigen::MatrixRXf get_f32_c = Eigen::MatrixRXf::Random(shape_a[0], shape_b[1]);
+    auto shape_a = ir_ts_type_a->NormalizeShape();
+    auto shape_b = ir_ts_type_b->NormalizeShape();
 
-    // // get_f32_c.setZero();
-    // auto t0 = std::chrono::high_resolution_clock::now();
-    // tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
-    // auto t1 = std::chrono::high_resolution_clock::now();
+    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
 
-    // fmt::print("cost time: {}ns, galois gemm flops: {}gflops\n", (t1 - t0).count(),
-    //            shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
-    //            t0).count()));
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto ir_mat_c_ptr = tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
+    auto t1 = std::chrono::high_resolution_clock::now();
+    fmt::print("cost time: {}ns, galois flops: {}gflops\n", (t1 - t0).count(),
+               shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
+
+    free(ir_mat_c_ptr);
 }
 
 // TEST(GaloisTests, TestMatrixMultiply1) {
@@ -83,7 +83,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply) {
 //     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
 //     auto t1 = std::chrono::high_resolution_clock::now();
 
-//     fmt::print("cost time: {}ns, galois gemm flops: {}gflops\n", (t1 - t0).count(),
+//     fmt::print("cost time: {}ns, galois flops: {}gflops\n", (t1 - t0).count(),
 //                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
 //                t0).count()));
 // }
@@ -128,7 +128,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply) {
 //     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
 //     auto t1 = std::chrono::high_resolution_clock::now();
 
-//     fmt::print("cost time: {}ns, galois gemm flops: {}gflops\n", (t1 - t0).count(),
+//     fmt::print("cost time: {}ns, galois flops: {}gflops\n", (t1 - t0).count(),
 //                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
 //                t0).count()));
 // }
@@ -180,7 +180,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply) {
 //     auto t0_eigen = std::chrono::high_resolution_clock::now();
 //     eigen_matrix_f32_expect = (eigen_matrix_f32_a * eigen_matrix_f32_b).eval();
 //     auto t1_eigen = std::chrono::high_resolution_clock::now();
-//     fmt::print("cost time: {}ns, eigen gemm flops: {}gflops\n", (t1_eigen - t0_eigen).count(),
+//     fmt::print("cost time: {}ns, eigen flops: {}gflops\n", (t1_eigen - t0_eigen).count(),
 //                shape_a[0] * shape_a[1] * shape_b[1] * 2 /
 //                    static_cast<double>((t1_eigen - t0_eigen).count()));
 
@@ -189,7 +189,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply) {
 //     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
 //     auto t1 = std::chrono::high_resolution_clock::now();
 
-//     fmt::print("cost time: {}ns, galois gemm flops: {}gflops\n", (t1 - t0).count(),
+//     fmt::print("cost time: {}ns, galois flops: {}gflops\n", (t1 - t0).count(),
 //                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
 //                t0).count()));
 
@@ -214,7 +214,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply) {
 
 TEST(GaloisTests, TestGemm0) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(500, 512);
+    auto ir_ts_type_a = f32(512, 512);
     auto ir_ts_type_b = f32(512, 512);
 
     auto ir_builder = ir::Builder::Create();
@@ -243,15 +243,14 @@ TEST(GaloisTests, TestGemm0) {
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
 
-    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Random(shape_a[0], shape_a[1]);
-    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Random(shape_b[0], shape_b[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
     auto shape_c = ir_ts_type_c->shape;
-    Eigen::MatrixRXf eigen_matrix_f32_expect = Eigen::MatrixRXf::Random(shape_c[0], shape_c[1]);
 
     auto t0_eigen = std::chrono::high_resolution_clock::now();
-    eigen_matrix_f32_expect = (eigen_matrix_f32_a * eigen_matrix_f32_b).eval();
+    Eigen::MatrixRXf eigen_matrix_f32_expect = (eigen_matrix_f32_a * eigen_matrix_f32_b).eval();
     auto t1_eigen = std::chrono::high_resolution_clock::now();
-    fmt::print("cost time: {}ns, eigen gemm flops: {}gflops\n", (t1_eigen - t0_eigen).count(),
+    fmt::print("cost time: {}ns, eigen flops: {}gflops\n", (t1_eigen - t0_eigen).count(),
                shape_a[0] * shape_a[1] * shape_b[1] * 2 /
                    static_cast<double>((t1_eigen - t0_eigen).count()));
 
@@ -259,7 +258,7 @@ TEST(GaloisTests, TestGemm0) {
     auto f32_c_ptr = tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
     auto t1 = std::chrono::high_resolution_clock::now();
 
-    fmt::print("cost time: {}ns, galois gemm flops: {}gflops\n", (t1 - t0).count(),
+    fmt::print("cost time: {}ns, galois flops: {}gflops\n", (t1 - t0).count(),
                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
 
     auto get_f32_c = [=](int64_t i, int64_t j) -> float { return f32_c_ptr[i * shape_c[1] + j]; };
