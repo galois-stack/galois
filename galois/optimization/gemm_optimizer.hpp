@@ -41,14 +41,14 @@ class GemmOptimizer {
         auto [ir_gemm_operator, scope] = ir_builder->CreateOperator(
             ir_matrix_multiply->GetOperatorType(), ir_matrix_multiply->name + "_gemm");
 
-        ir_builder->kernel_queue.push_back(op::ProductKernel::Create());
+        ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel4x1x4::Create());
+        ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel8x1x8::Create());
 
         auto ir_ts_type_a = ir::f32(4, 1)(2, 1)(1, 512)(64, 1);
         auto ir_ts_type_b = ir::f32(1, 4)(1, 2)(512, 1)(1, 64);
 
         auto ir_mat_a = ir_gemm_operator->inputs[0];
         auto ir_mat_b = ir_gemm_operator->inputs[1];
-        // auto ir_mat_c = ir_builder->Create<ir::Alloca>(ir_ts_type_c);
 
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_ts_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_ts_type_b, ir_builder);

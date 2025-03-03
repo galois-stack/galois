@@ -5,6 +5,10 @@
 
 #include "galois/ir/ir.hpp"
 
+namespace galois::op {
+class MatrixMultiplyKernel;
+}  // namespace galois::op
+
 namespace galois::ir {
 
 class Builder : public std::enable_shared_from_this<Builder> {
@@ -153,7 +157,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
 
     size_t id = 0;
 
-    std::list<std::shared_ptr<Kernel>> kernel_queue;
+    std::list<std::shared_ptr<op::MatrixMultiplyKernel>> kernel_queue;
 };
 
 class OperatorCreator : public Named {
