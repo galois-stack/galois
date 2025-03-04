@@ -148,6 +148,18 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return ir_accessor;
     }
 
+    std::shared_ptr<ir::Constant> GetZero(std::shared_ptr<ir::TensorType> ir_type) {
+        if (auto ir_float_type = Cast<FloatType>(ir_type->data_type)) {
+            return ir::ConstantFloat::Create(ir_type, 0.0);
+        } else if (auto ir_int_type = Cast<IntType>(ir_type->data_type)) {
+            return ir::ConstantInt::Create(ir_type, 0);
+        } else {
+            GALOIS_ASSERT(false);
+        }
+
+        return nullptr;
+    }
+
    public:
     std::stack<std::shared_ptr<Grid>> grid_stack;
     std::stack<std::shared_ptr<OperatorFunction>> operator_stack;

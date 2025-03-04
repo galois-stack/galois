@@ -134,6 +134,8 @@ class IntType : public RealNumberType {
         return self;
     }
 
+    static std::shared_ptr<TensorType> Create(int64_t bits, bool is_signed);
+
    public:
     bool is_signed = true;
 };
@@ -1099,6 +1101,29 @@ inline std::shared_ptr<TensorType> FloatType::Create(int64_t bits) {
     std::shared_ptr<TensorType> self(new TensorType);
     self->value_type = nullptr;
     self->data_type = ir_float_type;
+    self->shape.resize(0);
+    self->stride.resize(0);
+
+    self->name = self->data_type->name + "[]";
+    self->fullname = self->name;
+    self->bytes = self->data_type->bytes;
+    global_context.created_types.push_back(self);
+    return self;
+}
+
+inline std::shared_ptr<TensorType> IntType::Create(int64_t bits, bool is_signed) {
+    auto ir_int_type = IntType::CreateImp(bits, is_signed);
+    for (auto ir_type : global_context.created_types) {
+        if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
+            if (ir_tensor_type->IsScalar() && ir_tensor_type->data_type == ir_int_type) {
+                return ir_tensor_type;
+            }
+        }
+    }
+
+    std::shared_ptr<TensorType> self(new TensorType);
+    self->value_type = nullptr;
+    self->data_type = ir_int_type;
     self->shape.resize(0);
     self->stride.resize(0);
 

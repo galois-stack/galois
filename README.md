@@ -169,8 +169,8 @@ TEST(galoisTests, TestGemm) {
     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
         prajna_compiler->GetSymbolValue("::tmp_module"));
 
-    Eigen::MatrixRXf eigen_matrix_f32_a = Eigen::MatrixRXf::Ones(shape_a[0], shape_a[1]);
-    Eigen::MatrixRXf eigen_matrix_f32_b = Eigen::MatrixRXf::Ones(shape_b[0], shape_b[1]);
+    Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Ones(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf32 eigen_matrix_f32_b = Eigen::MatrixRXf32::Ones(shape_b[0], shape_b[1]);
     auto shape_c = Cast<TensorType>(ir_module->type)->shape;
     // 执行
     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), eigen_matrix_f32_c.data());

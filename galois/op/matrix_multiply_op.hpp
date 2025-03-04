@@ -54,6 +54,43 @@ class MatrixMultiplyKernel4x1x4 : public MatrixMultiplyKernel {
     }
 };
 
+class MatrixMultiplyKernelI8_16x1x16 : public MatrixMultiplyKernel {
+   public:
+    static std::shared_ptr<MatrixMultiplyKernelI8_16x1x16> Create() {
+        return std::make_shared<MatrixMultiplyKernelI8_16x1x16>();
+    }
+
+    bool Match(std::shared_ptr<TensorType> ir_mat_type_a,
+               std::shared_ptr<TensorType> ir_mat_type_b) override {
+        if ((ir_mat_type_a == TensorType::CreateMatrixType(IntType::Create(8, true), 16, 1)) &&
+            ir_mat_type_b == TensorType::CreateMatrixType(IntType::Create(8, true), 1, 16)) {
+            return true;
+        }
+        return false;
+    }
+
+    void Express(std::shared_ptr<Tensor> ir_mat_a, std::shared_ptr<Tensor> ir_mat_b,
+                 std::shared_ptr<Tensor> ir_mat_c, std::shared_ptr<Builder> ir_builder) override {
+        Eigen::VectorXi64 v16(1);
+        v16[0] = 16;
+        auto ir_i8x16_type = TensorType::Create(IntType::Create(8, true), v16);
+        auto ir_bit_cast_a = ir_builder->Create<BitCast>(ir_mat_a, ir_i8x16_type);
+        auto ir_bit_cast_b = ir_builder->Create<BitCast>(ir_mat_b, ir_i8x16_type);
+        auto ir_bit_cast_c =
+            ir_builder->Create<BitCast>(ir_mat_c, TensorType::Create(ir_i8x16_type, v16));
+
+        for (int64_t i = 0; i < 16; ++i) {
+            auto ir_vector_broadcast_a = ir_builder->Create<VectorBroadcast>(ir_bit_cast_a, i);
+            auto ir_mul = ir_builder->Create<Mul>(ir_vector_broadcast_a, ir_bit_cast_b);
+            auto ir_accessor_c = ir_builder->CreateAccessor(ir_bit_cast_c);
+            ir_accessor_c->shift_vector[0] = i;
+            auto ir_sum = ir_builder->Create<Add>(ir_mul, ir_accessor_c);
+            auto ir_write =
+                ir_builder->Create<Write>(ir_sum, Cast<Accessor>(ir_accessor_c->Clone()));
+        }
+    }
+};
+
 class MatrixMultiplyKernel8x1x8 : public MatrixMultiplyKernel {
    public:
     static std::shared_ptr<MatrixMultiplyKernel8x1x8> Create() {
