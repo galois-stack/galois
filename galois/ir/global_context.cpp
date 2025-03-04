@@ -10,6 +10,7 @@ GlobalContext::GlobalContext(int64_t target_bits) {
 
 GlobalContext global_context = GlobalContext(64);
 TensorTypePointer f32(CreateScalarType<FloatType>(32));
+TensorTypePointer i8(CreateScalarType<IntType>(8, true));
 TensorTypePointer i64(CreateScalarType<IntType>(64, true));
 TensorTypePointer bool_(CreateScalarType<IntType>(1, false));
 

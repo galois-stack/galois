@@ -41,7 +41,7 @@ class SetZeroCreator : public OperatorCreator {
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_input->type->shape);
         auto ir_accessor = ir_builder->CreateIdentityAccessor(ir_input);
         if (ir_accessor->type->IsScalar()) {
-            auto ir_zero = ir_builder->Create<ir::ConstantFloat>(ir::FloatType::Create(32), 0.0);
+            auto ir_zero = ir_builder->GetZero(ir_accessor->type);
             ir_builder->Create<ir::Write>(ir_zero, ir_accessor);
         } else {
             this->AffineExpress({ir_accessor}, ir_builder);
