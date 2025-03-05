@@ -50,8 +50,7 @@ endif()
 #     $<INSTALL_INTERFACE:include>
 # )
 
-add_subdirectory(prajna)
-
+add_subdirectory(third_party/prajna)
 # use third_party from prajna
 # add_subdirectory(third_party/boost EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/cxxopts EXCLUDE_FROM_ALL)

@@ -5,7 +5,7 @@
 	path = third_party/eigen
 	url = https://gitlab.com/libeigen/eigen.git
 [submodule "prajna"]
-	path = prajna
+	path = third_party/prajna
 	url = https://github.com/prajna-lang/prajna.git
 [submodule "third_party/cpuinfo"]
 	path = third_party/cpuinfo
