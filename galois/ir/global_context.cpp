@@ -9,9 +9,9 @@ GlobalContext::GlobalContext(int64_t target_bits) {
 }
 
 GlobalContext global_context = GlobalContext(64);
-TensorTypePointer f32(CreateScalarType<FloatType>(32));
-TensorTypePointer i8(CreateScalarType<IntType>(8, true));
-TensorTypePointer i64(CreateScalarType<IntType>(64, true));
-TensorTypePointer bool_(CreateScalarType<IntType>(1, false));
+std::shared_ptr<TensorType> f32(FloatType::Create(32));
+std::shared_ptr<TensorType> f64(FloatType::Create(64));
+std::shared_ptr<TensorType> i8(IntType::Create(8, true));
+std::shared_ptr<TensorType> i64(IntType::Create(64, true));
 
 }  // namespace galois::ir

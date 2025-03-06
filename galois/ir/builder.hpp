@@ -149,9 +149,9 @@ class Builder : public std::enable_shared_from_this<Builder> {
     }
 
     std::shared_ptr<ir::Constant> GetZero(std::shared_ptr<ir::TensorType> ir_type) {
-        if (auto ir_float_type = Cast<FloatType>(ir_type->data_type)) {
+        if (auto ir_float_type = Cast<FloatType>(ir_type)) {
             return ir::ConstantFloat::Create(ir_type, 0.0);
-        } else if (auto ir_int_type = Cast<IntType>(ir_type->data_type)) {
+        } else if (auto ir_int_type = Cast<IntType>(ir_type)) {
             return ir::ConstantInt::Create(ir_type, 0);
         } else {
             GALOIS_ASSERT(false);
@@ -170,39 +170,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
     size_t id = 0;
 
     std::list<std::shared_ptr<op::MatrixMultiplyKernel>> kernel_queue;
-};
-
-class OperatorCreator : public Named {
-   public:
-    virtual std::vector<std::shared_ptr<Tensor>> GetOutputs(
-        std::vector<std::shared_ptr<Tensor>> ir_inputs, std::shared_ptr<Builder> ir_builder) = 0;
-
-    virtual void AffineExpress(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                               std::vector<std::shared_ptr<Tensor>> ir_outputs,
-                               std::shared_ptr<Builder> ir_builder) = 0;
-};
-
-class CopyOperatorCreator : public OperatorCreator {
-   public:
-    std::vector<std::shared_ptr<Tensor>> GetOutputs(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                                                    std::shared_ptr<Builder> ir_builder) override {
-        auto input = ir_inputs.front();
-        auto ir_tensor = ir_builder->Create<Tensor>(input->type);
-        return {ir_tensor};
-    }
-
-    void AffineExpress(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) override {
-        if (ir_inputs[0]->type->IsScalar()) {
-            ir_builder->Create<Write>(ir_inputs[0], ir_outputs[0]);
-        }
-
-        auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_inputs[0]->type->shape);
-        auto ir_input_accessor = ir_builder->CreateIdentityAccessor(ir_inputs[0]);
-        auto ir_output_accessor = ir_builder->CreateIdentityAccessor(ir_outputs[0]);
-        this->AffineExpress({ir_input_accessor}, {ir_output_accessor}, ir_builder);
-    }
 };
 
 }  // namespace galois::ir

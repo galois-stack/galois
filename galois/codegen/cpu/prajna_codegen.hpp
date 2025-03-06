@@ -46,12 +46,12 @@ class PrajnaCodegen {
         }
 
         if (ir_type->IsScalar()) {
-            if (auto ir_float_type = Cast<ir::FloatType>(ir_type->data_type)) {
+            if (auto ir_float_type = Cast<ir::FloatType>(ir_type)) {
                 ir_type->pir_type = pir::FloatType::Create(ir_float_type->bits);
                 return ir_type->pir_type;
             }
 
-            if (auto ir_int_type = Cast<ir::IntType>(ir_type->data_type)) {
+            if (auto ir_int_type = Cast<ir::IntType>(ir_type)) {
                 ir_type->pir_type = pir::IntType::Create(ir_int_type->bits, ir_int_type->is_signed);
                 return ir_type->pir_type;
             }
@@ -207,7 +207,7 @@ class PrajnaCodegen {
         this->EmitTensor(ir_arithmetic_instruction->GetOperand(0));
         this->EmitTensor(ir_arithmetic_instruction->GetOperand(1));
 
-        auto ir_value_type = ir_arithmetic_instruction->type->data_type;
+        auto ir_value_type = ir_arithmetic_instruction->type->PrimitiveDataType();
         GALOIS_ASSERT(Is<RealNumberType>(ir_value_type));
 
         auto pir_binary_operation = pir::BinaryOperator::Operation::None;
