@@ -44,8 +44,8 @@ class GemmOptimizer {
         ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel4x1x4::Create());
         ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel8x1x8::Create());
 
-        auto ir_ts_type_a = ir::f32(4, 1)(2, 1)(1, 512)(64, 1);
-        auto ir_ts_type_b = ir::f32(1, 4)(1, 2)(512, 1)(1, 64);
+        auto ir_ts_type_a = ir::f32->Tile(4, 1)->Tile(2, 1)->Tile(1, 512)->Tile(64, 1);
+        auto ir_ts_type_b = ir::f32->Tile(1, 4)->Tile(1, 2)->Tile(512, 1)->Tile(1, 64);
 
         auto ir_mat_a = ir_gemm_operator->inputs[0];
         auto ir_mat_b = ir_gemm_operator->inputs[1];

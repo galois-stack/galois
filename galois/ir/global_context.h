@@ -12,7 +12,6 @@ namespace galois::ir {
 
 class Type;
 class TensorType;
-class TensorTypePointer;
 
 class GlobalContext {
    public:
@@ -20,13 +19,13 @@ class GlobalContext {
 
     /// @brief 用于存储已经构造了的类型
     /// @note 需要使用vector来确保构造的顺序, 因为后面的codegen需要顺序正确
-    std::list<std::shared_ptr<Named>> created_types;
+    std::list<std::shared_ptr<TensorType>> created_types;
 };
 
 extern GlobalContext global_context;
-extern TensorTypePointer f32;
-extern TensorTypePointer i8;
-extern TensorTypePointer i64;
-extern TensorTypePointer bool_;
+extern std::shared_ptr<TensorType> f32;
+extern std::shared_ptr<TensorType> i8;
+extern std::shared_ptr<TensorType> i64;
+extern std::shared_ptr<TensorType> bool_;
 
 }  // namespace galois::ir

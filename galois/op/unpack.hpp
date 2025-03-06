@@ -10,7 +10,7 @@ class UnpackCreator : public UnaryOperatorCreator {
     static std::shared_ptr<UnpackCreator> Create() { return std::make_shared<UnpackCreator>(); }
 
     std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_input_type) override {
-        auto ir_scalar_type = ir_input_type->ScalarType();
+        auto ir_scalar_type = ir_input_type->PrimitiveDataType();
         auto shape = ir_input_type->NormalizeShape();
         return TensorType::Create(ir_scalar_type, shape);
     }

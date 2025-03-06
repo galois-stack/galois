@@ -5,8 +5,8 @@
 
 TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = ir::f32(4, 1)(2, 1)(1, 1024)(64, 1);
-    auto ir_ts_type_b = ir::f32(1, 4)(1, 3)(1024, 1)(1, 64);
+    auto ir_ts_type_a = ir::f32->Tile(4, 1)->Tile(2, 1)->Tile(1, 1024)->Tile(64, 1);
+    auto ir_ts_type_b = ir::f32->Tile(1, 4)->Tile(1, 3)->Tile(1024, 1)->Tile(1, 64);
     ir_ts_type_a->value_type->enable_multi_thread = true;
 
     auto ir_builder = ir::Builder::Create();
@@ -46,8 +46,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
 
 TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = ir::i8(16, 1)(1, 2048)(128, 1);
-    auto ir_ts_type_b = ir::i8(1, 16)(2048, 1)(1, 128);
+    auto ir_ts_type_a = ir::i8->Tile(16, 1)->Tile(1, 2048)->Tile(128, 1);
+    auto ir_ts_type_b = ir::i8->Tile(1, 16)->Tile(2048, 1)->Tile(1, 128);
     ir_ts_type_a->value_type->enable_multi_thread = true;
 
     auto ir_builder = ir::Builder::Create();
@@ -257,8 +257,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 
 TEST(GaloisTests, TestGemm0) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32(512, 512);
-    auto ir_ts_type_b = f32(512, 512);
+    auto ir_ts_type_a = f32->Tile(512, 512);
+    auto ir_ts_type_b = f32->Tile(512, 512);
 
     auto ir_builder = ir::Builder::Create();
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();

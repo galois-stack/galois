@@ -41,137 +41,9 @@ namespace galois::ir {
 namespace pir = prajna::ir;
 
 class OperatorFunction;
-
-class TensorType;
-
-class Type : public Named {
-   protected:
-    Type() = default;
-
-   public:
-    virtual bool IsScalar() { return true; }
-
-    virtual ~Type() {}
-
-   public:
-    // @ref https://llvm.org/docs/LangRef.html#langref-datalayout
-    // bytes是多少可参阅datalyout的描述
-    int64_t bytes = 0;
-    std::shared_ptr<pir::Type> pir_type;
-};
-
 class Instruction;
 
-struct InstructionAndOperandIndex {
-    std::shared_ptr<Instruction> instruction;
-    int64_t operand_index;
-};
-
-inline bool operator==(galois::ir::InstructionAndOperandIndex lhs,
-                       galois::ir::InstructionAndOperandIndex rhs) {
-    return lhs.instruction == rhs.instruction && lhs.operand_index == rhs.operand_index;
-}
-
-class RealNumberType : public Type {
-   protected:
-    RealNumberType() = default;
-
-   public:
-    int64_t bits = 0;
-};
-
-class FloatType : public RealNumberType {
-   protected:
-    FloatType() = default;
-
-   public:
-    static std::shared_ptr<FloatType> CreateImp(int64_t bits) {
-        for (auto ir_type : global_context.created_types) {
-            if (auto ir_float_type = Cast<FloatType>(ir_type)) {
-                if (ir_float_type->bits == bits) {
-                    return ir_float_type;
-                }
-            }
-        }
-
-        std::shared_ptr<FloatType> self(new FloatType);
-        self->bits = bits;
-        self->bytes = bits / 8;
-        self->name = "f" + std::to_string(bits);
-        self->fullname = "f" + std::to_string(bits);
-        global_context.created_types.push_back(self);
-        return self;
-    }
-
-    static std::shared_ptr<TensorType> Create(int64_t bits);
-};
-
-class IntType : public RealNumberType {
-   protected:
-    IntType() = default;
-
-   public:
-    static std::shared_ptr<IntType> CreateImp(int64_t bits, bool is_signed) {
-        for (auto ir_type : global_context.created_types) {
-            if (auto ir_int_type = Cast<IntType>(ir_type)) {
-                // if (Is<ir::CharType>(ir_type) || Is<ir::BoolType>(ir_type)) {
-                //     continue;
-                // }
-
-                if (ir_int_type->bits == bits && ir_int_type->is_signed == is_signed) {
-                    return ir_int_type;
-                }
-            }
-        }
-
-        std::shared_ptr<IntType> self(new IntType);
-        self->bits = bits;
-        self->bytes = (bits + 7) / 8;
-        self->is_signed = is_signed;
-        self->name = std::string(is_signed ? "i" : "u") + std::to_string(bits);
-        self->fullname = std::string(is_signed ? "i" : "u") + std::to_string(bits);
-        global_context.created_types.push_back(self);
-        return self;
-    }
-
-    static std::shared_ptr<TensorType> Create(int64_t bits, bool is_signed);
-
-   public:
-    bool is_signed = true;
-};
-
-class VectorType : public Type {
-   protected:
-    VectorType() = default;
-
-   public:
-    static std::shared_ptr<VectorType> Create(std::shared_ptr<Type> value_type, int64_t size) {
-        GALOIS_ASSERT(IsPowerOfTwo(size));
-        for (auto ir_type : global_context.created_types) {
-            if (auto ir_vectory_type = Cast<VectorType>(ir_type)) {
-                if (ir_vectory_type->value_type == value_type && ir_vectory_type->size == size) {
-                    return ir_vectory_type;
-                }
-            }
-        }
-
-        std::shared_ptr<VectorType> self(new VectorType);
-        self->value_type = value_type;
-        self->size = size;
-        self->bytes = value_type->bytes * size;
-        self->name = value_type->name + "[" + std::to_string(size) + "]";
-        self->fullname = self->name;
-        global_context.created_types.push_back(self);
-        return self;
-    }
-
-   public:
-    std::shared_ptr<Type> value_type = nullptr;
-    int64_t size = 0;
-};
-
 enum struct Layout { RowMajor, ColumnMajor, View };
-
 enum struct MemoryType { Host, Stack };
 
 class TensorType : public Named, public std::enable_shared_from_this<TensorType> {
@@ -191,7 +63,6 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
 
         std::shared_ptr<TensorType> self(new TensorType);
         self->value_type = value_type;
-        self->data_type = self->value_type->data_type;
         self->shape = shape;
         self->layout = layout;
 
@@ -228,11 +99,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         return self;
     }
 
-    std::shared_ptr<TensorType> ScalarType() {
+    std::shared_ptr<TensorType> PrimitiveDataType() {
         if (this->IsScalar()) {
             return this->shared_from_this();
         } else {
-            return this->value_type->ScalarType();
+            return this->value_type->PrimitiveDataType();
         }
     }
 
@@ -258,7 +129,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         return TensorType::Create(value_type, shape, layout);
     }
 
-    std::shared_ptr<TensorType> operator()(Eigen::VectorXi64 shape) {
+    template <typename... Dims>
+    std::shared_ptr<TensorType> Tile(Dims... dims) {
+        std::array<int64_t, std::tuple_size<std::tuple<Dims...>>::value> shape_array = {dims...};
+        Eigen::VectorXi64 shape(shape_array.size());
+        std::copy(RANGE(shape_array), shape.begin());
         return TensorType::Create(this->shared_from_this(), shape);
     }
 
@@ -270,12 +145,15 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         return sum;
     }
 
-    bool IsScalar() { return this->shape.size() == 0; }
+    virtual bool IsScalar() { return this->shape.size() == 0; }
+
+    std::shared_ptr<TensorType> Tile(Eigen::VectorXi64 shape) {
+        return TensorType::Create(this->shared_from_this(), shape);
+    }
 
    public:
     Eigen::VectorXi64 shape;
     std::shared_ptr<TensorType> value_type;
-    std::shared_ptr<Type> data_type;
     Layout layout = Layout::RowMajor;
     Eigen::RowVectorXi64 stride;
     MemoryType memory_type = MemoryType::Host;
@@ -286,21 +164,78 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     std::shared_ptr<pir::Type> pir_type;
 };
 
-class TensorTypePointer : public std::shared_ptr<TensorType> {
+struct InstructionAndOperandIndex {
+    std::shared_ptr<Instruction> instruction;
+    int64_t operand_index;
+};
+
+inline bool operator==(galois::ir::InstructionAndOperandIndex lhs,
+                       galois::ir::InstructionAndOperandIndex rhs) {
+    return lhs.instruction == rhs.instruction && lhs.operand_index == rhs.operand_index;
+}
+
+class RealNumberType : public TensorType {
+   protected:
+    RealNumberType() = default;
+
    public:
-    TensorTypePointer(std::shared_ptr<TensorType> ir_type) : std::shared_ptr<TensorType>(ir_type) {}
+    int64_t bits = 0;
+};
 
-    template <typename... Dims>
-    TensorTypePointer operator()(Dims... dims) {
-        std::array<int64_t, std::tuple_size<std::tuple<Dims...>>::value> shape_array = {dims...};
-        Eigen::VectorXi64 shape(shape_array.size());
-        std::copy(RANGE(shape_array), shape.begin());
-        return TensorType::Create(*this, shape);
+class FloatType : public RealNumberType {
+   protected:
+    FloatType() = default;
+
+   public:
+    static std::shared_ptr<FloatType> Create(int64_t bits) {
+        for (auto ir_type : global_context.created_types) {
+            if (auto ir_float_type = Cast<FloatType>(ir_type)) {
+                if (ir_float_type->bits == bits) {
+                    return ir_float_type;
+                }
+            }
+        }
+
+        std::shared_ptr<FloatType> self(new FloatType);
+        self->value_type = nullptr;
+        self->shape.resize(0);
+        self->stride.resize(0);
+
+        self->bits = bits;
+        self->bytes = bits / 8;
+        self->name = "f" + std::to_string(bits);
+        self->fullname = "f" + std::to_string(bits);
+        global_context.created_types.push_back(self);
+        return self;
+    }
+};
+
+class IntType : public RealNumberType {
+   protected:
+    IntType() = default;
+
+   public:
+    static std::shared_ptr<IntType> Create(int64_t bits, bool is_signed) {
+        std::shared_ptr<IntType> self(new IntType);
+        for (auto ir_type : global_context.created_types) {
+            if (auto ir_int_type = Cast<IntType>(ir_type)) {
+                if (ir_int_type->bits == bits && ir_int_type->is_signed == is_signed) {
+                    return ir_int_type;
+                }
+            }
+        }
+
+        self->bits = bits;
+        self->is_signed = is_signed;
+        self->bytes = (bits + 7) / 8;
+        self->name = std::string(is_signed ? "i" : "u") + std::to_string(bits);
+        self->fullname = std::string(is_signed ? "i" : "u") + std::to_string(bits);
+        global_context.created_types.push_back(self);
+        return self;
     }
 
-    TensorTypePointer operator()(Eigen::VectorXi64 shape) {
-        return TensorType::Create(*this, shape);
-    }
+   public:
+    bool is_signed = true;
 };
 
 class Viewer;
@@ -524,7 +459,7 @@ class GridIndexVector : public Tensor {
    public:
     static std::shared_ptr<GridIndexVector> Create(int64_t rank) {
         std::shared_ptr<GridIndexVector> self(new GridIndexVector);
-        self->type = i64(rank);
+        self->type = i64->Tile(rank);
         self->tag = "GridIndexVector";
         return self;
     }
@@ -1034,7 +969,6 @@ class SparseType : public TensorType {
     std::shared_ptr<SparseType> Create(std::shared_ptr<TensorType> ir_tensor_type) {
         std::shared_ptr<SparseType> self(new SparseType);
         self->value_type = ir_tensor_type->value_type;
-        self->data_type = ir_tensor_type->data_type;
 
         auto ir_mask_type = TensorType::Create(bool_, ir_tensor_type->shape);
         self->mask_tensor = Tensor::Create(ir_mask_type);
@@ -1059,84 +993,9 @@ class Kernel {
     virtual ~Kernel() = default;
 };
 
-// inline std::shared_ptr<TensorType> ToType(std::string type_str) {
-//     std::smatch sm;
-//     // float32[100x200], $1是类型, $2位数, S3S4...是shape
-//     std::regex e("([a-z]+)(\\d+)(\\[\\w*\\])*");
-//     std::regex_match(type_str, sm, e);
-//     GALOIS_ASSERT(sm.size() >= 4);
-//     auto bits = std::stoi(sm[2]);
-//     std::shared_ptr<TensorType> value_type = nullptr;
-//     if (sm[1] == "float") {
-//         value_type = FloatType::Create(bits);
-//     }
-//     if (sm[1] == "int") {
-//         value_type = IntType::Create(bits, true);
-//     }
-//     if (sm[1] == "uint") {
-//         value_type = IntType::Create(bits, false);
-//     }
-//     for (int64_t i = 3; i < sm.size(); ++i) {
-//         auto shape_vec = split(sm[i].str(), 'x');
-//         Eigen::VectorXi64 shape(shape_vec.size());
-//         for (auto j = 0; j < shape.size(); ++j) {
-//         d:
-//             shape[j] = std::stoi(shape_vec[j]);
-//         }
-//         value_type = TensorType::Create(value_type, shape);
-//     }
-//     return value_type;
-// }
-
-inline std::shared_ptr<TensorType> FloatType::Create(int64_t bits) {
-    auto ir_float_type = FloatType::CreateImp(bits);
-    for (auto ir_type : global_context.created_types) {
-        if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
-            if (ir_tensor_type->IsScalar() && ir_tensor_type->data_type == ir_float_type) {
-                return ir_tensor_type;
-            }
-        }
-    }
-
-    std::shared_ptr<TensorType> self(new TensorType);
-    self->value_type = nullptr;
-    self->data_type = ir_float_type;
-    self->shape.resize(0);
-    self->stride.resize(0);
-
-    self->name = self->data_type->name + "[]";
-    self->fullname = self->name;
-    self->bytes = self->data_type->bytes;
-    global_context.created_types.push_back(self);
-    return self;
-}
-
-inline std::shared_ptr<TensorType> IntType::Create(int64_t bits, bool is_signed) {
-    auto ir_int_type = IntType::CreateImp(bits, is_signed);
-    for (auto ir_type : global_context.created_types) {
-        if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
-            if (ir_tensor_type->IsScalar() && ir_tensor_type->data_type == ir_int_type) {
-                return ir_tensor_type;
-            }
-        }
-    }
-
-    std::shared_ptr<TensorType> self(new TensorType);
-    self->value_type = nullptr;
-    self->data_type = ir_int_type;
-    self->shape.resize(0);
-    self->stride.resize(0);
-
-    self->name = self->data_type->name + "[]";
-    self->fullname = self->name;
-    self->bytes = self->data_type->bytes;
-    global_context.created_types.push_back(self);
-    return self;
-}
-
 template <typename DataType, typename... Args>
 inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
-    auto ir_data_type = DataType::CreateImp(args...);
+    auto ir_data_type = DataType::Create(args...);
     auto fullname = ir_data_type->name + "[]";
     for (auto ir_type : global_context.created_types) {
         if (ir_type->fullname == fullname) {
@@ -1146,11 +1005,9 @@ inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
 
     std::shared_ptr<TensorType> self(new TensorType);
     self->value_type = nullptr;
-    self->data_type = ir_data_type;
     self->shape.resize(0);
     self->stride.resize(0);
     self->fullname = fullname;
-    self->bytes = self->data_type->bytes;
     global_context.created_types.push_back(self);
     return self;
 }
