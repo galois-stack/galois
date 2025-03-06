@@ -28,7 +28,7 @@ class FullCreator : public op::OperatorCreator {
     void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_ts,
                            std::shared_ptr<ir::Builder> ir_builder) {
         if (ir_ts->type->IsScalar()) {
-            auto ir_zero = ir_builder->Create<ir::ConstantFloat>(ir::FloatType::Create(32), 0.0);
+            auto ir_zero = ir_builder->GetZero(ir_ts->type);
             ir_builder->Create<ir::Write>(ir_zero, ir_ts);
         } else {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_ts->type->shape);
