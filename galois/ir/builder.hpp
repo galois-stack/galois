@@ -149,10 +149,14 @@ class Builder : public std::enable_shared_from_this<Builder> {
     }
 
     std::shared_ptr<ir::Constant> GetZero(std::shared_ptr<ir::TensorType> ir_type) {
+        return this->GetConstant(ir_type, 0);
+    }
+
+    std::shared_ptr<ir::Constant> GetConstant(std::shared_ptr<ir::TensorType> ir_type, double v) {
         if (auto ir_float_type = Cast<FloatType>(ir_type)) {
-            return ir::ConstantFloat::Create(ir_type, 0.0);
+            return ir::ConstantFloat::Create(ir_type, v);
         } else if (auto ir_int_type = Cast<IntType>(ir_type)) {
-            return ir::ConstantInt::Create(ir_type, 0);
+            return ir::ConstantInt::Create(ir_type, static_cast<int64_t>(v));
         } else {
             GALOIS_ASSERT(false);
         }

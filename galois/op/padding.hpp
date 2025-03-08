@@ -56,16 +56,18 @@ class PaddingCreator : public UnaryOperatorCreator {
         {
             Eigen::VectorXi64 remainder_shape = output_shape;
             remainder_shape[0] = output_shape[0] - input_shape[0];
+            if (remainder_shape[0] == 0) {
+                return;
+            }
             auto ir_output_left_origin = ir_builder->CreateAccessor(ir_output);
             ir_output_left_origin->shift_vector[0] = input_shape[0];
             auto ir_output_slice =
                 ir_builder->Create<Slice>(ir_output_left_origin, remainder_shape);
-            set_zero_creator.AffineExpress({ir_output_slice}, ir_builder);
+            ir_builder->Express<op::FillCreator>({ir_output_slice}, ir_output_slice->type, 0);
         }
     }
 
     Eigen::VectorXi64 padding_shape;
-    SetZeroCreator set_zero_creator;
 };
 
 }  // namespace galois::op

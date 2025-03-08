@@ -184,9 +184,6 @@ class MatrixMultiplyCreator : public BinaryOperatorCreator {
 
         this->AffineExpressImpl(ir_accessor_a, ir_accessor_b, ir_accessor_c, ir_builder);
     }
-
-   private:
-    std::shared_ptr<SetZeroCreator> set_zero_creator = SetZeroCreator::Create();
 };
 
 }  // namespace galois::op
