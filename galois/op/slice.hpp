@@ -42,7 +42,6 @@ class SliceCreator : public OperatorCreator {
     }
 
     Eigen::VectorXi64 slice_shape;
-    SetZeroCreator set_zero_creator;
 };
 
 }  // namespace galois::op
