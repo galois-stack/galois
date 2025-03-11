@@ -131,7 +131,7 @@ class MatrixMultiplyCreator : public BinaryCreator {
     static std::shared_ptr<MatrixMultiplyCreator> Create() {
         auto self = std::make_shared<MatrixMultiplyCreator>();
         self->name = "MatrixMultiply";
-        self->fullname = "MatrixMultiply";
+        self->fullname = self->name;
         return self;
     }
 
