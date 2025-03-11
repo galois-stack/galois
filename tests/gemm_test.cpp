@@ -324,3 +324,50 @@ TEST(GaloisTests, TestGemm0) {
 
     free(static_cast<void *>(f32_c_ptr));
 }
+
+
+TEST(GaloisTests, TestFill) {
+    //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
+    // auto ir_ts_type_a = ir::f32->Tile(4, 1)->Tile(2, 1)->Tile(1, 1024)->Tile(64, 1);
+    // auto ir_ts_type_b = ir::f32->Tile(1, 4)->Tile(1, 3)->Tile(1024, 1)->Tile(1, 64);
+    // ir_ts_type_a->value_type->enable_multi_thread = true;
+
+    // 1.创建张量类型
+    auto ir_ts_type = ir::f32->Tile(4, 1)->Tile(2, 1);
+   
+   // 2.创建IR构建器和Fill算子，填充值为5
+   auto ir_builder = ir::Builder::Create();
+
+   auto ir_fill_op_creator = op::FillCreator::Create(ir_ts_type,5);
+
+    // 3.推导类型
+    auto ir_ts_type_c = ir_fill_op_creator->InferType({ir_ts_type});
+
+    // 先创建出张量类型，但是我要操作的是张量，因此需要根据张量类型创建对应的张量
+    // 
+    // 4.创建操作类型和操作符  //张量类型
+    auto ir_operator_type = ir::OperatorType::Create({ir_ts_type},ir_ts_type_c);
+    auto [ir_operator, operator_scope] =
+        ir_builder->CreateOperator(ir_operator_type, "fill_tensor");
+
+    // 对张量进行填充
+    ir_fill_op_creator->AffineExpress(ir_operator->inputs, ir_builder);
+
+    
+    operator_scope = nullptr;  // 释放operator_scope
+
+    
+    //todo之后 遍历fill后的张量，检查是否填充正确
+
+
+
+    // auto shape_a = ir_ts_type->NormalizeShape();
+
+    // Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Ones(shape_a[0], shape_a[1]);
+
+
+    
+}
+
+
+
