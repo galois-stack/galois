@@ -1,3 +1,4 @@
+#include <cassert>
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "galois_test.hpp"
@@ -327,10 +328,6 @@ TEST(GaloisTests, TestGemm0) {
 
 
 TEST(GaloisTests, TestFill) {
-    //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    // auto ir_ts_type_a = ir::f32->Tile(4, 1)->Tile(2, 1)->Tile(1, 1024)->Tile(64, 1);
-    // auto ir_ts_type_b = ir::f32->Tile(1, 4)->Tile(1, 3)->Tile(1024, 1)->Tile(1, 64);
-    // ir_ts_type_a->value_type->enable_multi_thread = true;
 
     // 1.创建张量类型
     auto ir_ts_type = ir::f32->Tile(4, 1)->Tile(2, 1);
@@ -343,8 +340,6 @@ TEST(GaloisTests, TestFill) {
     // 3.推导类型
     auto ir_ts_type_c = ir_fill_op_creator->InferType({ir_ts_type});
 
-    // 先创建出张量类型，但是我要操作的是张量，因此需要根据张量类型创建对应的张量
-    // 
     // 4.创建操作类型和操作符  //张量类型
     auto ir_operator_type = ir::OperatorType::Create({ir_ts_type},ir_ts_type_c);
     auto [ir_operator, operator_scope] =
@@ -353,20 +348,22 @@ TEST(GaloisTests, TestFill) {
     // 对张量进行填充
     ir_fill_op_creator->AffineExpress(ir_operator->inputs, ir_builder);
 
-    
     operator_scope = nullptr;  // 释放operator_scope
 
-    
-    //todo之后 遍历fill后的张量，检查是否填充正确
+    auto prajna_compiler = CreateCompiler();
+    auto llvm_codegen =
+        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
+    llvm_codegen->EmitOperatorFunction(ir_operator);
+    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
+    auto tmp_fun = reinterpret_cast<void (*)(float *)>(
+    prajna_compiler->GetSymbolValue("::fill_tensor"));
 
+    auto input = new float[8];
+    tmp_fun(input); // 传入一个 float*，与函数匹配
+    GALOIS_ASSERT(input[0] == 5.0);
+    GALOIS_ASSERT(input[4] == 5.0);
+    GALOIS_ASSERT(input[7] == 5.0);
 
-
-    // auto shape_a = ir_ts_type->NormalizeShape();
-
-    // Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Ones(shape_a[0], shape_a[1]);
-
-
-    
 }
 
 
