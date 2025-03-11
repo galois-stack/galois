@@ -6,7 +6,7 @@
 
 namespace galois::op {
 
-class BinaryOperatorCreator : public OperatorCreator {
+class BinaryCreator : public Creator {
    public:
     virtual std::shared_ptr<ir::TensorType> InferTypeImpl(
         std::shared_ptr<ir::TensorType> ir_input_type0,

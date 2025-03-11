@@ -6,7 +6,7 @@
 
 namespace galois::op {
 
-class FullCreator : public op::OperatorCreator {
+class FullCreator : public op::Creator {
    public:
     static std::shared_ptr<FullCreator> Create(std::shared_ptr<ir::TensorType> ir_tensor_type,
                                                double value) {

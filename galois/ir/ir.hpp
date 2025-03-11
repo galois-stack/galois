@@ -964,6 +964,27 @@ class Return : public Instruction {
     void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 };
 
+class UnaryIntrinsic : public Instruction {
+   protected:
+    UnaryIntrinsic() = default;
+
+   public:
+    static std::shared_ptr<UnaryIntrinsic> Create(std::string intrinsic_name,
+                                                  std::shared_ptr<Tensor> ir_oprand) {
+        GALOIS_ASSERT(intrinsic_name.size());
+        std::shared_ptr<UnaryIntrinsic> self(new UnaryIntrinsic);
+        self->OperandResize(1);
+        self->intrinsic_name = intrinsic_name;
+        self->SetOperand(0, ir_oprand);
+        self->type = ir_oprand->type;
+        self->tag = "UnaryIntrinsic";
+        return self;
+    }
+
+   public:
+    std::string intrinsic_name;
+};
+
 class SparseType : public TensorType {
    public:
     std::shared_ptr<SparseType> Create(std::shared_ptr<TensorType> ir_tensor_type) {
@@ -1011,7 +1032,6 @@ inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
     global_context.created_types.push_back(self);
     return self;
 }
-
 inline std::vector<std::shared_ptr<TensorType>> GetTensorTypes(
     std::vector<std::shared_ptr<Tensor>> ir_tensors) {
     std::vector<std::shared_ptr<TensorType>> ir_types;

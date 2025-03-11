@@ -1,7 +1,7 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/operator_creator.hpp"
+#include "galois/op/unary.hpp"
 
 namespace galois::op {
 
@@ -32,7 +32,7 @@ class PackKernel : public Kernel {
     }
 };
 
-class PackCreator : public UnaryOperatorCreator {
+class PackCreator : public UnaryCreator {
    public:
     PackCreator() = default;
 
