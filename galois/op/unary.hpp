@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "galois/op/operator_creator.hpp"
+#include "galois/ir/builder.hpp"
 
 namespace galois::op {
 

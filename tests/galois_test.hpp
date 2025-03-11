@@ -3,7 +3,7 @@
 #include <chrono>
 
 #include "galois/galois.hpp"
-#include "galois/op/operator_creator.hpp"
+#include "galois/op/creator.hpp"
 // #include "galois/op/affine_convertor.hpp"
 #include "galois/op/op.hpp"
 // #include "galois/optimization/gemm_optimizer.hpp"

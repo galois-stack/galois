@@ -129,7 +129,10 @@ class MatrixMultiplyKernel8x1x8 : public MatrixMultiplyKernel {
 class MatrixMultiplyCreator : public BinaryCreator {
    public:
     static std::shared_ptr<MatrixMultiplyCreator> Create() {
-        return std::make_shared<MatrixMultiplyCreator>();
+        auto self = std::make_shared<MatrixMultiplyCreator>();
+        self->name = "MatrixMultiply";
+        self->fullname = "MatrixMultiply";
+        return self;
     }
 
     std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_mat_a_type,
