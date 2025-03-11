@@ -347,8 +347,8 @@ TEST(GaloisTests, TestFill) {
 
     // 对张量进行填充
     ir_fill_op_creator->AffineExpress(ir_operator->inputs, ir_builder);
-
-    operator_scope = nullptr;  // 释放operator_scope
+    // 释放operator_scope
+    operator_scope = nullptr;  
 
     auto prajna_compiler = CreateCompiler();
     auto llvm_codegen =
@@ -359,10 +359,15 @@ TEST(GaloisTests, TestFill) {
     prajna_compiler->GetSymbolValue("::fill_tensor"));
 
     auto input = new float[8];
-    tmp_fun(input); // 传入一个 float*，与函数匹配
+    // 传入一个 float*，与函数匹配
+    tmp_fun(input); 
     GALOIS_ASSERT(input[0] == 5.0);
     GALOIS_ASSERT(input[4] == 5.0);
     GALOIS_ASSERT(input[7] == 5.0);
+
+    // 释放动态数组
+    delete[] input;  
+    tmp_fun = nullptr; 
 
 }
 
