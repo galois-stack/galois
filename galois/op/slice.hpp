@@ -5,7 +5,7 @@
 
 namespace galois::op {
 
-class SliceCreator : public OperatorCreator {
+class SliceCreator : public Creator {
    public:
     static std::shared_ptr<SliceCreator> Create(Eigen::VectorXi64 slice_shape) {
         std::shared_ptr<SliceCreator> self(new SliceCreator);

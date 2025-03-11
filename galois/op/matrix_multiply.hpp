@@ -1,6 +1,6 @@
 #pragma once
 
-#include "galois/op/binary_operator.hpp"
+#include "galois/op/binary.hpp"
 
 namespace galois::op {
 
@@ -126,7 +126,7 @@ class MatrixMultiplyKernel8x1x8 : public MatrixMultiplyKernel {
     }
 };
 
-class MatrixMultiplyCreator : public BinaryOperatorCreator {
+class MatrixMultiplyCreator : public BinaryCreator {
    public:
     static std::shared_ptr<MatrixMultiplyCreator> Create() {
         return std::make_shared<MatrixMultiplyCreator>();

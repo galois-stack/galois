@@ -365,6 +365,11 @@ class PrajnaCodegen {
             return;
         }
 
+        if (auto ir_unary_intrinsic = Cast<ir::UnaryIntrinsic>(ir_instruction)) {
+            this->EmitUnaryIntrinsic(ir_unary_intrinsic);
+            return;
+        }
+
         GALOIS_UNREACHABLE;
     }
 
@@ -670,16 +675,16 @@ class PrajnaCodegen {
     void EmitAlloca(std::shared_ptr<ir::Alloca> ir_alloca) {
         auto ir_tensor_type = ir_alloca->type;
         if (ir_alloca->type->memory_type == ir::MemoryType::Host) {
-            // auto tensor_bytes = ir_tensor_type->Size() * ir_tensor_type->value_type->bytes;
-            // auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            //     pir_builder->Create<pir::Call>(this->pir_function_dict["malloc"],
-            //                                    pir_builder->GetInt64Constant(tensor_bytes)),
-            //     pir::PointerType::Create(this->EmitType(ir_tensor_type)));
-            // ir_alloca->pir_value =
-            // pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer); return; auto
-            auto tensor_bytes = ir_tensor_type->Size() * ir_tensor_type->value_type->bytes;
+            auto tensor_bytes = ir_tensor_type->bytes;
+            int64_t alignment = 16;
+            if (tensor_bytes % 32 == 0) {
+                alignment = 32;
+            } else if (tensor_bytes % 16 == 0) {
+                alignment = 16;
+            }
+            tensor_bytes = (tensor_bytes + alignment - 1) / alignment * alignment;
             std::list<std::shared_ptr<pir::Value>> pir_arguments = {
-                pir_builder->GetInt64Constant(32),  // alignment
+                pir_builder->GetInt64Constant(alignment),  // alignment
                 pir_builder->GetInt64Constant(tensor_bytes)};
             auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
                 pir_builder->Create<pir::Call>(this->pir_function_dict["aligned_alloc"],
@@ -836,6 +841,17 @@ class PrajnaCodegen {
                                                    pir::CastInstruction::Operation::PtrToInt,
                                                    pir_async_args_struct, pir_i64_type)});
         }
+    }
+
+    void EmitUnaryIntrinsic(std::shared_ptr<ir::UnaryIntrinsic> ir_intrinsic) {
+        auto ir_operand = ir_intrinsic->GetOperand(0);
+        auto pir_operand_type = ir_operand->type->pir_type;
+        auto pir_intrinsic_type = pir::FunctionType::Create({pir_operand_type}, pir_operand_type);
+        auto llvm_intrinsic_name =
+            "llvm." + ir_intrinsic->intrinsic_name + "." + pir_operand_type->name;
+        auto pir_intrinsic = pir_builder->GetIntrinsic(llvm_intrinsic_name, pir_intrinsic_type);
+        ir_intrinsic->pir_value =
+            pir_builder->Create<pir::Call>(pir_intrinsic, ir_operand->pir_value);
     }
 
     void EmitPthreadBlock(std::shared_ptr<PthreadBlock> ir_pthread_block) {

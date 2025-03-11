@@ -1,11 +1,11 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/operator_creator.hpp"
+#include "galois/op/unary.hpp"
 
 namespace galois::op {
 
-class PaddingCreator : public UnaryOperatorCreator {
+class PaddingCreator : public UnaryCreator {
    public:
     static std::shared_ptr<PaddingCreator> Create(Eigen::VectorXi64 padding_shape) {
         std::shared_ptr<PaddingCreator> self(new PaddingCreator);

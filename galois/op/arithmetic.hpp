@@ -1,11 +1,11 @@
 #pragma once
 
-#include "galois/op/binary_operator.hpp"
+#include "galois/op/binary.hpp"
 
 namespace galois::op {
 
 template <typename Instruction>
-class ArithemticCreator : public BinaryOperatorCreator {
+class ArithemticCreator : public BinaryCreator {
    public:
     std::shared_ptr<ir::TensorType> InferTypeImpl(
         std::shared_ptr<ir::TensorType> ir_input_type0,

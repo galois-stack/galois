@@ -4,7 +4,7 @@
 
 namespace galois::op {
 
-class FillCreator : public op::OperatorCreator {
+class FillCreator : public op::Creator {
    public:
     static std::shared_ptr<FillCreator> Create(std::shared_ptr<ir::TensorType> ir_tensor_type,
                                                double value) {

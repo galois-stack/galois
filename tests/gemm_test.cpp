@@ -1,5 +1,4 @@
-#include "arm_neon.h"
-#include "galois/op/matrix_multiply_op.hpp"
+#include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "galois_test.hpp"
 

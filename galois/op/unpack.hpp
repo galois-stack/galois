@@ -1,11 +1,11 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/operator_creator.hpp"
+#include "galois/op/unary.hpp"
 
 namespace galois::op {
 
-class UnpackCreator : public UnaryOperatorCreator {
+class UnpackCreator : public UnaryCreator {
    public:
     static std::shared_ptr<UnpackCreator> Create() { return std::make_shared<UnpackCreator>(); }
 

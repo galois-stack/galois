@@ -202,7 +202,7 @@ cost time: 23944500ns, galois gemm flops: 89.68588393994446gflops
 实现这个运算, 在galois平台下只需要100行左右的代码, 完整可参阅代码galois/op/matrix_multiply.hpp. 下面一起看一下关键函数AffineExpress
 
 ```c++
-class MatrixMultiplyCreator : public OperatorCreator {
+class MatrixMultiplyCreator : public Creator {
    public:
     std::shared_ptr<TensorType> InferType(
         std::vector<std::shared_ptr<TensorType>> ir_input_types) override {
