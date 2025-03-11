@@ -22,8 +22,6 @@ class PrajnaCodegen {
         pir_module->symbol_table = prajna_symbol_table;
         this->pir_builder =
             prajna::lowering::IrBuilder::Create(prajna_symbol_table, pir_module, pir_logger);
-
-        this->BindIntrinsics();
     }
 
     void DeclareIntrinsic() {
@@ -90,14 +88,21 @@ class PrajnaCodegen {
         std::unique_ptr<ScopeGuard> thread_guard;
         if (ir_grid->enable_multi_thread) {
             auto pir_thread_num = pir_builder->GetInt32Constant(12);
-            auto pir_thread_pool = pir_builder->Create<pir::Call>(
-                this->pir_function_dict["thpool_init"], pir_thread_num);
+            auto pir_i32_function_type_i64 = pir::FunctionType::Create(
+                {pir::IntType::Create(32, true)}, pir::IntType::Create(64, true));
+            auto pir_thpool_init =
+                pir_builder->GetIntrinsic("thpool_init", pir_i32_function_type_i64);
+            auto pir_thread_pool = pir_builder->Create<pir::Call>(pir_thpool_init, pir_thread_num);
             this->pir_thpool = pir_thread_pool;
+            auto pir_i64_function_type = pir::FunctionType::Create({pir::IntType::Create(64, true)},
+                                                                   pir::VoidType::Create());
             thread_guard = std::move(ScopeGuard::Create([=]() {
-                pir_builder->Create<pir::Call>(this->pir_function_dict["thpool_wait"],
-                                               pir_thread_pool);
-                pir_builder->Create<pir::Call>(this->pir_function_dict["thpool_destroy"],
-                                               pir_thread_pool);
+                pir_builder->Create<pir::Call>(
+                    pir_builder->GetIntrinsic("thpool_wait", pir_i64_function_type),
+                    pir_thread_pool);
+                pir_builder->Create<pir::Call>(
+                    pir_builder->GetIntrinsic("thpool_destroy", pir_i64_function_type),
+                    pir_thread_pool);
             }));
         }
 
@@ -606,72 +611,6 @@ class PrajnaCodegen {
                 pir::PointerType::Create(ir_bit_cast->type->pir_type)));
     }
 
-    void BindThreadPoolFunctions() {
-        auto pir_i64_type = pir::IntType::Create(64, true);
-        {
-            auto pir_function_type =
-                pir::FunctionType::Create({pir::IntType::Create(32, true)}, pir_i64_type);
-            auto pir_function = pir_builder->CreateFunction(prajna::ast::Identifier("thpool_init"),
-                                                            pir_function_type);
-            pir_function->annotation_dict["intrinsic"].push_back("thpool_init");
-            this->pir_function_dict["thpool_init"] = pir_function;
-        }
-        {
-            auto pir_function_type = pir::FunctionType::Create(
-                {pir_i64_type, pir_i64_type, pir_i64_type}, pir::VoidType::Create());
-            auto pir_function = pir_builder->CreateFunction(
-                prajna::ast::Identifier("thpool_add_work"), pir_function_type);
-            pir_function->annotation_dict["intrinsic"].push_back("thpool_add_work");
-            this->pir_function_dict["thpool_add_work"] = pir_function;
-        }
-        {
-            auto pir_function_type =
-                pir::FunctionType::Create({pir_i64_type}, pir::VoidType::Create());
-            auto pir_function = pir_builder->CreateFunction(prajna::ast::Identifier("thpool_wait"),
-                                                            pir_function_type);
-            pir_function->annotation_dict["intrinsic"].push_back("thpool_wait");
-            this->pir_function_dict["thpool_wait"] = pir_function;
-        }
-        {
-            auto pir_function_type =
-                pir::FunctionType::Create({pir_i64_type}, pir::VoidType::Create());
-            auto pir_function = pir_builder->CreateFunction(
-                prajna::ast::Identifier("thpool_destroy"), pir_function_type);
-            pir_function->annotation_dict["intrinsic"].push_back("thpool_destroy");
-            this->pir_function_dict["thpool_destroy"] = pir_function;
-        }
-    }
-
-    void BindIntrinsics() {
-        {
-            auto function_type =
-                pir::FunctionType::Create({pir::IntType::Create(64, true)},
-                                          pir::PointerType::Create(pir::IntType::Create(8, false)));
-            this->pir_function_dict["malloc"] =
-                pir_builder->CreateFunction(prajna::ast::Identifier("malloc"), function_type);
-            this->pir_function_dict["malloc"]->annotation_dict["intrinsic"].push_back("malloc");
-        }
-        {
-            auto function_type = pir::FunctionType::Create(
-                {pir::IntType::Create(64, true), pir::IntType::Create(64, true)},
-                pir::PointerType::Create(pir::IntType::Create(8, false)));
-            this->pir_function_dict["aligned_alloc"] = pir_builder->CreateFunction(
-                prajna::ast::Identifier("aligned_alloc"), function_type);
-            this->pir_function_dict["aligned_alloc"]->annotation_dict["intrinsic"].push_back(
-                "aligned_alloc");
-        }
-        {
-            auto function_type = pir::FunctionType::Create(
-                {pir::PointerType::Create(pir::IntType::Create(8, false))},
-                pir::VoidType::Create());
-            this->pir_function_dict["free"] =
-                pir_builder->CreateFunction(prajna::ast::Identifier("free"), function_type);
-            this->pir_function_dict["free"]->annotation_dict["intrinsic"].push_back("free");
-        }
-
-        this->BindThreadPoolFunctions();
-    }
-
     void EmitAlloca(std::shared_ptr<ir::Alloca> ir_alloca) {
         auto ir_tensor_type = ir_alloca->type;
         if (ir_alloca->type->memory_type == ir::MemoryType::Host) {
@@ -686,9 +625,12 @@ class PrajnaCodegen {
             std::list<std::shared_ptr<pir::Value>> pir_arguments = {
                 pir_builder->GetInt64Constant(alignment),  // alignment
                 pir_builder->GetInt64Constant(tensor_bytes)};
+            auto pir_function_type = pir::FunctionType::Create(
+                {pir::IntType::Create(64, true), pir::IntType::Create(64, true)},
+                pir::PointerType::Create(pir::IntType::Create(8, false)));
+            auto pir_aligned_alloc = pir_builder->GetIntrinsic("aligned_alloc", pir_function_type);
             auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-                pir_builder->Create<pir::Call>(this->pir_function_dict["aligned_alloc"],
-                                               pir_arguments),
+                pir_builder->Create<pir::Call>(pir_aligned_alloc, pir_arguments),
                 pir::PointerType::Create(this->EmitType(ir_tensor_type)));
             ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
             return;
@@ -720,7 +662,10 @@ class PrajnaCodegen {
     void EmitFree(std::shared_ptr<ir::Free> ir_free) {
         this->EmitTensor(ir_free->Tensor());
         ir_free->pir_value = pir_builder->Create<pir::Call>(
-            this->pir_function_dict["free"],
+            pir_builder->GetIntrinsic(
+                "free", pir::FunctionType::Create(
+                            {pir::PointerType::Create(pir::IntType::Create(8, false))},
+                            pir::VoidType::Create())),
             pir_builder->Create<pir::BitCast>(
                 prajna::Cast<pir::DeferencePointer>(ir_free->Tensor()->pir_value)->Pointer(),
                 pir::PointerType::Create(pir::IntType::Create(8, false))));
@@ -831,15 +776,18 @@ class PrajnaCodegen {
                 ++i;
             }
             auto pir_i64_type = pir::IntType::Create(64, true);
-            pir_builder->Create<pir::Call>(this->pir_function_dict["thpool_add_work"],
-                                           std::list<std::shared_ptr<pir::Value>>{
-                                               this->pir_thpool,
-                                               pir_builder->Create<pir::CastInstruction>(
-                                                   pir::CastInstruction::Operation::PtrToInt,
-                                                   pir_async_function, pir_i64_type),
-                                               pir_builder->Create<pir::CastInstruction>(
-                                                   pir::CastInstruction::Operation::PtrToInt,
-                                                   pir_async_args_struct, pir_i64_type)});
+            auto pir_function_type = pir::FunctionType::Create(
+                {pir_i64_type, pir_i64_type, pir_i64_type}, pir::VoidType::Create());
+            pir_builder->Create<pir::Call>(
+                pir_builder->GetIntrinsic("thpool_add_work", pir_function_type),
+                std::list<std::shared_ptr<pir::Value>>{
+                    this->pir_thpool,
+                    pir_builder->Create<pir::CastInstruction>(
+                        pir::CastInstruction::Operation::PtrToInt, pir_async_function,
+                        pir_i64_type),
+                    pir_builder->Create<pir::CastInstruction>(
+                        pir::CastInstruction::Operation::PtrToInt, pir_async_args_struct,
+                        pir_i64_type)});
         }
     }
 
@@ -859,15 +807,21 @@ class PrajnaCodegen {
     }
 
     std::shared_ptr<pir::Value> PirNew(std::shared_ptr<pir::Type> pir_type) {
+        auto pir_function_type =
+            pir::FunctionType::Create({pir::IntType::Create(64, true)},
+                                      pir::PointerType::Create(pir::IntType::Create(8, false)));
+        auto pir_malloc = pir_builder->GetIntrinsic("malloc", pir_function_type);
         return pir_builder->Create<pir::BitCast>(
-            pir_builder->Create<pir::Call>(this->pir_function_dict["malloc"],
+            pir_builder->Create<pir::Call>(pir_malloc,
                                            pir_builder->GetInt64Constant(pir_type->bytes)),
             pir::PointerType::Create(pir_type));
     }
 
     void PirFree(std::shared_ptr<pir::Value> pir_value) {
+        auto pir_function_type = pir::FunctionType::Create(
+            {pir::PointerType::Create(pir::IntType::Create(8, false))}, pir::VoidType::Create());
         pir_builder->Create<pir::Call>(
-            this->pir_function_dict["free"],
+            pir_builder->GetIntrinsic("free", pir_function_type),
             pir_builder->Create<pir::BitCast>(
                 pir_value, pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
@@ -878,7 +832,6 @@ class PrajnaCodegen {
 
     std::shared_ptr<pir::Value> pir_thpool = nullptr;
     std::shared_ptr<prajna::lowering::IrBuilder> pir_builder = nullptr;
-    std::unordered_map<std::string, std::shared_ptr<pir::Function>> pir_function_dict;
 };
 
 }  // namespace galois::codegen::cpu
