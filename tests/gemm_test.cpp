@@ -1,3 +1,4 @@
+#include <cassert>
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "galois_test.hpp"
@@ -308,3 +309,9 @@ TEST(GaloisTests, TestGemm0) {
 
     free(static_cast<void *>(f32_c_ptr));
 }
+
+
+
+
+
+
