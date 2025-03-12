@@ -1,11 +1,12 @@
-#include "galois/op/unary_intrinsic.hpp"
+#include "galois/op/sum.hpp"
+
 #include "galois_test.hpp"
 
-TEST(GaloisTests, TestUnaryIntrinsic) {
-    auto ir_input_type = ir::f32;
+TEST(GaloisTests, TestSum) {
+    auto ir_input_type = ir::f32->Tile(4);
     auto ir_builder = ir::Builder::Create();
-    auto ir_intrin_creator = op::UnaryInstrinsicCreator::Create("sin");
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_intrin_creator, {ir_input_type});
+    auto ir_sum_creator = op::SumCreator::Create();
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_sum_creator, {ir_input_type});
 
     auto prajna_compiler = CreateCompiler();
     auto llvm_codegen =
@@ -15,7 +16,11 @@ TEST(GaloisTests, TestUnaryIntrinsic) {
     auto tmp_fun = reinterpret_cast<float *(*)(float *)>(
         prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
 
-    float input = 3.1415f / 2.0f;
-    auto value = *tmp_fun(&input);
-    fmt::print("sin(3.1415) = {}\n", value);
+    auto input = new float[4];
+    input[0] = 0.0f;
+    input[1] = 1.0f;
+    input[2] = 2.0f;
+    input[3] = 3.0f;
+    auto sum = *tmp_fun(input);
+    fmt::print("sum : {}\n", sum);
 }

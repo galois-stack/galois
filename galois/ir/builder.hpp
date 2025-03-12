@@ -4,6 +4,7 @@
 #include <stack>
 
 #include "galois/ir/ir.hpp"
+#include "galois/op/creator.hpp"
 
 namespace galois::op {
 class MatrixMultiplyKernel;
@@ -102,6 +103,16 @@ class Builder : public std::enable_shared_from_this<Builder> {
             this->temp_tensors_stack.pop();
         });
         return {ir_operator, std::move(scope_guard)};
+    }
+
+    std::shared_ptr<OperatorFunction> CreateOperatorByCreator(
+        std::shared_ptr<op::Creator> op_creator,
+        std::vector<std::shared_ptr<TensorType>> input_types) {
+        auto ir_output_type = op_creator->InferType(input_types);
+        auto [ir_operator, operator_scope] = this->CreateOperator(
+            OperatorType::Create(input_types, ir_output_type), op_creator->fullname);
+        op_creator->AffineExpress(ir_operator->inputs, this->shared_from_this());
+        return ir_operator;
     }
 
     template <typename Creator, typename... CreatorArgs>

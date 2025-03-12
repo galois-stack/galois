@@ -1,8 +1,8 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
+#include "galois/op/creator.hpp"
 #include "galois/op/fill.hpp"
-#include "galois/op/operator_creator.hpp"
 
 namespace galois::op {
 
@@ -14,6 +14,8 @@ class FullCreator : public op::Creator {
         self->ir_tensor_type = ir_tensor_type;
         self->value = value;
         self->fill_creator = FillCreator::Create(ir_tensor_type, value);
+        self->name = "Full";
+        self->fullname = self->name;
         return self;
     }
 

@@ -7,7 +7,12 @@ namespace galois::op {
 
 class UnpackCreator : public UnaryCreator {
    public:
-    static std::shared_ptr<UnpackCreator> Create() { return std::make_shared<UnpackCreator>(); }
+    static std::shared_ptr<UnpackCreator> Create() {
+        auto self = std::make_shared<UnpackCreator>();
+        self->name = "Unpack";
+        self->fullname = self->name;
+        return self;
+    }
 
     std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_input_type) override {
         auto ir_scalar_type = ir_input_type->PrimitiveDataType();

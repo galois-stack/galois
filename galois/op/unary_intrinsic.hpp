@@ -9,6 +9,8 @@ class UnaryInstrinsicCreator : public UnaryCreator {
     static std::shared_ptr<UnaryInstrinsicCreator> Create(std::string intrinsic_name) {
         auto self = std::make_shared<UnaryInstrinsicCreator>();
         self->intrinsic_name = intrinsic_name;
+        self->name = intrinsic_name;
+        self->fullname = self->name;
         return self;
     }
 

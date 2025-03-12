@@ -39,6 +39,8 @@ class PackCreator : public UnaryCreator {
     static std::shared_ptr<PackCreator> Create(std::shared_ptr<TensorType> ir_pack_type) {
         std::shared_ptr<PackCreator> self(new PackCreator);
         self->pack_type = ir_pack_type;
+        self->name = "Pack";
+        self->fullname = self->name;
         return self;
     }
 

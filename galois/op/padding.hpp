@@ -10,6 +10,8 @@ class PaddingCreator : public UnaryCreator {
     static std::shared_ptr<PaddingCreator> Create(Eigen::VectorXi64 padding_shape) {
         std::shared_ptr<PaddingCreator> self(new PaddingCreator);
         self->padding_shape = padding_shape;
+        self->name = "Padding";
+        self->fullname = self->name;
         return self;
     }
 

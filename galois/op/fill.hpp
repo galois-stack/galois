@@ -1,6 +1,6 @@
 #pragma once
 
-#include "galois/op/operator_creator.hpp"
+#include "galois/ir/builder.hpp"
 
 namespace galois::op {
 
@@ -11,6 +11,8 @@ class FillCreator : public op::Creator {
         auto self = std::make_shared<FillCreator>();
         self->ir_tensor_type = ir_tensor_type;
         self->value = value;
+        self->name = "Fill";
+        self->fullname = self->name;
         return self;
     }
 

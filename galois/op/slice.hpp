@@ -1,7 +1,7 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/operator_creator.hpp"
+#include "galois/op/creator.hpp"
 
 namespace galois::op {
 
@@ -10,6 +10,8 @@ class SliceCreator : public Creator {
     static std::shared_ptr<SliceCreator> Create(Eigen::VectorXi64 slice_shape) {
         std::shared_ptr<SliceCreator> self(new SliceCreator);
         self->slice_shape = slice_shape;
+        self->name = "Slice";
+        self->fullname = self->name;
         return self;
     }
 

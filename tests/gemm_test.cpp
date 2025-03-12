@@ -12,14 +12,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     auto ir_builder = ir::Builder::Create();
     ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel4x1x4::Create());
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-    auto ir_ts_type_c =
-        ir_packed_matrix_multiply_op_creator->InferType({ir_ts_type_a, ir_ts_type_b});
-
-    auto ir_operator_type = ir::OperatorType::Create({ir_ts_type_a, ir_ts_type_b}, ir_ts_type_c);
-
-    auto [ir_operator, operator_scope] =
-        ir_builder->CreateOperator(ir_operator_type, "packed_matrix_multiply");
-    ir_packed_matrix_multiply_op_creator->AffineExpress(ir_operator->inputs, ir_builder);
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
+                                                           {ir_ts_type_a, ir_ts_type_b});
 
     auto prajna_compiler = CreateCompiler();
     auto llvm_codegen =
@@ -27,7 +21,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     llvm_codegen->EmitOperatorFunction(ir_operator);
     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
     auto tmp_fun = reinterpret_cast<float *(*)(float *, float *)>(
-        prajna_compiler->GetSymbolValue("::packed_matrix_multiply"));
+        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -53,14 +47,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     auto ir_builder = ir::Builder::Create();
     ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernelI8_16x1x16::Create());
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-    auto ir_ts_type_c =
-        ir_packed_matrix_multiply_op_creator->InferType({ir_ts_type_a, ir_ts_type_b});
-
-    auto ir_operator_type = ir::OperatorType::Create({ir_ts_type_a, ir_ts_type_b}, ir_ts_type_c);
-
-    auto [ir_operator, operator_scope] =
-        ir_builder->CreateOperator(ir_operator_type, "packed_matrix_multiply");
-    ir_packed_matrix_multiply_op_creator->AffineExpress(ir_operator->inputs, ir_builder);
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
+                                                           {ir_ts_type_a, ir_ts_type_b});
 
     auto prajna_compiler = CreateCompiler();
     auto llvm_codegen =
@@ -68,7 +56,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     llvm_codegen->EmitOperatorFunction(ir_operator);
     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
     auto tmp_fun = reinterpret_cast<int8_t *(*)(int8_t *, int8_t *)>(
-        prajna_compiler->GetSymbolValue("::packed_matrix_multiply"));
+        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -266,12 +254,8 @@ TEST(GaloisTests, TestGemm0) {
         ir_packed_matrix_multiply_op_creator->InferType({ir_ts_type_a, ir_ts_type_b});
 
     auto ir_operator_type = ir::OperatorType::Create({ir_ts_type_a, ir_ts_type_b}, ir_ts_type_c);
-
-    auto [ir_operator, operator_scope] =
-        ir_builder->CreateOperator(ir_operator_type, "packed_matrix_multiply");
-    ir_packed_matrix_multiply_op_creator->AffineExpress(ir_operator->inputs, ir_builder);
-    operator_scope = nullptr;  // 释放operator_scope
-
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
+                                                           {ir_ts_type_a, ir_ts_type_b});
     auto gemm_optimizer = optimization::GemmOptimizer::Create();
     auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
 
@@ -281,7 +265,7 @@ TEST(GaloisTests, TestGemm0) {
     llvm_codegen->EmitOperatorFunction(ir_gemm_operator);
     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
     auto tmp_fun = reinterpret_cast<float *(*)(float *, float *)>(
-        prajna_compiler->GetSymbolValue("::packed_matrix_multiply_gemm"));
+        prajna_compiler->GetSymbolValue("::" + ir_gemm_operator->fullname));
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();

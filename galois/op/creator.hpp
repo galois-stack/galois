@@ -1,7 +1,10 @@
 #pragma once
 
-#include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
+
+namespace galois::ir {
+class Builder;
+}
 
 namespace galois::op {
 
