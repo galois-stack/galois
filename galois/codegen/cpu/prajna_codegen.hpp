@@ -692,7 +692,9 @@ class PrajnaCodegen {
             std::list<std::shared_ptr<pir::Value>> pir_arguments;
             for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
                 pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
-                    prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
+                    // 我们通过指针来传递参数， 所以需要用变量包装一下
+                    pir_builder->VariableLikedNormalize(ir_call->Input(i)->pir_value)));
+                // prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
             }
 
             ir_call->pir_value = pir_builder->Create<pir::Call>(

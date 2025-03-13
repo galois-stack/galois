@@ -5,8 +5,15 @@
 namespace galois::op {
 
 template <typename Instruction>
-class ArithemticCreator : public BinaryCreator {
+class ArithmeticCreator : public BinaryCreator {
    public:
+    static std::shared_ptr<ArithmeticCreator> Create() {
+        auto self = std::make_shared<ArithmeticCreator>();
+        self->name = "ToName ";
+        self->fullname = self->name;
+        return self;
+    }
+
     std::shared_ptr<ir::TensorType> InferTypeImpl(
         std::shared_ptr<ir::TensorType> ir_input_type0,
         std::shared_ptr<ir::TensorType> ir_input_type1) override {
@@ -27,9 +34,9 @@ class ArithemticCreator : public BinaryCreator {
     }
 };
 
-using AddCreator = ArithemticCreator<ir::Add>;
-using SubCreator = ArithemticCreator<ir::Sub>;
-using MulCreator = ArithemticCreator<ir::Mul>;
-using DivCreator = ArithemticCreator<ir::Div>;
+using AddCreator = ArithmeticCreator<ir::Add>;
+using SubCreator = ArithmeticCreator<ir::Sub>;
+using MulCreator = ArithmeticCreator<ir::Mul>;
+using DivCreator = ArithmeticCreator<ir::Div>;
 
 }  // namespace galois::op
