@@ -25,7 +25,8 @@ class SumCreator : public op::Creator {
                        std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_re_type = this->InferType(ir::GetTensorTypes(ir_inputs));
         auto ir_re = ir_builder->Create<ir::Alloca>(ir_re_type);
-        ir_builder->Express<op::FillCreator>({ir_re}, ir_re_type, 0.0);
+        ir_builder->Express<op::FillCreator>(
+            {ir_re, ir_builder->GetZero(ir_re_type->PrimitiveDataType())});
         this->AffineExpressImpl(ir_inputs.front(), ir_re, ir_builder);
         ir_builder->Create<ir::Return>(ir_re);
     }
