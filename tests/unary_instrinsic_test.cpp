@@ -1,5 +1,5 @@
 #include "galois/op/unary_intrinsic.hpp"
-#include "galois_test.hpp"
+#include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestUnaryIntrinsic) {
     auto ir_input_type = ir::f32;

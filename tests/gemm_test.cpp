@@ -1,7 +1,8 @@
 #include <cassert>
+
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
-#include "galois_test.hpp"
+#include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
@@ -309,9 +310,3 @@ TEST(GaloisTests, TestGemm0) {
 
     free(static_cast<void *>(f32_c_ptr));
 }
-
-
-
-
-
-

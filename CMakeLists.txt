@@ -58,6 +58,8 @@ add_subdirectory(third_party/prajna)
 # add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/mtensor EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/eigen EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+
 # add_subdirectory(third_party/json EXCLUDE_FROM_ALL) # prajna depends
 
 set(CPUINFO_BUILD_UNIT_TESTS  OFF)

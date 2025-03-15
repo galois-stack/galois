@@ -1,6 +1,6 @@
 #include "galois/op/sum.hpp"
 
-#include "galois_test.hpp"
+#include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestSum) {
     auto ir_input_type = ir::f32->Tile(4);
