@@ -1,6 +1,6 @@
 #include "galois/op/fill.hpp"
 
-#include "galois_test.hpp"
+#include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestFill) {
     // 1.创建张量类型

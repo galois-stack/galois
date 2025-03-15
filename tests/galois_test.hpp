@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "benchmark/benchmark.h"
 #include "galois/galois.hpp"
 #include "galois/op/creator.hpp"
 // #include "galois/op/affine_convertor.hpp"
