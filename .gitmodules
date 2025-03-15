@@ -13,3 +13,6 @@
 [submodule "third_party/C-Thread-Pool"]
 	path = third_party/C-Thread-Pool
 	url = https://github.com/Pithikos/C-Thread-Pool
+[submodule "third_party/benchmark"]
+	path = third_party/benchmark
+	url = https://github.com/google/benchmark
