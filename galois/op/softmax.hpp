@@ -11,7 +11,7 @@ class SoftmaxCreator : public op::Creator {
    public:
     static std::shared_ptr<SoftmaxCreator> Create() {
         auto self = std::make_shared<SoftmaxCreator>();
-        self->name = "Fill";
+        self->name = "Softmax";
         self->fullname = self->name;
         return self;
     }
