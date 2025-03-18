@@ -1,5 +1,50 @@
+#include <cstdint>
 #include "galois/op/unary_intrinsic.hpp"
 #include "tests/galois_test.hpp"
+
+
+
+void BM_UnaryIntrinsic(benchmark::State &state) {
+
+
+    auto ir_input_type = ir::f32;
+    auto ir_builder = ir::Builder::Create();
+    auto ir_intrin_creator = op::UnaryInstrinsicCreator::Create("sin");
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_intrin_creator, {ir_input_type});
+
+    auto prajna_compiler = CreateCompiler();
+    auto llvm_codegen =
+        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
+    llvm_codegen->EmitOperatorFunction(ir_operator);
+    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
+    auto tmp_fun = reinterpret_cast<float *(*)(float *)>(
+        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
+
+
+    // 创建输入数据
+    auto length = int64_t(state.range(0));
+    auto input = new float[length];
+    for (int64_t i = 0; i < length; ++i) {
+        input[i] = static_cast<float>(i) / length;  // 初始化为某个范围的浮点数
+    }
+
+    for(auto _ : state) {
+        tmp_fun(input);
+    }    
+    
+    // 设置基准测试数据
+    state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) * length * sizeof(float));
+    state.SetItemsProcessed(static_cast<int64_t>(state.iterations()) * length);
+
+    // 清理资源
+    delete[] input;
+    tmp_fun = nullptr;
+
+    
+}
+
+BENCHMARK(BM_UnaryIntrinsic)->Arg(1 << 10)->Arg(1 << 20)->Arg(1 << 30);
+
 
 TEST(GaloisTests, TestUnaryIntrinsic) {
     auto ir_input_type = ir::f32;
