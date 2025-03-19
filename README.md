@@ -222,7 +222,7 @@ class MatrixMultiplyCreator : public Creator {
                        std::shared_ptr<Builder> ir_builder) override {
         // 某种意义上可以从下往上把这个kernel的实现优化出来的, galois也实验了这样的优化, 但最终并没有这样做,
         // 从上往下的优化更为直接有效, 它可以充分利用已知的规则, 所以galois会预先实现一些比较关键的矩阵乘法kernel
-        for (auto ir_kernel : ir_builder->kernel_queue) {
+        for (auto ir_kernel : ir_builder->matrix_multiply_kernel_queue) {
             if (ir_kernel->Match(ir_inputs, ir_outputs, ir_builder)) {
                 ir_kernel->Build(ir_inputs, ir_outputs, ir_builder);
                 return;
