@@ -35,6 +35,37 @@ TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     free(ir_mat_c_ptr);
 }
 
+TEST(GaloisTests, TestPackedMatrixMultiply_F32x8x1x8) {
+    //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
+    auto ir_ts_type_a = ir::f32->Tile(8, 1)->Tile(2, 1)->Tile(1, 1024)->Tile(64, 1);
+    auto ir_ts_type_b = ir::f32->Tile(1, 8)->Tile(1, 1)->Tile(1024, 1)->Tile(1, 64);
+    ir_ts_type_a->value_type->enable_multi_thread = true;
+
+    auto ir_builder = ir::Builder::Create();
+    ir_builder->matrix_multiply_kernel_queue.push_back(
+        op::VectorizedMatrixMultiplyKernel::Create(256));
+    auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
+                                                           {ir_ts_type_a, ir_ts_type_b});
+
+    auto jit_engine = jit::Engine::Create();
+    auto mat_mul_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *)>(ir_operator);
+
+    auto shape_a = ir_ts_type_a->NormalizeShape();
+    auto shape_b = ir_ts_type_b->NormalizeShape();
+
+    Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Ones(shape_a[0], shape_a[1]);
+    Eigen::MatrixRXf32 eigen_matrix_f32_b = Eigen::MatrixRXf32::Ones(shape_b[0], shape_b[1]);
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto ir_mat_c_ptr = mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
+    auto t1 = std::chrono::high_resolution_clock::now();
+    fmt::print("cost time: {}ns, galois flops: {:.04f}gops\n", (t1 - t0).count(),
+               shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
+
+    free(ir_mat_c_ptr);
+}
+
 TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
     auto ir_ts_type_a = ir::i8->Tile(16, 1)->Tile(1, 2048)->Tile(128, 1);
@@ -66,177 +97,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     free(ir_mat_c_ptr);
 }
 
-// TEST(GaloisTests, TestMatrixMultiply1) {
-//     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-//     auto ir_ts_type_a = f32(4, 1)(2, 1)(1, 1024)(64, 1)(2, 1)(10, 10);
-//     auto ir_ts_type_b = f32(1, 4)(1, 2)(1024, 1)(1, 64)(1, 2)(10, 10);  // 一个比较合理的设计
-//     ir_ts_type_a->value_type->enable_multi_thread = true;
-//     auto shape_a = ir_ts_type_a->NormalizeShape();
-//     auto shape_b = ir_ts_type_b->NormalizeShape();
-
-//     auto ir_input_a = graph::Input::Create(ir_ts_type_a);
-//     auto ir_input_b = graph::Input::Create(ir_ts_type_b);
-//     auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
-//     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_input_a,
-//     ir_input_b}); auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_mat_mul,
-//     "tmp_module");
-
-//     auto ir_affine_convertor = graph::AffineConvertor::Create();
-//     auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
-//     transform::Each<ir::Grid>(ir_operator, [](std::shared_ptr<ir::Grid> ir_grid) {
-//         if (ir_grid->enable_multi_thread) {
-//             transform::AsyncInvokeByThreadPool(ir_grid);
-//         }
-//     });
-
-//     auto prajna_compiler = CreateCompiler();
-//     auto llvm_codegen =
-//         std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-//     llvm_codegen->EmitOperatorFunction(ir_operator);
-//     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-//     auto mat_mul_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
-//         prajna_compiler->GetSymbolValue("::tmp_module"));
-
-//     Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Ones(shape_a[0], shape_a[1]);
-//     Eigen::MatrixRXf32 eigen_matrix_f32_b = Eigen::MatrixRXf32::Ones(shape_b[0], shape_b[1]);
-//     Eigen::MatrixRXf32 get_f32_c = Eigen::MatrixRXf32::Random(shape_a[0], shape_b[1]);
-
-//     // get_f32_c.setZero();
-//     auto t0 = std::chrono::high_resolution_clock::now();
-//     mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
-//     auto t1 = std::chrono::high_resolution_clock::now();
-
-//     fmt::print("cost time: {}ns, galois flops: {:.04f}gops\n", (t1 - t0).count(),
-//                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
-//                t0).count()));
-// }
-
-// TEST(GaloisTests, TestMatrixMultiply256) {
-//     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-//     auto ir_ts_type_a = f32(8, 1)(1, 512)(128, 1)(4, 1);
-//     auto ir_ts_type_b = f32(1, 8)(512, 1)(1, 128)(1, 4);
-//     // ir_ts_type_a->enable_multi_thread = true;
-//     auto shape_a = ir_ts_type_a->NormalizeShape();
-//     auto shape_b = ir_ts_type_b->NormalizeShape();
-
-//     auto ir_input_a = graph::Input::Create(ir_ts_type_a);
-//     auto ir_input_b = graph::Input::Create(ir_ts_type_b);
-//     auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
-//     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_input_a,
-//     ir_input_b}); auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_mat_mul,
-//     "tmp_module");
-
-//     auto ir_affine_convertor = graph::AffineConvertor::Create();
-//     auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
-//     transform::Each<ir::Grid>(ir_operator, [](std::shared_ptr<ir::Grid> ir_grid) {
-//         if (ir_grid->enable_multi_thread) {
-//             transform::AsyncInvokeByThreadPool(ir_grid);
-//         }
-//     });
-
-//     auto prajna_compiler = CreateCompiler();
-//     auto llvm_codegen =
-//         std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-//     llvm_codegen->EmitOperatorFunction(ir_operator);
-//     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-//     auto mat_mul_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
-//         prajna_compiler->GetSymbolValue("::tmp_module"));
-
-//     Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Random(shape_a[0], shape_a[1]);
-//     Eigen::MatrixRXf32 eigen_matrix_f32_b = Eigen::MatrixRXf32::Random(shape_b[0], shape_b[1]);
-//     Eigen::MatrixRXf32 get_f32_c = Eigen::MatrixRXf32::Random(shape_a[0], shape_b[1]);
-
-//     // get_f32_c.setZero();
-//     auto t0 = std::chrono::high_resolution_clock::now();
-//     mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
-//     auto t1 = std::chrono::high_resolution_clock::now();
-
-//     fmt::print("cost time: {}ns, galois flops: {:.04f}gops\n", (t1 - t0).count(),
-//                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
-//                t0).count()));
-// }
-
-// TEST(GaloisTests, TestGemm) {
-//     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-//     auto ir_ts_type_a = f32(8, 1)(1, 512)(64, 1);
-//     auto ir_ts_type_b = f32(1, 8)(512, 1)(1, 64);
-//     // ir_ts_type_a->enable_multi_thread = false;
-
-//     auto shape_a = ir_ts_type_a->NormalizeShape();
-//     auto shape_b = ir_ts_type_b->NormalizeShape();
-
-//     auto ir_input_a = graph::Input::Create(f32(shape_a));
-//     auto ir_input_b = graph::Input::Create(f32(shape_b));
-//     auto ir_pack_op_a = op::PackCreator::Create(ir_ts_type_a);
-//     auto ir_pack_a = graph::ComputeNode::Create(ir_pack_op_a, {ir_input_a});
-//     auto ir_pack_op_b = op::PackCreator::Create(ir_ts_type_b);
-//     auto ir_pack_b = graph::ComputeNode::Create(ir_pack_op_b, {ir_input_b});
-//     auto ir_matrix_multiply_op = op::MatrixMultiplyCreator::Create();
-//     auto ir_mat_mul = graph::ComputeNode::Create(ir_matrix_multiply_op, {ir_pack_a, ir_pack_b});
-//     auto ir_unpack_op_c = op::UnpackCreator::Create();
-//     auto ir_unpack_c = graph::ComputeNode::Create(ir_unpack_op_c, {ir_mat_mul});
-//     auto ir_module = graph::ComputeGraph::BuildComputeGraph(ir_unpack_c, "tmp_module");
-
-//     auto ir_affine_convertor = graph::AffineConvertor::Create();
-//     auto ir_operator = ir_affine_convertor->EmitModule(ir_module);
-//     transform::Each<ir::Grid>(ir_operator, [](std::shared_ptr<ir::Grid> ir_grid) {
-//         if (ir_grid->enable_multi_thread) {
-//             transform::AsyncInvokeByThreadPool(ir_grid);
-//         }
-//     });
-
-//     auto prajna_compiler = CreateCompiler();
-//     auto llvm_codegen =
-//         std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-//     llvm_codegen->EmitOperatorFunction(ir_operator);
-//     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-//     auto mat_mul_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
-//         prajna_compiler->GetSymbolValue("::tmp_module"));
-
-//     Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Random(shape_a[0], shape_a[1]);
-//     Eigen::MatrixRXf32 eigen_matrix_f32_b = Eigen::MatrixRXf32::Random(shape_b[0], shape_b[1]);
-//     auto shape_c = Cast<TensorType>(ir_module->type)->shape;
-//     Eigen::MatrixRXf32 get_f32_c = Eigen::MatrixRXf32::Random(shape_c[0], shape_c[1]);
-//     Eigen::MatrixRXf32 eigen_matrix_f32_expect = Eigen::MatrixRXf32::Random(shape_c[0],
-//     shape_c[1]);
-
-//     Eigen::setNbThreads(1);
-//     auto t0_eigen = std::chrono::high_resolution_clock::now();
-//     eigen_matrix_f32_expect = (eigen_matrix_f32_a * eigen_matrix_f32_b).eval();
-//     auto t1_eigen = std::chrono::high_resolution_clock::now();
-//     fmt::print("cost time: {}ns, eigen flops: {:.04f}gops\n", (t1_eigen - t0_eigen).count(),
-//                shape_a[0] * shape_a[1] * shape_b[1] * 2 /
-//                    static_cast<double>((t1_eigen - t0_eigen).count()));
-
-//     // get_f32_c.setZero();
-//     auto t0 = std::chrono::high_resolution_clock::now();
-//     mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
-//     auto t1 = std::chrono::high_resolution_clock::now();
-
-//     fmt::print("cost time: {}ns, galois flops: {:.04f}gops\n", (t1 - t0).count(),
-//                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 -
-//                t0).count()));
-
-//     int64_t error_count = 0;
-//     for (int64_t i = 0; i < shape_c[0]; ++i) {
-//         for (int64_t j = 0; j < shape_c[1]; ++j) {
-//             if ((std::abs(get_f32_c(i, j) - eigen_matrix_f32_expect(i, j))) /
-//                     std::max(std::abs(eigen_matrix_f32_expect(i, j)),
-//                              std::abs(get_f32_c(i, j))) >
-//                 0.1f) {
-//                 fmt::print("err pos: {},{}; {}, {}\n", i, j, get_f32_c(i, j),
-//                            eigen_matrix_f32_expect(i, j));
-//                 ++error_count;
-//                 if (error_count > 100) {
-//                     std::terminate();
-//                 }
-//                 std::cout << std::endl;
-//             }
-//         }
-//     }
-// }
-
-TEST(GaloisTests, TestGemm0) {
+TEST(GaloisTests, TestGemm) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
     auto ir_ts_type_a = f32->Tile(512, 512);
     auto ir_ts_type_b = f32->Tile(512, 512);
