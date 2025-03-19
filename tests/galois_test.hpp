@@ -4,14 +4,7 @@
 
 #include "benchmark/benchmark.h"
 #include "galois/galois.hpp"
-#include "galois/op/creator.hpp"
-// #include "galois/op/affine_convertor.hpp"
-#include "galois/op/op.hpp"
-// #include "galois/optimization/gemm_optimizer.hpp"
 #include "gtest/gtest.h"
-#include "prajna/bindings/core.hpp"
-#include "prajna/jit/execution_engine.h"
-#include "thpool.h"
 
 using namespace galois;
 using namespace galois::ir;
@@ -21,22 +14,3 @@ namespace Eigen {
 typedef Matrix<float, -1, -1, Eigen::RowMajor || Eigen::Aligned16> MatrixRXf32;
 typedef Matrix<int8_t, -1, -1, Eigen::RowMajor || Eigen::Aligned16> MatrixRXi8;
 }  // namespace Eigen
-
-inline std::shared_ptr<prajna::Compiler> CreateCompiler() {
-    auto prajna_compiler = prajna::Compiler::Create(false);
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_init),
-                                               "thpool_init");
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_add_work),
-                                               "thpool_add_work");
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_wait),
-                                               "thpool_wait");
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(thpool_destroy),
-                                               "thpool_destroy");
-
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(aligned_alloc),
-                                               "aligned_alloc");
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(malloc), "malloc");
-    prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(free), "free");
-
-    return prajna_compiler;
-}
