@@ -138,11 +138,12 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     }
 
     int64_t Size() {
-        int64_t sum = 1;
-        for (int64_t i = 0; i < this->shape.size(); ++i) {
-            sum *= this->shape[i];
-        }
-        return sum;
+        return std::accumulate(RANGE(this->shape), 1, [](int64_t x, int64_t y) { return x * y; });
+    }
+
+    int64_t NormalizeSize() {
+        return std::accumulate(RANGE(this->NormalizeShape()), 1,
+                               [](int64_t x, int64_t y) { return x * y; });
     }
 
     virtual bool IsScalar() { return this->shape.size() == 0; }
