@@ -50,7 +50,7 @@ class VectorizedMatrixMultiplyKernel : public MatrixMultiplyKernel {
     void Express(std::shared_ptr<Tensor> ir_mat_a, std::shared_ptr<Tensor> ir_mat_b,
                  std::shared_ptr<Tensor> ir_mat_c, std::shared_ptr<Builder> ir_builder) override {
         Eigen::VectorXi64 vectorized_shape(1);
-        auto ir_element_type = ir_mat_a->type->PrimitiveDataType();
+        auto ir_element_type = ir_mat_a->type->DataType();
         vectorized_shape[0] = this->bytes / ir_element_type->bytes;
         auto ir_vectorized_type = TensorType::Create(ir_element_type, vectorized_shape);
         auto ir_bit_cast_a = ir_builder->Create<BitCast>(ir_mat_a, ir_vectorized_type);

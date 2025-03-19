@@ -212,7 +212,7 @@ class PrajnaCodegen {
         this->EmitTensor(ir_arithmetic_instruction->GetOperand(0));
         this->EmitTensor(ir_arithmetic_instruction->GetOperand(1));
 
-        auto ir_value_type = ir_arithmetic_instruction->type->PrimitiveDataType();
+        auto ir_value_type = ir_arithmetic_instruction->type->DataType();
         GALOIS_ASSERT(Is<RealNumberType>(ir_value_type));
 
         auto pir_binary_operation = pir::BinaryOperator::Operation::None;
