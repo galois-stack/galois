@@ -15,7 +15,7 @@ class UnpackCreator : public UnaryCreator {
     }
 
     std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_input_type) override {
-        auto ir_scalar_type = ir_input_type->PrimitiveDataType();
+        auto ir_scalar_type = ir_input_type->DataType();
         auto shape = ir_input_type->NormalizeShape();
         return TensorType::Create(ir_scalar_type, shape);
     }

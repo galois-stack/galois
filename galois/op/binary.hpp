@@ -27,7 +27,7 @@ class BinaryCreator : public Creator {
         auto ir_output_type = this->InferTypeImpl(ir_inputs[0]->type, ir_inputs[1]->type);
         auto ir_output = ir_builder->Create<ir::Alloca>(ir_output_type);
         ir_builder->Express<op::FillCreator>(
-            {ir_output, ir_builder->GetZero(ir_output_type->PrimitiveDataType())});
+            {ir_output, ir_builder->GetZero(ir_output_type->DataType())});
         this->AffineExpressImpl(ir_inputs[0], ir_inputs[1], ir_output, ir_builder);
         ir_builder->Create<ir::Return>(ir_output);
     }

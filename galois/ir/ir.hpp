@@ -99,11 +99,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         return self;
     }
 
-    std::shared_ptr<TensorType> PrimitiveDataType() {
+    std::shared_ptr<TensorType> DataType() {
         if (this->IsScalar()) {
             return this->shared_from_this();
         } else {
-            return this->value_type->PrimitiveDataType();
+            return this->value_type->DataType();
         }
     }
 
