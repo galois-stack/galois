@@ -16,13 +16,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                            {ir_ts_type_a, ir_ts_type_b});
 
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    auto tmp_fun = reinterpret_cast<float *(*)(float *, float *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto mat_mul_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *)>(ir_operator);
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -31,7 +26,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_F32x4x1x4) {
     Eigen::MatrixRXf32 eigen_matrix_f32_b = Eigen::MatrixRXf32::Ones(shape_b[0], shape_b[1]);
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    auto ir_mat_c_ptr = tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
+    auto ir_mat_c_ptr = mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
     auto t1 = std::chrono::high_resolution_clock::now();
     fmt::print("cost time: {}ns, galois flops: {}gops\n", (t1 - t0).count(),
                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
@@ -51,13 +46,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                            {ir_ts_type_a, ir_ts_type_b});
 
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    auto tmp_fun = reinterpret_cast<int8_t *(*)(int8_t *, int8_t *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto mat_mul_fun = jit_engine->EmitOperatorSymbol<int8_t *(*)(int8_t *, int8_t *)>(ir_operator);
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -66,7 +56,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
     Eigen::MatrixRXi8 eigen_matrix_i8_b = Eigen::MatrixRXi8::Zero(shape_b[0], shape_b[1]);
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    auto ir_mat_c_ptr = tmp_fun(eigen_matrix_i8_a.data(), eigen_matrix_i8_b.data());
+    auto ir_mat_c_ptr = mat_mul_fun(eigen_matrix_i8_a.data(), eigen_matrix_i8_b.data());
     auto t1 = std::chrono::high_resolution_clock::now();
     fmt::print("cost time: {}ns, galois flops: {}gops\n", (t1 - t0).count(),
                shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
@@ -102,7 +92,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 //         std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
 //     llvm_codegen->EmitOperatorFunction(ir_operator);
 //     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-//     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
+//     auto mat_mul_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
 //         prajna_compiler->GetSymbolValue("::tmp_module"));
 
 //     Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Ones(shape_a[0], shape_a[1]);
@@ -111,7 +101,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 
 //     // get_f32_c.setZero();
 //     auto t0 = std::chrono::high_resolution_clock::now();
-//     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
+//     mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
 //     auto t1 = std::chrono::high_resolution_clock::now();
 
 //     fmt::print("cost time: {}ns, galois flops: {}gops\n", (t1 - t0).count(),
@@ -147,7 +137,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 //         std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
 //     llvm_codegen->EmitOperatorFunction(ir_operator);
 //     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-//     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
+//     auto mat_mul_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
 //         prajna_compiler->GetSymbolValue("::tmp_module"));
 
 //     Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Random(shape_a[0], shape_a[1]);
@@ -156,7 +146,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 
 //     // get_f32_c.setZero();
 //     auto t0 = std::chrono::high_resolution_clock::now();
-//     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
+//     mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
 //     auto t1 = std::chrono::high_resolution_clock::now();
 
 //     fmt::print("cost time: {}ns, galois flops: {}gops\n", (t1 - t0).count(),
@@ -198,7 +188,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 //         std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
 //     llvm_codegen->EmitOperatorFunction(ir_operator);
 //     prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-//     auto tmp_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
+//     auto mat_mul_fun = reinterpret_cast<void (*)(float *, float *, float *)>(
 //         prajna_compiler->GetSymbolValue("::tmp_module"));
 
 //     Eigen::MatrixRXf32 eigen_matrix_f32_a = Eigen::MatrixRXf32::Random(shape_a[0], shape_a[1]);
@@ -218,7 +208,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 
 //     // get_f32_c.setZero();
 //     auto t0 = std::chrono::high_resolution_clock::now();
-//     tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
+//     mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data(), get_f32_c.data());
 //     auto t1 = std::chrono::high_resolution_clock::now();
 
 //     fmt::print("cost time: {}ns, galois flops: {}gops\n", (t1 - t0).count(),
@@ -260,13 +250,9 @@ TEST(GaloisTests, TestGemm0) {
     auto gemm_optimizer = optimization::GemmOptimizer::Create();
     auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
 
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_gemm_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    auto tmp_fun = reinterpret_cast<float *(*)(float *, float *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_gemm_operator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto mat_mul_fun =
+        jit_engine->EmitOperatorSymbol<float *(*)(float *, float *)>(ir_gemm_operator);
 
     auto shape_a = ir_ts_type_a->NormalizeShape();
     auto shape_b = ir_ts_type_b->NormalizeShape();
@@ -283,7 +269,7 @@ TEST(GaloisTests, TestGemm0) {
                    static_cast<double>((t1_eigen - t0_eigen).count()));
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    auto f32_c_ptr = tmp_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
+    auto f32_c_ptr = mat_mul_fun(eigen_matrix_f32_a.data(), eigen_matrix_f32_b.data());
     auto t1 = std::chrono::high_resolution_clock::now();
 
     fmt::print("cost time: {}ns, galois flops: {}gops\n", (t1 - t0).count(),
