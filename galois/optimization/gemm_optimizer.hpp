@@ -5,6 +5,24 @@
 
 namespace galois::optimization {
 
+class NativeCpuInfo {
+   public:
+    static std::shared_ptr<NativeCpuInfo> Create() {
+        std::shared_ptr<NativeCpuInfo> self(new NativeCpuInfo);
+        self->register_count = 32;
+        self->cache_sizes.resize(2);
+        return self;
+    }
+
+    int64_t RegisterCount() { return this->register_count; }
+    int64_t CacheLevel() { return cache_sizes.size(); }
+    int64_t GetCacheSize(int64_t level) { return cache_sizes[level]; }
+
+   private:
+    int64_t register_count = 32;
+    std::vector<int64_t> cache_sizes;
+};
+
 class GemmOptimizer {
    protected:
     GemmOptimizer() = default;
@@ -44,7 +62,7 @@ class GemmOptimizer {
         ir_builder->matrix_multiply_kernel_queue.push_back(
             op::VectorizedMatrixMultiplyKernel::Create(128));
 
-        auto ir_tile_mat_type_a = ir::f32->Tile(4, 1)->Tile(2, 1)->Tile(1, 512)->Tile(64, 1);
+        auto ir_tile_mat_type_a = ir::f32->Tile(4, 1)->Tile(3, 1)->Tile(1, 512)->Tile(64, 1);
         auto ir_tile_mat_type_b = ir::f32->Tile(1, 4)->Tile(1, 2)->Tile(512, 1)->Tile(1, 64);
 
         auto ir_mat_a = ir_gemm_operator->inputs[0];
@@ -57,7 +75,7 @@ class GemmOptimizer {
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸
-        auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->out_type;
+        auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->output_type;
         auto sp_padding_creator = op::SliceCreator::Create(ir_mat_c_type->shape);
         auto ir_mat_c =
             ir_builder->Express<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);

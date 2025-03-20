@@ -558,11 +558,11 @@ class Viewer : public Tensor {
     std::shared_ptr<Tensor> ir_tensor = nullptr;
 };
 
-class Slice : public Tensor {
+class SliceView : public Tensor {
    public:
-    static std::shared_ptr<Slice> Create(std::shared_ptr<Accessor> ir_accessor_origin,
-                                         Eigen::VectorXi64 shape) {
-        std::shared_ptr<Slice> self(new Slice);
+    static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_accessor_origin,
+                                             Eigen::VectorXi64 shape) {
+        std::shared_ptr<SliceView> self(new SliceView);
         GALOIS_ASSERT(ir_accessor_origin->Tensor()->IsContinous());
         self->origin = ir_accessor_origin;
         self->shape = shape;
@@ -766,8 +766,8 @@ class OperatorType : public TensorType {
         std::vector<std::shared_ptr<TensorType>> ir_in_types,
         std::shared_ptr<TensorType> ir_out_types) {
         std::shared_ptr<OperatorType> self(new OperatorType);
-        self->in_types = ir_in_types;
-        self->out_type = ir_out_types;
+        self->input_types = ir_in_types;
+        self->output_type = ir_out_types;
         self->name = "(";
         for (auto ir_in_type : ir_in_types) {
             self->name += ir_in_type->name + ",";
@@ -779,8 +779,8 @@ class OperatorType : public TensorType {
     }
 
    public:
-    std::vector<std::shared_ptr<TensorType>> in_types;
-    std::shared_ptr<TensorType> out_type;
+    std::vector<std::shared_ptr<TensorType>> input_types;
+    std::shared_ptr<TensorType> output_type;
 };
 
 /// @brief An operator of tensors, which is liked as a node of ComputingGraph
@@ -791,7 +791,7 @@ class OperatorFunction : public Block {
         std::shared_ptr<OperatorFunction> self(new OperatorFunction);
         self->type = ir_operator_type;
 
-        std::transform(RANGE(ir_operator_type->in_types), std::back_inserter(self->inputs),
+        std::transform(RANGE(ir_operator_type->input_types), std::back_inserter(self->inputs),
                        [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
 
         self->tag = "OperatorFunction";
@@ -892,9 +892,10 @@ class Call : public Instruction {
         self->OperatorFunction(ir_operator);
         auto iter_inputs = ir_inputs.begin();
         for (int64_t i = 0; i < self->InputSize(); ++i, ++iter_inputs) {
+            GALOIS_ASSERT(ir_operator->GetOperatorType()->input_types[i] == ir_inputs[i]->type);
             self->Input(i, *iter_inputs);
         }
-        self->type = ir_operator->GetOperatorType()->out_type;
+        self->type = ir_operator->GetOperatorType()->output_type;
         self->tag = "Call";
         return self;
     }
@@ -1001,19 +1002,6 @@ class SparseType : public TensorType {
 };
 
 class Builder;
-
-class Kernel {
-   public:
-    virtual bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) = 0;
-
-    virtual void Build(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) = 0;
-
-    virtual ~Kernel() = default;
-};
 
 template <typename DataType, typename... Args>
 inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
