@@ -60,15 +60,18 @@ class PaddingCreator : public UnaryCreator {
         {
             Eigen::VectorXi64 remainder_shape = output_shape;
             remainder_shape[0] = output_shape[0] - input_shape[0];
-            if (remainder_shape[0] == 0) {
-                return;
-            }
             auto ir_output_left_origin = ir_builder->CreateAccessor(ir_output);
             ir_output_left_origin->shift_vector[0] = input_shape[0];
             auto ir_output_slice =
                 ir_builder->Create<ir::SliceView>(ir_output_left_origin, remainder_shape);
-            ir_builder->Express<op::FillCreator>(
-                {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())});
+
+            auto fill_creator = op::FillCreator::Create();
+            fill_creator->AffineExpress(
+                {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())},
+                ir_builder);
+            // TODO:(存在问题， 需要修复）
+            // ir_builder->Express<op::FillCreator>(
+            //     {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())});
         }
     }
 
