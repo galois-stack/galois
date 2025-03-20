@@ -51,6 +51,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
                                               Eigen::VectorXi64 shape,
                                               Layout layout = Layout::RowMajor) {
+        // 如果shape为0， 直接退化为value_type
+        if (!shape.size()) {
+            return value_type;
+        }
+
         for (auto ir_type : global_context.created_types) {
             if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
                 if (ir_tensor_type->value_type == value_type &&
@@ -66,44 +71,39 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         self->shape = shape;
         self->layout = layout;
 
-        if (self->shape.size() == 0) {
-            self->name = value_type->name;
-            self->bytes = self->value_type->bytes;
+        if (layout == Layout::RowMajor) {
+            self->stride.resize(shape.size());
+            auto i = shape.size() - 1;
+            self->stride[i] = 1;
+            while (i > 0) {
+                i = i - 1;
+                self->stride[i] = shape[i + 1] * self->stride[i + 1];
+            }
         } else {
-            if (layout == Layout::RowMajor) {
-                self->stride.resize(shape.size());
-                auto i = shape.size() - 1;
-                self->stride[i] = 1;
-                while (i > 0) {
-                    i = i - 1;
-                    self->stride[i] = shape[i + 1] * self->stride[i + 1];
-                }
-            } else {
-                self->stride.resize(shape.size());
-                self->stride[0] = 1;
-                for (int64_t i = 1; i < shape.size(); ++i) {
-                    self->stride[i] = shape[i - 1] * self->stride[i - 1];
-                }
+            self->stride.resize(shape.size());
+            self->stride[0] = 1;
+            for (int64_t i = 1; i < shape.size(); ++i) {
+                self->stride[i] = shape[i - 1] * self->stride[i - 1];
             }
-            self->name = value_type->name + "[";
-            for (auto i : shape) {
-                self->name += std::to_string(i);
-                self->name.push_back('x');
-            }
-            self->name.back() = ']';
-            self->fullname = self->name;
-            self->bytes = self->Size() * self->value_type->bytes;
         }
+        self->name = value_type->name + "[";
+        for (auto i : shape) {
+            self->name += std::to_string(i);
+            self->name.push_back('x');
+        }
+        self->name.back() = ']';
+        self->fullname = self->name;
+        self->bytes = self->Size() * self->value_type->bytes;
 
         global_context.created_types.push_back(self);
         return self;
     }
 
-    std::shared_ptr<TensorType> PrimitiveDataType() {
+    std::shared_ptr<TensorType> DataType() {
         if (this->IsScalar()) {
             return this->shared_from_this();
         } else {
-            return this->value_type->PrimitiveDataType();
+            return this->value_type->DataType();
         }
     }
 
@@ -138,11 +138,12 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     }
 
     int64_t Size() {
-        int64_t sum = 1;
-        for (int64_t i = 0; i < this->shape.size(); ++i) {
-            sum *= this->shape[i];
-        }
-        return sum;
+        return std::accumulate(RANGE(this->shape), 1, [](int64_t x, int64_t y) { return x * y; });
+    }
+
+    int64_t NormalizeSize() {
+        return std::accumulate(RANGE(this->NormalizeShape()), 1,
+                               [](int64_t x, int64_t y) { return x * y; });
     }
 
     virtual bool IsScalar() { return this->shape.size() == 0; }
@@ -557,11 +558,11 @@ class Viewer : public Tensor {
     std::shared_ptr<Tensor> ir_tensor = nullptr;
 };
 
-class Slice : public Tensor {
+class SliceView : public Tensor {
    public:
-    static std::shared_ptr<Slice> Create(std::shared_ptr<Accessor> ir_accessor_origin,
-                                         Eigen::VectorXi64 shape) {
-        std::shared_ptr<Slice> self(new Slice);
+    static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_accessor_origin,
+                                             Eigen::VectorXi64 shape) {
+        std::shared_ptr<SliceView> self(new SliceView);
         GALOIS_ASSERT(ir_accessor_origin->Tensor()->IsContinous());
         self->origin = ir_accessor_origin;
         self->shape = shape;
@@ -765,8 +766,8 @@ class OperatorType : public TensorType {
         std::vector<std::shared_ptr<TensorType>> ir_in_types,
         std::shared_ptr<TensorType> ir_out_types) {
         std::shared_ptr<OperatorType> self(new OperatorType);
-        self->in_types = ir_in_types;
-        self->out_type = ir_out_types;
+        self->input_types = ir_in_types;
+        self->output_type = ir_out_types;
         self->name = "(";
         for (auto ir_in_type : ir_in_types) {
             self->name += ir_in_type->name + ",";
@@ -778,8 +779,8 @@ class OperatorType : public TensorType {
     }
 
    public:
-    std::vector<std::shared_ptr<TensorType>> in_types;
-    std::shared_ptr<TensorType> out_type;
+    std::vector<std::shared_ptr<TensorType>> input_types;
+    std::shared_ptr<TensorType> output_type;
 };
 
 /// @brief An operator of tensors, which is liked as a node of ComputingGraph
@@ -790,7 +791,7 @@ class OperatorFunction : public Block {
         std::shared_ptr<OperatorFunction> self(new OperatorFunction);
         self->type = ir_operator_type;
 
-        std::transform(RANGE(ir_operator_type->in_types), std::back_inserter(self->inputs),
+        std::transform(RANGE(ir_operator_type->input_types), std::back_inserter(self->inputs),
                        [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
 
         self->tag = "OperatorFunction";
@@ -891,9 +892,10 @@ class Call : public Instruction {
         self->OperatorFunction(ir_operator);
         auto iter_inputs = ir_inputs.begin();
         for (int64_t i = 0; i < self->InputSize(); ++i, ++iter_inputs) {
+            GALOIS_ASSERT(ir_operator->GetOperatorType()->input_types[i] == ir_inputs[i]->type);
             self->Input(i, *iter_inputs);
         }
-        self->type = ir_operator->GetOperatorType()->out_type;
+        self->type = ir_operator->GetOperatorType()->output_type;
         self->tag = "Call";
         return self;
     }
@@ -1000,19 +1002,6 @@ class SparseType : public TensorType {
 };
 
 class Builder;
-
-class Kernel {
-   public:
-    virtual bool Match(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) = 0;
-
-    virtual void Build(std::vector<std::shared_ptr<Tensor>> ir_inputs,
-                       std::vector<std::shared_ptr<Tensor>> ir_outputs,
-                       std::shared_ptr<Builder> ir_builder) = 0;
-
-    virtual ~Kernel() = default;
-};
 
 template <typename DataType, typename... Args>
 inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {

@@ -8,18 +8,13 @@ void BM_Softmax(benchmark::State &state) {
     auto ir_softmax_creator = op::SoftmaxCreator::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator(ir_softmax_creator, {ir_vec_type});
 
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    auto tmp_fun = reinterpret_cast<float *(*)(float *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto softmax_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
 
     auto input = std::vector<float>(length, 1.0f);
 
     for (auto _ : state) {
-        tmp_fun(input.data());
+        softmax_fun(input.data());
     }
     state.SetBytesProcessed(int64_t(state.iterations()) * length * sizeof(float));
     state.SetItemsProcessed(int64_t(state.iterations()) * length);
@@ -32,16 +27,11 @@ TEST(GaloisTests, TestSoftmax) {
     auto ir_softmax_creator = op::SoftmaxCreator::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator(ir_softmax_creator, {ir_vec_type});
 
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    auto tmp_fun = reinterpret_cast<float *(*)(float *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto softmax_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
 
     auto input = std::array<float, 4>{1.0f, 2.0f, 3.0f, 4.0f};
-    auto value = tmp_fun(input.data());
+    auto value = softmax_fun(input.data());
 
     for (int i = 0; i < 4; ++i) {
         fmt::print("{}, ", value[i]);

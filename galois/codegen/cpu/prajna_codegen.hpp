@@ -11,7 +11,7 @@
 
 namespace galois::codegen::cpu {
 
-using namespace ir;
+namespace pir = prajna::ir;
 
 class PrajnaCodegen {
    public:
@@ -38,7 +38,7 @@ class PrajnaCodegen {
             return ir_type->pir_type;
         }
 
-        if (Is<VoidType>(ir_type)) {
+        if (Is<ir::VoidType>(ir_type)) {
             ir_type->pir_type = pir::VoidType::Create();
             return ir_type->pir_type;
         }
@@ -72,7 +72,7 @@ class PrajnaCodegen {
         return nullptr;
     }
 
-    void EmitGridIndexVector(std::shared_ptr<GridIndexVector> ir_indices) {
+    void EmitGridIndexVector(std::shared_ptr<ir::GridIndexVector> ir_indices) {
         this->EmitType(ir_indices->type);
         ir_indices->pir_value = pir_builder->Create<pir::LocalVariable>(ir_indices->type->pir_type);
     }
@@ -141,12 +141,12 @@ class PrajnaCodegen {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
-        for (auto ir_input_type : ir_operator->GetOperatorType()->in_types) {
+        for (auto ir_input_type : ir_operator->GetOperatorType()->input_types) {
             pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_input_type)));
         }
 
         std::list<std::shared_ptr<pir::Type>> pir_output_types;
-        auto pir_out_type = this->EmitType(ir_operator->GetOperatorType()->out_type);
+        auto pir_out_type = this->EmitType(ir_operator->GetOperatorType()->output_type);
         if (prajna::Is<pir::VoidType>(pir_out_type)) {
             pir_output_types.push_back(pir_out_type);
         } else {
@@ -212,8 +212,8 @@ class PrajnaCodegen {
         this->EmitTensor(ir_arithmetic_instruction->GetOperand(0));
         this->EmitTensor(ir_arithmetic_instruction->GetOperand(1));
 
-        auto ir_value_type = ir_arithmetic_instruction->type->PrimitiveDataType();
-        GALOIS_ASSERT(Is<RealNumberType>(ir_value_type));
+        auto ir_value_type = ir_arithmetic_instruction->type->DataType();
+        GALOIS_ASSERT(Is<ir::RealNumberType>(ir_value_type));
 
         auto pir_binary_operation = pir::BinaryOperator::Operation::None;
         if (auto ir_add = Cast<ir::Add>(ir_arithmetic_instruction)) {
@@ -241,10 +241,10 @@ class PrajnaCodegen {
             }
         }
         if (auto ir_div = Cast<ir::Div>(ir_arithmetic_instruction)) {
-            if (Is<FloatType>(ir_value_type)) {
+            if (Is<ir::FloatType>(ir_value_type)) {
                 pir_binary_operation = pir::BinaryOperator::Operation::FDiv;
             }
-            if (auto ir_int_type = Cast<IntType>(ir_value_type)) {
+            if (auto ir_int_type = Cast<ir::IntType>(ir_value_type)) {
                 if (ir_int_type->is_signed) {
                     pir_binary_operation = pir::BinaryOperator::Operation::SDiv;
                 } else {
@@ -277,8 +277,8 @@ class PrajnaCodegen {
             this->EmitPthreadBlock(ir_pthread_block);
         }
 
-        if (auto ir_slice = Cast<ir::Slice>(ir_tensor)) {
-            this->EmitSlice(ir_slice);
+        if (auto ir_slice = Cast<ir::SliceView>(ir_tensor)) {
+            this->EmitSliceView(ir_slice);
             return;
         }
 
@@ -671,7 +671,7 @@ class PrajnaCodegen {
                 pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
 
-    void EmitSlice(std::shared_ptr<ir::Slice> ir_slice) {
+    void EmitSliceView(std::shared_ptr<ir::SliceView> ir_slice) {
         this->EmitAccessor(ir_slice->origin);
 
         // stride使用被slice的tensor
@@ -687,14 +687,13 @@ class PrajnaCodegen {
         ir_slice->pir_value = prajna::Cast<pir::VariableLiked>(ir_slice->origin->pir_value);
     }
 
-    void EmitCall(std::shared_ptr<Call> ir_call) {
+    void EmitCall(std::shared_ptr<ir::Call> ir_call) {
         if (!ir_call->annotation_dict.count("enable_multi_thread")) {
             std::list<std::shared_ptr<pir::Value>> pir_arguments;
             for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
                 pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
                     // 我们通过指针来传递参数， 所以需要用变量包装一下
                     pir_builder->VariableLikedNormalize(ir_call->Input(i)->pir_value)));
-                // prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
             }
 
             ir_call->pir_value = pir_builder->Create<pir::Call>(
@@ -702,7 +701,7 @@ class PrajnaCodegen {
 
             // TODO: warlaround
             auto ir_operator_type = ir_call->OperatorFunction()->GetOperatorType();
-            if (!Is<VoidType>(ir_operator_type->out_type)) {
+            if (!Is<ir::VoidType>(ir_operator_type->output_type)) {
                 ir_call->pir_value = pir_builder->Create<pir::DeferencePointer>(ir_call->pir_value);
             }
         } else {  // async invoke
@@ -804,7 +803,7 @@ class PrajnaCodegen {
             pir_builder->Create<pir::Call>(pir_intrinsic, ir_operand->pir_value);
     }
 
-    void EmitPthreadBlock(std::shared_ptr<PthreadBlock> ir_pthread_block) {
+    void EmitPthreadBlock(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) {
         auto ir_captured_tensors = transform::CaptureExternalTensors(ir_pthread_block);
     }
 

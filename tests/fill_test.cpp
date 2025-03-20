@@ -12,15 +12,8 @@ void BM_Fill(benchmark::State &state) {
     auto ir_fill_creator = op::FillCreator::Create();
     auto ir_operator =
         ir_builder->CreateOperatorByCreator(ir_fill_creator, {ir_input_type, ir_value_type});
-
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    // 获取编译后的 Fill 函数地址，转换为函数指针 fill_fun。
-    auto fill_fun = reinterpret_cast<void (*)(float *, float *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_fill_creator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)(float *, float *)>(ir_operator);
 
     std::vector<float> input_vec(length);
     float value = 1.0f;
@@ -46,14 +39,8 @@ TEST(GaloisTests, TestFill) {
     auto ir_fill_creator = op::FillCreator::Create();
     auto ir_operator =
         ir_builder->CreateOperatorByCreator(ir_fill_creator, {ir_input_type, ir_value_type});
-
-    auto prajna_compiler = CreateCompiler();
-    auto llvm_codegen =
-        std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-    llvm_codegen->EmitOperatorFunction(ir_operator);
-    prajna_compiler->GenLlvm(llvm_codegen->pir_builder->module);
-    auto fill_fun = reinterpret_cast<void (*)(float *, float *)>(
-        prajna_compiler->GetSymbolValue("::" + ir_fill_creator->fullname));
+    auto jit_engine = jit::Engine::Create();
+    auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)(float *, float *)>(ir_operator);
 
     std::vector<float> input_vec(length);
     float value = 5.0f;

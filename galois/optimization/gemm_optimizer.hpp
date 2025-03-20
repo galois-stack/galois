@@ -5,6 +5,25 @@
 
 namespace galois::optimization {
 
+class NativeCpuInfo {
+   public:
+    static std::shared_ptr<NativeCpuInfo> Create() {
+        std::shared_ptr<NativeCpuInfo> self(new NativeCpuInfo);
+        self->simd_register_count = 32;
+        self->cache_sizes.resize(2);
+        return self;
+    }
+
+    int64_t SimdBits() { return 128; }  // TODO: AVX is 256
+    int64_t SimdRegisterCount() { return this->simd_register_count; }
+    int64_t CacheLevel() { return cache_sizes.size(); }
+    int64_t GetCacheSize(int64_t level) { return cache_sizes[level]; }
+
+   private:
+    int64_t simd_register_count = 32;
+    std::vector<int64_t> cache_sizes;
+};
+
 class GemmOptimizer {
    protected:
     GemmOptimizer() = default;
@@ -12,6 +31,7 @@ class GemmOptimizer {
    public:
     static std::shared_ptr<GemmOptimizer> Create() {
         std::shared_ptr<GemmOptimizer> self(new GemmOptimizer);
+        self->cpu_info = NativeCpuInfo::Create();
         return self;
     }
 
@@ -27,7 +47,11 @@ class GemmOptimizer {
                 .matrix();
         // 计算最终裁剪尺寸
         auto padding_shape = (plane_shape.array() * basic_padding_shape.array()).matrix();
-        auto ir_padded_mat = ir_builder->Express<op::PaddingCreator>({ir_mat}, padding_shape);
+        std::shared_ptr<ir::Tensor> ir_padded_mat = ir_mat;
+        // TODO: 后期使用编译技术， 优化此操作， 无需手动写
+        if (ir_mat->type->shape != padding_shape) {
+            ir_padded_mat = ir_builder->Express<op::PaddingCreator>({ir_mat}, padding_shape);
+        }
         // 将裁剪后的矩阵分块打包
         auto ir_packed_type = ir::TensorType::Create(ir_tile_type, plane_shape);
         auto ir_packed_mat = ir_builder->Express<op::PackCreator>({ir_padded_mat}, ir_packed_type);
@@ -41,14 +65,31 @@ class GemmOptimizer {
         auto [ir_gemm_operator, scope] = ir_builder->CreateOperator(
             ir_matrix_multiply->GetOperatorType(), ir_matrix_multiply->name + "_gemm");
 
-        ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel4x1x4::Create());
-        ir_builder->kernel_queue.push_back(op::MatrixMultiplyKernel8x1x8::Create());
-
-        auto ir_tile_mat_type_a = ir::f32->Tile(4, 1)->Tile(2, 1)->Tile(1, 512)->Tile(64, 1);
-        auto ir_tile_mat_type_b = ir::f32->Tile(1, 4)->Tile(1, 2)->Tile(512, 1)->Tile(1, 64);
+        ir_builder->matrix_multiply_kernel_queue.push_back(
+            op::VectorizedMatrixMultiplyKernel::Create(this->cpu_info->SimdBits()));
 
         auto ir_mat_a = ir_gemm_operator->inputs[0];
         auto ir_mat_b = ir_gemm_operator->inputs[1];
+
+        auto simd_lines = (this->cpu_info->SimdBits() / 8) / ir_mat_a->type->DataType()->bytes;
+        auto ir_tile_mat_type_a = ir::f32->Tile(simd_lines, 1);
+        auto ir_tile_mat_type_b = ir::f32->Tile(1, simd_lines);
+        GALOIS_ASSERT(this->cpu_info->SimdRegisterCount() == 32);
+        if (simd_lines == 2) {
+            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(4, 1)->Tile(1, 32)->Tile(2, 1);
+            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 3)->Tile(32, 1)->Tile(1, 2);
+        } else if (simd_lines == 4) {
+            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(3, 1)->Tile(1, 32)->Tile(4, 1);
+            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 2)->Tile(32, 1)->Tile(1, 4);
+        } else if (simd_lines == 8) {
+            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(2, 1)->Tile(1, 64)->Tile(4, 1);
+            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 1)->Tile(64, 1)->Tile(1, 4);
+        } else if (simd_lines == 16) {
+            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(1, 1)->Tile(1, 128)->Tile(4, 1);
+            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 1)->Tile(128, 1)->Tile(1, 4);
+        } else {
+            GALOIS_UNREACHABLE;
+        }
 
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_tile_mat_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_tile_mat_type_b, ir_builder);
@@ -57,7 +98,7 @@ class GemmOptimizer {
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸
-        auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->out_type;
+        auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->output_type;
         auto sp_padding_creator = op::SliceCreator::Create(ir_mat_c_type->shape);
         auto ir_mat_c =
             ir_builder->Express<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
@@ -65,6 +106,9 @@ class GemmOptimizer {
 
         return ir_gemm_operator;
     }
+
+   private:
+    std::shared_ptr<NativeCpuInfo> cpu_info = nullptr;
 };
 
 }  // namespace galois::optimization
