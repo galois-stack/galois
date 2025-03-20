@@ -51,6 +51,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
                                               Eigen::VectorXi64 shape,
                                               Layout layout = Layout::RowMajor) {
+        // 如果shape为0， 直接退化为value_type
+        if (!shape.size()) {
+            return value_type;
+        }
+
         for (auto ir_type : global_context.created_types) {
             if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
                 if (ir_tensor_type->value_type == value_type &&
@@ -66,34 +71,29 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         self->shape = shape;
         self->layout = layout;
 
-        if (self->shape.size() == 0) {
-            self->name = value_type->name;
-            self->bytes = self->value_type->bytes;
+        if (layout == Layout::RowMajor) {
+            self->stride.resize(shape.size());
+            auto i = shape.size() - 1;
+            self->stride[i] = 1;
+            while (i > 0) {
+                i = i - 1;
+                self->stride[i] = shape[i + 1] * self->stride[i + 1];
+            }
         } else {
-            if (layout == Layout::RowMajor) {
-                self->stride.resize(shape.size());
-                auto i = shape.size() - 1;
-                self->stride[i] = 1;
-                while (i > 0) {
-                    i = i - 1;
-                    self->stride[i] = shape[i + 1] * self->stride[i + 1];
-                }
-            } else {
-                self->stride.resize(shape.size());
-                self->stride[0] = 1;
-                for (int64_t i = 1; i < shape.size(); ++i) {
-                    self->stride[i] = shape[i - 1] * self->stride[i - 1];
-                }
+            self->stride.resize(shape.size());
+            self->stride[0] = 1;
+            for (int64_t i = 1; i < shape.size(); ++i) {
+                self->stride[i] = shape[i - 1] * self->stride[i - 1];
             }
-            self->name = value_type->name + "[";
-            for (auto i : shape) {
-                self->name += std::to_string(i);
-                self->name.push_back('x');
-            }
-            self->name.back() = ']';
-            self->fullname = self->name;
-            self->bytes = self->Size() * self->value_type->bytes;
         }
+        self->name = value_type->name + "[";
+        for (auto i : shape) {
+            self->name += std::to_string(i);
+            self->name.push_back('x');
+        }
+        self->name.back() = ']';
+        self->fullname = self->name;
+        self->bytes = self->Size() * self->value_type->bytes;
 
         global_context.created_types.push_back(self);
         return self;
