@@ -15,18 +15,20 @@ class PaddingCreator : public UnaryCreator {
         return self;
     }
 
-    std::shared_ptr<TensorType> InferTypeImpl(std::shared_ptr<TensorType> ir_input_type) override {
-        return TensorType::Create(Cast<TensorType>(ir_input_type)->value_type, padding_shape);
+    std::shared_ptr<ir::TensorType> InferTypeImpl(
+        std::shared_ptr<ir::TensorType> ir_input_type) override {
+        return ir::TensorType::Create(Cast<ir::TensorType>(ir_input_type)->value_type,
+                                      padding_shape);
     };
 
     void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
                            std::shared_ptr<ir::Tensor> ir_output,
-                           std::shared_ptr<Builder> ir_builder) override {
+                           std::shared_ptr<ir::Builder> ir_builder) override {
         auto input_shape = ir_input->type->shape;
         auto output_shape = ir_output->type->shape;
 
         if (input_shape.size() == 0) {
-            ir_builder->Create<Write>(ir_input, ir_output);
+            ir_builder->Create<ir::Write>(ir_input, ir_output);
             return;
         }
 
@@ -43,7 +45,7 @@ class PaddingCreator : public UnaryCreator {
                 input_slice_shape[i] = input_shape[i + 1];
             }
             auto ir_input_slice =
-                ir_builder->Create<Slice>(ir_input_left_origin, input_slice_shape);
+                ir_builder->Create<ir::SliceView>(ir_input_left_origin, input_slice_shape);
 
             auto ir_output_left_origin = ir_builder->CreateAccessor(ir_output);
             ir_output_left_origin->transform_matrix(0) = 1;
@@ -52,7 +54,7 @@ class PaddingCreator : public UnaryCreator {
                 output_slice_shape[i] = output_shape[i + 1];
             }
             auto ir_output_slice =
-                ir_builder->Create<Slice>(ir_output_left_origin, output_slice_shape);
+                ir_builder->Create<ir::SliceView>(ir_output_left_origin, output_slice_shape);
             this->AffineExpressImpl(ir_input_slice, ir_output_slice, ir_builder);
         }
         {
@@ -64,7 +66,7 @@ class PaddingCreator : public UnaryCreator {
             auto ir_output_left_origin = ir_builder->CreateAccessor(ir_output);
             ir_output_left_origin->shift_vector[0] = input_shape[0];
             auto ir_output_slice =
-                ir_builder->Create<Slice>(ir_output_left_origin, remainder_shape);
+                ir_builder->Create<ir::SliceView>(ir_output_left_origin, remainder_shape);
             ir_builder->Express<op::FillCreator>(
                 {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())});
         }
