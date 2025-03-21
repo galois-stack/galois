@@ -8,6 +8,13 @@ set(CMAKE_CXX_STANDARD 17) # c++20目前系统库还不支持, 没有必要
 set(CXX_STANDARD_REQUIRED ON)  # 若不支持c++17选项则报错，而不是使用c++14
 set(CMAKE_CXX_EXTENSIONS OFF)  # 使用 -std=c++17而不是 -std=gnu++17
 
+if (${CMAKE_BUILD_TYPE} STREQUAL "debug")
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+if (${CMAKE_BUILD_TYPE} STREQUAL "release")
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
+
 # 在mac平台下， 因为llvm设置为hidden，所以避免编译warning这里全局设置为hidden
 # 之所以不用target_link_options设置，是因为其不能设置第三方项目
 if (NOT BUILD_SHARED_LIBS)
@@ -58,9 +65,16 @@ add_subdirectory(third_party/prajna)
 # add_subdirectory(third_party/fmt EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/mtensor EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/eigen EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
 
+# add_subdirectory(third_party/eigen EXCLUDE_FROM_ALL)
+# eigen的uninstall和z3的冲突， 所以这里自己定义
+add_library (eigen INTERFACE)
+target_include_directories (eigen INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen>
+)
+
+add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/z3 EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/json EXCLUDE_FROM_ALL) # prajna depends
 
 set(CPUINFO_BUILD_UNIT_TESTS  OFF)
@@ -68,7 +82,6 @@ set(CPUINFO_BUILD_MOCK_TESTS  OFF)
 set(CPUINFO_BUILD_BENCHMARKS  OFF) # disable benchmark, the googletest benchmark configure has bug
 set(CPUINFO_BUILD_PKG_CONFIG  OFF)
 add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
-# add_subdirectory(third_party/z3 EXCLUDE_FROM_ALL)
 
 add_library(thpool third_party/C-Thread-Pool/thpool.c)
 target_include_directories(thpool PUBLIC third_party/C-Thread-Pool)
