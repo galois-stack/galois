@@ -5,6 +5,7 @@
 #include "galois/ir/ir.hpp"
 #include "galois/op/op.hpp"
 
+
 namespace galois::optimization {
 
 class NativeCpuInfo {
