@@ -99,8 +99,8 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 
 TEST(GaloisTests, TestGemm) {
     //  一种快捷写法, 需要用TensorTypePointer包装后才支持这种写法
-    auto ir_ts_type_a = f32->Tile(1536 * 10, 1024 * 10);
-    auto ir_ts_type_b = f32->Tile(1024 * 10, 1024 * 10);
+    auto ir_ts_type_a = f32->Tile(1536 , 1024);
+    auto ir_ts_type_b = f32->Tile(1024 , 1024);
 
     auto ir_builder = ir::Builder::Create();
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
