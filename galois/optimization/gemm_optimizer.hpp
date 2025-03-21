@@ -28,7 +28,9 @@ class NativeCpuInfo {
     NativeCpuInfo() = default;
 
     void DetectCpuFeatures() {
-#ifdef __x86_64__  // x86_64
+        // 默认值
+        simd_bits = 128;
+        simd_register_count = 32;
         if (cpuinfo_has_x86_avx512f()) {
             simd_bits = 512;
             simd_register_count = 32;
@@ -38,24 +40,10 @@ class NativeCpuInfo {
         } else if (cpuinfo_has_x86_sse2()) {
             simd_bits = 128;
             simd_register_count = 8;
-        } else {
-            // 默认值
-            simd_bits = 128;
-            simd_register_count = 8;
-        }
-#elif defined(__aarch64__)  // ARM64 架构
-        if (cpuinfo_has_arm_neon()) {
+        } else if (cpuinfo_has_arm_neon()) {
             simd_bits = 128;
             simd_register_count = 32;
-        } else {
-            simd_bits = 128;           // 默认值
-            simd_register_count = 32;  // 默认值
         }
-#else
-        // 其他架构默认值
-        simd_bits = 128;
-        simd_register_count = 32;
-#endif
     }
 
     int64_t simd_register_count = 0;
