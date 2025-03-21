@@ -44,17 +44,22 @@ pipeline{
                 stage('x64-linux-nvgpu-release') {
                     agent {
                         dockerfile {
-                            filename 'ubuntu_dev_nvgpu.dockerfile'
-                            dir 'dockerfiles'
                             label 'Sunny'
-                            //需要jenkins也用root权限启动, 目前使用其他权限会有很多问题, root权限存在极大的安全隐患
-                            args '--gpus all -u root:root --network host'
+                            filename 'ubuntu_dev_nvgpu_jenkins.dockerfile'
+                            dir 'dockerfiles'
+                            // 参数由宿主主机的jenkins账号决定
+                            additionalBuildArgs '''\
+                            --build-arg GID=125 \
+                            --build-arg UID=124 \
+                            --build-arg UNAME=jenkins \
+                            '''
+                            args '--gpus all --network host'
                         }
                     }
                     environment {
-                        CXX = 'clang++'
-                        CC = 'clang'
-                        BUILD_TYPE = 'release'
+                            CXX = 'clang++'
+                            CC = 'clang'
+                            BUILD_TYPE = 'release'
                     }
                     stages {
                         stage('env') {
@@ -66,8 +71,6 @@ pipeline{
                                 sh 'nvidia-smi'
                                 sh 'pwd'
                                 sh 'git --version'
-                                sh 'git config --global safe.directory "*"'
-                                sh 'git config --global --list'
                             }
                         }
                         stage('build') {
