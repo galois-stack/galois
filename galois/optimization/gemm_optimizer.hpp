@@ -1,5 +1,6 @@
 #pragma once
 
+#include "c++/z3++.h"
 #include "galois/ir/ir.hpp"
 #include "galois/op/op.hpp"
 
@@ -72,24 +73,31 @@ class GemmOptimizer {
         auto ir_mat_b = ir_gemm_operator->inputs[1];
 
         auto simd_lines = (this->cpu_info->SimdBits() / 8) / ir_mat_a->type->DataType()->bytes;
-        auto ir_tile_mat_type_a = ir::f32->Tile(simd_lines, 1);
-        auto ir_tile_mat_type_b = ir::f32->Tile(1, simd_lines);
-        GALOIS_ASSERT(this->cpu_info->SimdRegisterCount() == 32);
-        if (simd_lines == 2) {
-            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(4, 1)->Tile(1, 32)->Tile(2, 1);
-            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 3)->Tile(32, 1)->Tile(1, 2);
-        } else if (simd_lines == 4) {
-            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(3, 1)->Tile(1, 32)->Tile(4, 1);
-            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 2)->Tile(32, 1)->Tile(1, 4);
-        } else if (simd_lines == 8) {
-            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(2, 1)->Tile(1, 64)->Tile(4, 1);
-            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 1)->Tile(64, 1)->Tile(1, 4);
-        } else if (simd_lines == 16) {
-            ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(1, 1)->Tile(1, 128)->Tile(4, 1);
-            ir_tile_mat_type_b = ir_tile_mat_type_b->Tile(1, 1)->Tile(128, 1)->Tile(1, 4);
-        } else {
-            GALOIS_UNREACHABLE;
-        }
+
+        /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
+        z3::context z3_context;
+        z3::params z3_params(z3_context);
+        z3_params.set("priority", z3_context.str_symbol("register tile"));
+        z3::optimize z3_optimize(z3_context);
+        z3_optimize.set(z3_params);
+        z3::expr x = z3_context.int_const("x");
+        z3::expr y = z3_context.int_const("y");
+        // z3::solver z3_sovler(z3_context);
+        z3_optimize.add(x > 0);
+        z3_optimize.add(y > 0);
+        z3_optimize.add(x >= y);
+        int32_t simd_register_count = cpu_info->SimdRegisterCount();
+        z3_optimize.add(x + y + x * y * int32_t(simd_lines) < simd_register_count);
+        z3::optimize::handle z3_handle_x = z3_optimize.maximize(x * y);
+        GALOIS_ASSERT(z3_optimize.check() == z3::sat);
+        z3::model z3_model = z3_optimize.get_model();
+        auto register_rows = z3_model.eval(x).get_numeral_int64();
+        auto register_cols = z3_model.eval(y).get_numeral_int64();
+
+        auto ir_tile_mat_type_a =
+            ir::f32->Tile(simd_lines, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b =
+            ir::f32->Tile(1, simd_lines)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
 
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_tile_mat_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_tile_mat_type_b, ir_builder);

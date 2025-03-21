@@ -16,3 +16,6 @@
 [submodule "third_party/benchmark"]
 	path = third_party/benchmark
 	url = https://github.com/google/benchmark
+[submodule "third_party/z3"]
+	path = third_party/z3
+	url = https://github.com/Z3Prover/z3.git
