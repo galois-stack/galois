@@ -1,10 +1,9 @@
 #pragma once
 
-#include "cpuinfo.h"
 #include "c++/z3++.h"
+#include "cpuinfo.h"
 #include "galois/ir/ir.hpp"
 #include "galois/op/op.hpp"
-
 
 namespace galois::optimization {
 
@@ -52,6 +51,46 @@ class NativeCpuInfo {
     std::vector<int64_t> cache_sizes;
 };
 
+class MatrixMultiplyTilePolicy {
+   public:
+    static std::shared_ptr<MatrixMultiplyTilePolicy> Create() {
+        std::shared_ptr<MatrixMultiplyTilePolicy> self(new MatrixMultiplyTilePolicy);
+        return self;
+    };
+
+    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>> Tile(
+        std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
+        /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
+        auto simd_lines = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
+        int32_t simd_register_count = cpu_info->SimdRegisterCount();
+
+        z3::context z3_context;
+        z3::params z3_params(z3_context);
+        z3_params.set("priority", z3_context.str_symbol("register tile"));
+        z3::optimize z3_optimize(z3_context);
+        z3_optimize.set(z3_params);
+        z3::expr x = z3_context.int_const("x");
+        z3::expr y = z3_context.int_const("y");
+        // z3::solver z3_sovler(z3_context);
+        z3_optimize.add(x > 0);
+        z3_optimize.add(y > 0);
+        z3_optimize.add(x >= y);
+        z3_optimize.add(x + y + x * y * int32_t(simd_lines) < simd_register_count);
+        z3::optimize::handle z3_handle_x = z3_optimize.maximize(x * y);
+        GALOIS_ASSERT(z3_optimize.check() == z3::sat);
+        z3::model z3_model = z3_optimize.get_model();
+        auto register_rows = z3_model.eval(x).get_numeral_int64();
+        auto register_cols = z3_model.eval(y).get_numeral_int64();
+
+        auto ir_tile_mat_type_a =
+            ir_data_type->Tile(simd_lines, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b =
+            ir_data_type->Tile(1, simd_lines)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
+
+        return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b);
+    }
+};
+
 class GemmOptimizer {
    protected:
     GemmOptimizer() = default;
@@ -60,6 +99,7 @@ class GemmOptimizer {
     static std::shared_ptr<GemmOptimizer> Create() {
         std::shared_ptr<GemmOptimizer> self(new GemmOptimizer);
         self->cpu_info = NativeCpuInfo::Create();
+        self->tile_policy = MatrixMultiplyTilePolicy::Create();
         return self;
     }
 
@@ -99,32 +139,8 @@ class GemmOptimizer {
         auto ir_mat_a = ir_gemm_operator->inputs[0];
         auto ir_mat_b = ir_gemm_operator->inputs[1];
 
-        auto simd_lines = (this->cpu_info->SimdBits() / 8) / ir_mat_a->type->DataType()->bytes;
-
-        /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
-        z3::context z3_context;
-        z3::params z3_params(z3_context);
-        z3_params.set("priority", z3_context.str_symbol("register tile"));
-        z3::optimize z3_optimize(z3_context);
-        z3_optimize.set(z3_params);
-        z3::expr x = z3_context.int_const("x");
-        z3::expr y = z3_context.int_const("y");
-        // z3::solver z3_sovler(z3_context);
-        z3_optimize.add(x > 0);
-        z3_optimize.add(y > 0);
-        z3_optimize.add(x >= y);
-        int32_t simd_register_count = cpu_info->SimdRegisterCount();
-        z3_optimize.add(x + y + x * y * int32_t(simd_lines) < simd_register_count);
-        z3::optimize::handle z3_handle_x = z3_optimize.maximize(x * y);
-        GALOIS_ASSERT(z3_optimize.check() == z3::sat);
-        z3::model z3_model = z3_optimize.get_model();
-        auto register_rows = z3_model.eval(x).get_numeral_int64();
-        auto register_cols = z3_model.eval(y).get_numeral_int64();
-
-        auto ir_tile_mat_type_a =
-            ir::f32->Tile(simd_lines, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b =
-            ir::f32->Tile(1, simd_lines)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
+        auto [ir_tile_mat_type_a, ir_tile_mat_type_b] =
+            this->tile_policy->Tile(ir_mat_a->type->DataType(), this->cpu_info);
 
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_tile_mat_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_tile_mat_type_b, ir_builder);
@@ -143,6 +159,7 @@ class GemmOptimizer {
 
    private:
     std::shared_ptr<NativeCpuInfo> cpu_info = nullptr;
+    std::shared_ptr<MatrixMultiplyTilePolicy> tile_policy = nullptr;
 };
 
 }  // namespace galois::optimization
