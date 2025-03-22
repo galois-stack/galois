@@ -3,4 +3,8 @@ set -e
 
 
 # 下载子模块
-git submodule update --init --recursive $@ .
+git submodule update --init $@ .
+
+pushd third_party/prajna
+bash scripts/clone_submodules.sh $@
+popd
