@@ -1,13 +1,11 @@
-#include <cassert>
-
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestPackedMatrixMultiply) {
     auto native_cpu_info = optimization::NativeCpuInfo::Create();
-    auto matrix_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
-    auto [ir_mat_type_a, ir_mat_type_b] = matrix_tile_policy->Tile(ir::f32, native_cpu_info);
+    auto mat_mul_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
+    auto [ir_mat_type_a, ir_mat_type_b] = mat_mul_tile_policy->Tile(ir::f32, native_cpu_info);
     // 太小测不出性能， 所以又Tile了一次
     ir_mat_type_a = ir_mat_type_a->Tile(64, 64);
     ir_mat_type_b = ir_mat_type_b->Tile(64, 64);

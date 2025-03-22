@@ -24,8 +24,15 @@ class GlobalContext {
 
 extern GlobalContext global_context;
 extern std::shared_ptr<TensorType> f32;
+extern std::shared_ptr<TensorType> f64;
 extern std::shared_ptr<TensorType> i8;
+extern std::shared_ptr<TensorType> i16;
+extern std::shared_ptr<TensorType> i32;
 extern std::shared_ptr<TensorType> i64;
+extern std::shared_ptr<TensorType> u8;
+extern std::shared_ptr<TensorType> u16;
+extern std::shared_ptr<TensorType> u32;
+extern std::shared_ptr<TensorType> u64;
 extern std::shared_ptr<TensorType> bool_;
 
 }  // namespace galois::ir
