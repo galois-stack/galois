@@ -69,21 +69,20 @@ for (size_t i = 0;i < rows; ++i){
 把$(i,j)$设为坐标向量, 我们可以把v在matrix上的下标表示为
 
 $$
-\begin{bmatrix} row \\ col \end{bmatrix} = \begin{bmatrix} 2 \ 0 \\ 0 \ 1 \end{bmatrix} * \begin{bmatrix} i \\ j \end{bmatrix}  + \begin{bmatrix} 0 \\ 1 \end{bmatrix} = \begin{bmatrix} 2 * i \\ j + 1 \end{bmatrix}
+\begin{bmatrix} row \\\ col \end{bmatrix} = \begin{bmatrix} 2 \ 0 \\\ 0 \ 1 \end{bmatrix} * \begin{bmatrix} i \\\ j \end{bmatrix}  + \begin{bmatrix} 0 \\\ 1 \end{bmatrix} = \begin{bmatrix} 2 * i \\\ j + 1 \end{bmatrix}
 $$
 
 其中访问v对应的matrix下标就是关于(i,j)的仿射表达式
 
 $$
-F = Ax + b \\其中,
-
-A = \begin{bmatrix} 2 \ 0 \\ 0 \ 1 \end{bmatrix}, b = \begin{bmatrix} 0 \\ 1 \end{bmatrix}, x =  \begin{bmatrix} i \\ j \end{bmatrix}
+F = Ax + b 其中,
+A = \begin{bmatrix} 2 \ 0 \\\ 0 \ 1 \end{bmatrix}, b = \begin{bmatrix} 0 \\\ 1 \end{bmatrix}, x =  \begin{bmatrix} i \\\ j \end{bmatrix}
 $$
 
 我们一般会用一维指针来表示tensor,可以根据matrix的步长$S$=$\begin{bmatrix}stride \ 1\end{bmatrix}$来计算指针偏移地址
 
 $$
-    offset = F * S = (\begin{bmatrix} 2 \ 0 \\ 0 \ 1 \end{bmatrix} * \begin{bmatrix} i \\ j \end{bmatrix}  + \begin{bmatrix} 0 \\ 1 \end{bmatrix}) * \begin{bmatrix}stride \ 1\end{bmatrix} = 2 * i * stride + j + 1
+    offset = F * S = (\begin{bmatrix} 2 \ 0 \\\ 0 \ 1 \end{bmatrix} * \begin{bmatrix} i \\\ j \end{bmatrix}  + \begin{bmatrix} 0 \\\ 1 \end{bmatrix}) * \begin{bmatrix}stride \ 1\end{bmatrix} = 2 * i * stride + j + 1
 $$
 
 到这里我们展示了用一个仿射表达式来表示一个多维数据的访问, 并且可以方便地计算出地址偏移量. 在galois中我们是这样表示一个访问的, 具体可参阅galois/ir/ir.hpp
