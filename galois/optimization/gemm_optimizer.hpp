@@ -134,7 +134,6 @@ class GemmOptimizer {
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸
         auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->output_type;
-        auto sp_padding_creator = op::SliceCreator::Create(ir_mat_c_type->shape);
         auto ir_mat_c =
             ir_builder->Express<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
         ir_builder->Create<ir::Return>(ir_mat_c);
