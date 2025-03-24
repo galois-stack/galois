@@ -2,6 +2,7 @@
 
 #include "galois/ir/ir.hpp"
 #include "galois/op/unary.hpp"
+#include "galois/op/fill.hpp"
 
 namespace galois::op {
 
