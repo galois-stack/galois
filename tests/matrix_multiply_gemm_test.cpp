@@ -26,7 +26,7 @@ class MatrixMultiplyGemmTest : public testing::TestWithParam<
         auto gemm_optimizer = optimization::GemmOptimizer::Create();
         auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);                                                       
 
-        auto jit_engine = jit::Engine::Create();
+        this->jit_engine = jit::Engine::Create();
         mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_gemm_operator);
 
         auto normalize_m = ir_mat_type_a->NormalizeShape()[0];
