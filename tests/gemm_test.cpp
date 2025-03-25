@@ -5,14 +5,13 @@
 TEST(GaloisTests, TestPackedMatrixMultiply) {
     auto native_cpu_info = optimization::NativeCpuInfo::Create();
     auto mat_mul_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
-    auto [ir_mat_type_a, ir_mat_type_b] = mat_mul_tile_policy->Tile(ir::f32, native_cpu_info);
+    auto [ir_mat_type_a, ir_mat_type_b, simd_mat_mul_kernel] = mat_mul_tile_policy->Tile(ir::f32, native_cpu_info);
     // 太小测不出性能， 所以又Tile了一次
     ir_mat_type_a = ir_mat_type_a->Tile(64, 64);
     ir_mat_type_b = ir_mat_type_b->Tile(64, 64);
 
     auto ir_builder = ir::Builder::Create();
-    ir_builder->matrix_multiply_kernel_queue.push_back(
-        op::VectorizedMatrixMultiplyKernel::Create(native_cpu_info->SimdBits()));
+    ir_builder->matrix_multiply_kernel_queue.push_back(simd_mat_mul_kernel);
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                            {ir_mat_type_a, ir_mat_type_b});
@@ -42,7 +41,7 @@ TEST(GaloisTests, TestPackedMatrixMultiply_i8x16x1x16) {
 
     auto ir_builder = ir::Builder::Create();
     ir_builder->matrix_multiply_kernel_queue.push_back(
-        op::VectorizedMatrixMultiplyKernel::Create(128));
+        op::SimdMatrixMultiplyKernel::Create(128));
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                            {ir_ts_type_a, ir_ts_type_b});

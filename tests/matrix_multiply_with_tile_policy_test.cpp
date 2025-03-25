@@ -14,14 +14,13 @@ class MatrixMultiplyWithTilePolicyTest
         auto native_cpu_info = optimization::NativeCpuInfo::Create();
         auto mat_mul_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
 
-        auto [ir_mat_type_a, ir_mat_type_b] =
+        auto [ir_mat_type_a, ir_mat_type_b, mat_mul_kernel] =
             mat_mul_tile_policy->Tile(ir_data_type, native_cpu_info);
         ir_mat_type_a = ir_mat_type_a->Tile(m, k);
         ir_mat_type_b = ir_mat_type_b->Tile(k, n);
 
         auto ir_builder = ir::Builder::Create();
-        ir_builder->matrix_multiply_kernel_queue.push_back(
-            op::VectorizedMatrixMultiplyKernel::Create(native_cpu_info->SimdBits()));
+        ir_builder->matrix_multiply_kernel_queue.push_back(mat_mul_kernel);
         auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
         auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                                {ir_mat_type_a, ir_mat_type_b});

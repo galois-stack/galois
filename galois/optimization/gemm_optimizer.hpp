@@ -58,7 +58,7 @@ class MatrixMultiplyTilePolicy {
         return self;
     };
 
-    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>> Tile(
+    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>, std::shared_ptr<op::SimdMatrixMultiplyKernel>> Tile(
         std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
         auto simd_lines = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
@@ -69,25 +69,23 @@ class MatrixMultiplyTilePolicy {
         z3_params.set("priority", z3_context.str_symbol("register tile"));
         z3::optimize z3_optimize(z3_context);
         z3_optimize.set(z3_params);
-        z3::expr x = z3_context.int_const("x");
-        z3::expr y = z3_context.int_const("y");
-        // z3::solver z3_sovler(z3_context);
-        z3_optimize.add(x > 0);
-        z3_optimize.add(y > 0);
-        z3_optimize.add(x >= y);
-        z3_optimize.add(x + y + x * y * int32_t(simd_lines) < simd_register_count);
-        z3::optimize::handle z3_handle_x = z3_optimize.maximize(x * y);
+        z3::expr register_rows = z3_context.int_const("register_rows");
+        z3::expr register_cols = z3_context.int_const("register_cols");
+        z3_optimize.add(register_rows > 0);
+        z3_optimize.add(register_cols > 0);
+        z3_optimize.add(register_rows >= register_cols);
+        z3_optimize.add(register_rows + register_cols + register_rows * register_cols * int32_t(simd_lines) < simd_register_count);
+        z3::optimize::handle z3_handle_x = z3_optimize.maximize(register_rows * register_cols);
         GALOIS_ASSERT(z3_optimize.check() == z3::sat);
         z3::model z3_model = z3_optimize.get_model();
-        auto register_rows = z3_model.eval(x).get_numeral_int64();
-        auto register_cols = z3_model.eval(y).get_numeral_int64();
+        auto i64_register_rows = z3_model.eval(register_rows).get_numeral_int64();
+        auto i64_register_cols = z3_model.eval(register_cols).get_numeral_int64();
 
         auto ir_tile_mat_type_a =
-            ir_data_type->Tile(simd_lines, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+            ir_data_type->Tile(simd_lines, 1)->Tile(i64_register_rows, 1)->Tile(1, 32)->Tile(4, 1);
         auto ir_tile_mat_type_b =
-            ir_data_type->Tile(1, simd_lines)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
-
-        return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b);
+            ir_data_type->Tile(1, simd_lines)->Tile(1, i64_register_cols)->Tile(32, 1)->Tile(1, 4);
+        return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b, op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
     }
 };
 
@@ -133,14 +131,13 @@ class GemmOptimizer {
         auto [ir_gemm_operator, scope] = ir_builder->CreateOperator(
             ir_matrix_multiply->GetOperatorType(), ir_matrix_multiply->name + "_gemm");
 
-        ir_builder->matrix_multiply_kernel_queue.push_back(
-            op::VectorizedMatrixMultiplyKernel::Create(this->cpu_info->SimdBits()));
-
         auto ir_mat_a = ir_gemm_operator->inputs[0];
         auto ir_mat_b = ir_gemm_operator->inputs[1];
 
-        auto [ir_tile_mat_type_a, ir_tile_mat_type_b] =
+        auto [ir_tile_mat_type_a, ir_tile_mat_type_b, ir_simd_mat_mul_kernel] =
             this->tile_policy->Tile(ir_mat_a->type->DataType(), this->cpu_info);
+
+        ir_builder->matrix_multiply_kernel_queue.push_back(ir_simd_mat_mul_kernel);
 
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_tile_mat_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_tile_mat_type_b, ir_builder);
