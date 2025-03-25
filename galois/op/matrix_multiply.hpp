@@ -87,7 +87,7 @@ class MatrixMultiplyCreator : public BinaryCreator {
         std::shared_ptr<ir::TensorType> ir_mat_a_type,
         std::shared_ptr<ir::TensorType> ir_mat_b_type) override {
         if (ir_mat_a_type->IsScalar() && ir_mat_b_type->IsScalar()) {
-            GALOIS_ASSERT(ir_mat_a_type == ir_mat_a_type);
+            GALOIS_ASSERT(ir_mat_a_type == ir_mat_b_type);
             return ir_mat_a_type;
         }
 
