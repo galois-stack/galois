@@ -24,7 +24,7 @@ class MatrixMultiplyGemmTest : public testing::TestWithParam<
                                                                {ir_mat_type_a, ir_mat_type_b});
 
         auto gemm_optimizer = optimization::GemmOptimizer::Create();
-        auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);                                                       
+        auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
 
         this->jit_engine = jit::Engine::Create();
         mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_gemm_operator);
@@ -73,4 +73,4 @@ INSTANTIATE_TEST_SUITE_P(MatrixMultiplyGemmTest, MatrixMultiplyGemmTest,
     testing::Combine(testing::Values(ir::f32, ir::f64, ir::i32),  //  f32
                      testing::Values(64, 512, 1024),              // m
                      testing::Values(64, 512, 1024),              // n
-                     testing::Values(64, 512, 2014)));            // k                                        
+                     testing::Values(64, 512, 2014)));            // k
