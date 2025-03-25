@@ -14,11 +14,12 @@ class MatrixMultiplyKernel {
                          std::shared_ptr<ir::Builder> ir_builder) = 0;
 };
 
-class VectorizedMatrixMultiplyKernel : public MatrixMultiplyKernel {
+class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
    public:
-    static std::shared_ptr<VectorizedMatrixMultiplyKernel> Create(int64_t bits) {
-        std::shared_ptr<VectorizedMatrixMultiplyKernel> self(new VectorizedMatrixMultiplyKernel);
+    static std::shared_ptr<SimdMatrixMultiplyKernel>  Create(int64_t bits) {
+        std::shared_ptr<SimdMatrixMultiplyKernel> self(new SimdMatrixMultiplyKernel);
         self->bits = bits;
+        // self->sim_cols = simd_cols;
         self->bytes = self->bits / 8;
         return self;
     }
@@ -37,9 +38,14 @@ class VectorizedMatrixMultiplyKernel : public MatrixMultiplyKernel {
 
     bool Match(std::shared_ptr<ir::TensorType> ir_mat_type_a,
                std::shared_ptr<ir::TensorType> ir_mat_type_b) override {
-        if (this->IsVectorized(ir_mat_type_a) && this->IsVectorized(ir_mat_type_b)) {
-            if (ir_mat_type_a->value_type == ir_mat_type_b->value_type) {
-                return true;
+        GALOIS_ASSERT(ir_mat_type_a->shape.size() == 2);
+        GALOIS_ASSERT(ir_mat_type_b->shape.size() == 2);
+        auto simd_lanes = this->bytes / ir_mat_type_a->value_type->bytes;
+        if (ir_mat_type_a->value_type == ir_mat_type_b->value_type) {
+            if (ir_mat_type_a->shape[1] == 1 && ir_mat_type_a->shape[0] <= simd_lanes) {
+                if (ir_mat_type_b->shape[0] == 1 && ir_mat_type_b->shape[1] == simd_lanes) {
+                    return true;
+                }
             }
         }
 
@@ -49,19 +55,23 @@ class VectorizedMatrixMultiplyKernel : public MatrixMultiplyKernel {
     void Express(std::shared_ptr<ir::Tensor> ir_mat_a, std::shared_ptr<ir::Tensor> ir_mat_b,
                  std::shared_ptr<ir::Tensor> ir_mat_c,
                  std::shared_ptr<ir::Builder> ir_builder) override {
-        Eigen::VectorXi64 vectorized_shape(1);
-        auto ir_element_type = ir_mat_a->type->DataType();
-        vectorized_shape[0] = this->bytes / ir_element_type->bytes;
-        auto ir_vectorized_type = ir::TensorType::Create(ir_element_type, vectorized_shape);
-        auto ir_bit_cast_a = ir_builder->Create<ir::BitCast>(ir_mat_a, ir_vectorized_type);
-        auto ir_bit_cast_b = ir_builder->Create<ir::BitCast>(ir_mat_b, ir_vectorized_type);
-        auto ir_bit_cast_c = ir_builder->Create<ir::BitCast>(
-            ir_mat_c, ir::TensorType::Create(ir_vectorized_type, vectorized_shape));
+        Eigen::VectorXi64 lanes_a(1);
+        lanes_a[0] = ir_mat_a->type->shape[0];
+        Eigen::VectorXi64 lanes_b(1);
+        lanes_b[0] = ir_mat_b->type->shape[1];
+        auto ir_data_type = ir_mat_a->type->DataType();
+        auto ir_simd_type_a = ir::TensorType::Create(ir_data_type, lanes_a);
+        auto ir_simd_type_b = ir::TensorType::Create(ir_data_type, lanes_b);
 
-        for (int64_t i = 0; i < vectorized_shape[0]; ++i) {
-            auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(ir_bit_cast_a, i);
-            auto ir_mul = ir_builder->Create<ir::Mul>(ir_vector_broadcast_a, ir_bit_cast_b);
-            auto ir_accessor_c = ir_builder->CreateAccessor(ir_bit_cast_c);
+        auto ir_vec_bit_cast_a = ir_builder->Create<ir::BitCast>(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->Create<ir::BitCast>(ir_mat_b, ir_simd_type_b);
+        auto ir_mat_bit_cast_c = ir_builder->Create<ir::BitCast>(
+            ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
+
+        for (int64_t i = 0; i < lanes_a[0]; ++i) {
+            auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, ir_simd_type_b, i);
+            auto ir_mul = ir_builder->Create<ir::Mul>(ir_vector_broadcast_a, ir_vec_bit_cast_b);
+            auto ir_accessor_c = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
             ir_accessor_c->shift_vector[0] = i;
             auto ir_sum = ir_builder->Create<ir::Add>(ir_mul, ir_accessor_c);
             auto ir_write =
@@ -70,8 +80,9 @@ class VectorizedMatrixMultiplyKernel : public MatrixMultiplyKernel {
     }
 
    private:
-    int64_t bits = 128;
-    int64_t bytes = 16;
+   int64_t bits = 128;
+   int64_t bytes = 16;
+   int64_t simd_cols;
 };
 
 class MatrixMultiplyCreator : public BinaryCreator {

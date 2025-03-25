@@ -686,13 +686,13 @@ class VectorBroadcast : public Instruction {
 
    public:
     /// TODO: 需要进一步处理
-    static std::shared_ptr<VectorBroadcast> Create(std::shared_ptr<ir::Tensor> ir_value,
+    static std::shared_ptr<VectorBroadcast> Create(std::shared_ptr<ir::Tensor> ir_value, std::shared_ptr<ir::TensorType> ir_type,
                                                    int64_t lane_id) {
         std::shared_ptr<VectorBroadcast> self(new VectorBroadcast);
         self->OperandResize(1);
         self->Vector(ir_value);
         self->lane_id = lane_id;
-        self->type = ir_value->type;
+        self->type = ir_type;
         self->tag = "VectorBroadcast";
         return self;
     }
