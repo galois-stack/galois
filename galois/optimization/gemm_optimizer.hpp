@@ -77,6 +77,7 @@ class MatrixMultiplyTilePolicy {
         z3::expr register_rows = z3_context.int_const("register_rows");
         z3::expr register_cols = z3_context.int_const("register_cols");
         z3_optimize.add(simd_lanes_a > 0 && simd_lanes_a <= int32_t(simd_lanes));
+        z3_optimize.add( simd_lanes_a == 8 || simd_lanes_a == 16 || simd_lanes_a == 32);
         z3_optimize.add(register_rows > 0);
         z3_optimize.add(register_cols > 0);
         z3_optimize.add(register_rows >= register_cols);

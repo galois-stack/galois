@@ -61,7 +61,7 @@ TEST_P(MatrixMultiplyWithTilePolicyTest, TestTilePolicy) {
 
 // ir::i16不支持需要修复,
 INSTANTIATE_TEST_SUITE_P(MatrixMultiplyWithTilePolicyTest, MatrixMultiplyWithTilePolicyTest,
-                         testing::Combine(testing::Values(ir::f32, ir::f64, ir::i32),
+                         testing::Combine(testing::Values(ir::f32, ir::f64, ir::i32, i8),
                                           testing::Values(1, 16, 32, 64, 128),
                                           testing::Values(1, 16, 32, 64, 128),
                                           testing::Values(1, 16, 32, 64, 128)));
