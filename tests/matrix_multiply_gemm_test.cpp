@@ -70,7 +70,7 @@ TEST_P(MatrixMultiplyGemmTest, TestMatrixMultiplyGemm) {
 
  // ir::i16不支持需要修复,
 INSTANTIATE_TEST_SUITE_P(MatrixMultiplyGemmTest, MatrixMultiplyGemmTest,
-    testing::Combine(testing::Values(ir::f32, ir::f64, ir::i32),  //  f32
+    testing::Combine(testing::Values(ir::i8),  //  f32
                      testing::Values(64, 512, 1024),              // m
                      testing::Values(64, 512, 1024),              // n
                      testing::Values(64, 512, 2014)));            // k

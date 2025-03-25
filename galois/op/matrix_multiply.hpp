@@ -69,7 +69,7 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
             ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
 
         for (int64_t i = 0; i < lanes_a[0]; ++i) {
-            auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, i);
+            auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, ir_simd_type_b, i);
             auto ir_mul = ir_builder->Create<ir::Mul>(ir_vector_broadcast_a, ir_vec_bit_cast_b);
             auto ir_accessor_c = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
             ir_accessor_c->shift_vector[0] = i;
