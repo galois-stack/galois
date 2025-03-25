@@ -2,10 +2,9 @@
 
 #include "c++/z3++.h"
 #include "cpuinfo.h"
+#include "fmt/format.h"
 #include "galois/ir/ir.hpp"
 #include "galois/op/op.hpp"
-
-#include "fmt/format.h"
 
 namespace galois::optimization {
 
@@ -53,17 +52,17 @@ class NativeCpuInfo {
     std::vector<int64_t> cache_sizes;
 };
 
-class SimdLanesTilePolicy{
-public:
+class SimdLanesTilePolicy {
+   public:
     static std::shared_ptr<SimdLanesTilePolicy> Create() {
         std::shared_ptr<SimdLanesTilePolicy> self(new SimdLanesTilePolicy);
         return self;
     }
 
-    std::tuple<int64_t, int64_t> Tile(
-        std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
+    std::tuple<int64_t, int64_t> Tile(std::shared_ptr<ir::TensorType> ir_data_type,
+                                      std::shared_ptr<NativeCpuInfo> cpu_info) {
         auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
-        auto simd_lanes_b = simd_lanes; // b的simd lanes是固定的
+        auto simd_lanes_b = simd_lanes;  // b的simd lanes是固定的
         int32_t simd_register_count = cpu_info->SimdRegisterCount();
 
         /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
@@ -73,10 +72,11 @@ public:
         z3::optimize z3_optimize(z3_context);
         z3_optimize.set(z3_params);
         // a的simd lanes, 通过求解得来， 因为存在寄存器不够用的情况， 所以需要裁剪
-        z3::expr z3_simd_lanes_a = z3_context.int_const ("z3_simd_lanes_a");
+        z3::expr z3_simd_lanes_a = z3_context.int_const("z3_simd_lanes_a");
         z3_optimize.add(z3_simd_lanes_a > 0 && z3_simd_lanes_a <= int32_t(simd_lanes));
         // 需要是2的倍数， 为了方便后续的计算。 若去除此限制， 需要考虑内存对齐等更多问题
-        z3_optimize.add(z3_simd_lanes_a == 2 || z3_simd_lanes_a == 4 || z3_simd_lanes_a == 8 || z3_simd_lanes_a == 16 || z3_simd_lanes_a == 32);
+        z3_optimize.add(z3_simd_lanes_a == 2 || z3_simd_lanes_a == 4 || z3_simd_lanes_a == 8 ||
+                        z3_simd_lanes_a == 16 || z3_simd_lanes_a == 32);
         // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化
         z3_optimize.add(z3_simd_lanes_a + 2 < simd_register_count);
         z3::optimize::handle z3_handle_x = z3_optimize.maximize(z3_simd_lanes_a);
@@ -94,9 +94,9 @@ class MatrixMultiplyTilePolicy {
         return self;
     };
 
-    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>, std::shared_ptr<op::SimdMatrixMultiplyKernel>> Tile(
-        std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
-
+    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
+               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+    Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         auto simd_lanes_tile_policy = SimdLanesTilePolicy::Create();
         auto [simd_lanes_a, simd_lanes_b] = simd_lanes_tile_policy->Tile(ir_data_type, cpu_info);
 
@@ -114,21 +114,23 @@ class MatrixMultiplyTilePolicy {
         z3_optimize.add(z3_register_cols > 0);
         z3_optimize.add(z3_register_rows >= z3_register_cols);
         // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化， 因为底层llvm怎么生成不好说
-        z3_optimize.add(z3_register_rows + z3_register_cols + z3_register_rows * z3_register_cols *int32_t(simd_lanes_a) < simd_register_count);
+        z3_optimize.add(z3_register_rows + z3_register_cols +
+                            z3_register_rows * z3_register_cols * int32_t(simd_lanes_a) <
+                        simd_register_count);
         // 最大化尺寸
-        z3::optimize::handle z3_handle_x = z3_optimize.maximize(z3_register_rows * z3_register_cols);
+        z3::optimize::handle z3_handle_x =
+            z3_optimize.maximize(z3_register_rows * z3_register_cols);
         GALOIS_ASSERT(z3_optimize.check() == z3::sat);
         z3::model z3_model = z3_optimize.get_model();
         auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
         auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
 
-        fmt::print("{}, {}, {}, {}\n", simd_lanes_a, register_rows, register_cols, simd_lanes_b);
-
         auto ir_tile_mat_type_a =
-            ir_data_type->Tile(8, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+            ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
         auto ir_tile_mat_type_b =
             ir_data_type->Tile(1, simd_lanes_b)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
-        return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b, op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
+        return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
+                               op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
     }
 };
 

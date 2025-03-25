@@ -26,15 +26,19 @@ class MatrixMultiplyWithTilePolicyTest
                                                                {ir_mat_type_a, ir_mat_type_b});
 
         this->jit_engine = jit::Engine::Create();
-         mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);
+        mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);
 
         auto normalize_m = ir_mat_type_a->NormalizeShape()[0];
         auto normalize_k = ir_mat_type_a->NormalizeShape()[1];
         auto normalize_n = ir_mat_type_b->NormalizeShape()[1];
         this->items = normalize_m * normalize_k * normalize_n;
 
-        this->sp_aligned256_mem_a = std::shared_ptr<void>( std::aligned_alloc(32, normalize_m * normalize_k * ir_data_type->bytes), [](void *p) { free(p); });
-        this->sp_aligned256_mem_b = std::shared_ptr<void>( std::aligned_alloc(32, normalize_k * normalize_n * ir_data_type->bytes), [](void *p) { free(p); });
+        this->sp_aligned256_mem_a = std::shared_ptr<void>(
+            std::aligned_alloc(32, normalize_m * normalize_k * ir_data_type->bytes),
+            [](void *p) { free(p); });
+        this->sp_aligned256_mem_b = std::shared_ptr<void>(
+            std::aligned_alloc(32, normalize_k * normalize_n * ir_data_type->bytes),
+            [](void *p) { free(p); });
     }
 
     void TearDown() override {
