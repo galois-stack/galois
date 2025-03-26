@@ -6,6 +6,7 @@
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
+#include "tests/test_utils.h"
 
 class MatrixMultiplyGemmTest
     : public testing::TestWithParam<
@@ -75,4 +76,6 @@ INSTANTIATE_TEST_SUITE_P(MatrixMultiplyGemmTest, MatrixMultiplyGemmTest,
                                                           ir::i8),       //  f32
                                           testing::Values(512, 1024),    // m
                                           testing::Values(512, 1024),    // n
-                                          testing::Values(512, 2014)));  // k
+                                          testing::Values(512, 2014)),   // k
+                                          galois::test::PrintTestName    // 自定义测试名称
+                                          ); 
