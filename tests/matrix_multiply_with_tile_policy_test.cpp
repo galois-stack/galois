@@ -4,6 +4,7 @@
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
+#include "tests/test_utils.h"
 
 class MatrixMultiplyWithTilePolicyTest
     : public testing::TestWithParam<
@@ -68,4 +69,6 @@ INSTANTIATE_TEST_SUITE_P(MatrixMultiplyWithTilePolicyTest, MatrixMultiplyWithTil
                          testing::Combine(testing::Values(ir::f64, ir::f32, ir::i32, i8),
                                           testing::Values(16, 32, 64, 128),
                                           testing::Values(16, 32, 64, 128),
-                                          testing::Values(16, 32, 64, 128)));
+                                          testing::Values(16, 32, 64, 128)),
+                                          galois::test::PrintTestName // 自定义测试名称
+                                        );
