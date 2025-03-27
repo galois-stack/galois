@@ -43,14 +43,12 @@ namespace pir = prajna::ir;
 class OperatorFunction;
 class Instruction;
 
-enum struct Layout { RowMajor, ColumnMajor, View };
 enum struct MemoryType { Host, Stack };
 
 class TensorType : public Named, public std::enable_shared_from_this<TensorType> {
    public:
     static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
-                                              Eigen::VectorXi64 shape,
-                                              Layout layout = Layout::RowMajor) {
+                                              Eigen::VectorXi64 shape) {
         // 如果shape为0， 直接退化为value_type
         if (!shape.size()) {
             return value_type;
@@ -60,7 +58,7 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
             if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
                 if (ir_tensor_type->value_type == value_type &&
                     shape.size() == ir_tensor_type->shape.size() &&
-                    shape == ir_tensor_type->shape && layout == ir_tensor_type->layout) {
+                    shape == ir_tensor_type->shape) {
                     return ir_tensor_type;
                 }
             }
@@ -69,23 +67,15 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         std::shared_ptr<TensorType> self(new TensorType);
         self->value_type = value_type;
         self->shape = shape;
-        self->layout = layout;
 
-        if (layout == Layout::RowMajor) {
-            self->stride.resize(shape.size());
-            auto i = shape.size() - 1;
-            self->stride[i] = 1;
-            while (i > 0) {
-                i = i - 1;
-                self->stride[i] = shape[i + 1] * self->stride[i + 1];
-            }
-        } else {
-            self->stride.resize(shape.size());
-            self->stride[0] = 1;
-            for (int64_t i = 1; i < shape.size(); ++i) {
-                self->stride[i] = shape[i - 1] * self->stride[i - 1];
-            }
+        self->stride.resize(shape.size());
+        auto i = shape.size() - 1;
+        self->stride[i] = 1;
+        while (i > 0) {
+            i = i - 1;
+            self->stride[i] = shape[i + 1] * self->stride[i + 1];
         }
+
         self->name = value_type->name + "[";
         for (auto i : shape) {
             self->name += std::to_string(i);
@@ -118,7 +108,6 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         self->value_type = value_type;
         self->shape = shape;
         self->stride = stride;
-        self->layout = Layout::RowMajor;
 
         self->name = value_type->name + "[";
         for (auto i : shape) {
@@ -156,12 +145,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     }
 
     static std::shared_ptr<TensorType> CreateMatrixType(std::shared_ptr<TensorType> value_type,
-                                                        int64_t rows, int64_t cols,
-                                                        Layout layout = Layout::RowMajor) {
+                                                        int64_t rows, int64_t cols) {
         Eigen::VectorXi64 shape(2);
         shape[0] = rows;
         shape[1] = cols;
-        return TensorType::Create(value_type, shape, layout);
+        return TensorType::Create(value_type, shape);
     }
 
     template <typename... Dims>
@@ -190,7 +178,6 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
    public:
     Eigen::VectorXi64 shape;
     std::shared_ptr<TensorType> value_type;
-    Layout layout = Layout::RowMajor;
     MemoryType memory_type = MemoryType::Host;
     int64_t bytes = 0;
     bool enable_multi_thread = false;
@@ -599,7 +586,7 @@ class SliceView : public Tensor {
         GALOIS_ASSERT(ir_accessor_origin->Tensor()->IsContinous());
         self->origin = ir_accessor_origin;
         self->shape = shape;
-        self->type = TensorType::Create(ir_accessor_origin->type, shape, Layout::View);
+        self->type = TensorType::Create(ir_accessor_origin->type, shape);
         self->tag = "Slice";
         return self;
     }
@@ -907,9 +894,8 @@ class BitCast : public Instruction {
 };
 
 inline std::shared_ptr<Tensor> CreateTensor(std::shared_ptr<TensorType> ir_value_type,
-                                            Eigen::VectorXi64 shape,
-                                            Layout layout = Layout::RowMajor) {
-    auto self = Tensor::Create(TensorType::Create(ir_value_type, shape, layout));
+                                            Eigen::VectorXi64 shape) {
+    auto self = Tensor::Create(TensorType::Create(ir_value_type, shape));
     return self;
 }
 

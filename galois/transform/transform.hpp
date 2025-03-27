@@ -311,14 +311,9 @@ inline void LayerMemory2(std::shared_ptr<ir::OperatorFunction> ir_operator) {
                 .eval();
         local_tensor_shape.array() /= local_tensor_type_shape.array();
 
-        ir::Layout layout = ir::Layout::RowMajor;
-        if (local_tensor_type_shape[0] == 4) {
-            layout = ir::Layout::ColumnMajor;
-        }
-
         // Copy memory to local tensor
         auto ir_local_tensor_type = ir::TensorType::Create(
-            ir_accessor_tmp->Tensor()->type->value_type, local_tensor_type_shape, layout);
+            ir_accessor_tmp->Tensor()->type->value_type, local_tensor_type_shape);
         auto ir_local_tensor = ir::CreateTensor(ir_local_tensor_type, local_tensor_shape);
 
         // TODO: 后面需要调整, 目前仅支持accessor一样的

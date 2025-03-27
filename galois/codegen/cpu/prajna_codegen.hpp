@@ -683,7 +683,6 @@ class PrajnaCodegen {
         for (; i >= 0; --j, --i) {
             stride[i] = ir_slice->origin->Tensor()->type->stride[j];
         }
-        ir_slice->type->layout = ir_slice->origin->Tensor()->type->layout;
         //
         auto ir_slice_type =
             ir::TensorType::Create(ir_slice->type->value_type, ir_slice->shape, stride);
