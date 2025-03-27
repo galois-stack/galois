@@ -99,6 +99,41 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         return self;
     }
 
+    static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
+                                              Eigen::VectorXi64 shape,
+                                              Eigen::RowVectorXi64 stride) {
+        for (auto ir_type : global_context.created_types) {
+            if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
+                if (ir_tensor_type->value_type == value_type &&
+                    shape.size() == ir_tensor_type->shape.size() &&
+                    shape == ir_tensor_type->shape &&
+                    stride.size() == ir_tensor_type->stride.size() &&
+                    stride == ir_tensor_type->stride) {
+                    return ir_tensor_type;
+                }
+            }
+        }
+
+        std::shared_ptr<TensorType> self(new TensorType);
+        self->value_type = value_type;
+        self->shape = shape;
+        self->stride = stride;
+        self->layout = Layout::RowMajor;
+
+        self->name = value_type->name + "[";
+        for (auto i : shape) {
+            self->name += std::to_string(i);
+            self->name.push_back('x');
+        }
+
+        self->name.back() = ']';
+        self->fullname = self->name;
+        self->bytes = self->Size() * self->value_type->bytes;
+        global_context.created_types.push_back(self);
+
+        return self;
+    }
+
     std::shared_ptr<TensorType> DataType() {
         if (this->IsScalar()) {
             return this->shared_from_this();
@@ -156,13 +191,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     Eigen::VectorXi64 shape;
     std::shared_ptr<TensorType> value_type;
     Layout layout = Layout::RowMajor;
-    Eigen::RowVectorXi64 stride;
     MemoryType memory_type = MemoryType::Host;
     int64_t bytes = 0;
-
     bool enable_multi_thread = false;
-
-    std::shared_ptr<pir::Type> pir_type;
+    Eigen::RowVectorXi64 stride;
+    std::shared_ptr<pir::Type> pir_type = nullptr;
 };
 
 struct InstructionAndOperandIndex {
@@ -686,7 +719,8 @@ class VectorBroadcast : public Instruction {
 
    public:
     /// TODO: 需要进一步处理
-    static std::shared_ptr<VectorBroadcast> Create(std::shared_ptr<ir::Tensor> ir_value, std::shared_ptr<ir::TensorType> ir_type,
+    static std::shared_ptr<VectorBroadcast> Create(std::shared_ptr<ir::Tensor> ir_value,
+                                                   std::shared_ptr<ir::TensorType> ir_type,
                                                    int64_t lane_id) {
         std::shared_ptr<VectorBroadcast> self(new VectorBroadcast);
         self->OperandResize(1);
