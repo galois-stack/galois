@@ -9,6 +9,7 @@ add_executable(galois_test
     softmatx_test.cpp
     full_test.cpp
     slice_test.cpp
+    padding_test.cpp
     matrix_multiply_with_tile_policy_test.cpp
     matrix_multiply_gemm_test.cpp)
 
