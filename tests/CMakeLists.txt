@@ -11,7 +11,8 @@ add_executable(galois_test
     slice_test.cpp
     padding_test.cpp
     matrix_multiply_with_tile_policy_test.cpp
-    matrix_multiply_gemm_test.cpp)
+    matrix_multiply_gemm_with_param_test.cpp
+    fill_with_param_test.cpp)
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
 target_compile_definitions(galois_ir PRIVATE  EIGEN_MAX_ALIGN_BYTES=32)

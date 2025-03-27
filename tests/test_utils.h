@@ -33,4 +33,22 @@ inline std::string PrintTestName(
            std::to_string(k) + "_" + std::to_string(n);
 }
 
+
+// 自定义测试名称生成器
+inline std::string PrintTestNameWithVector(
+    const testing::TestParamInfo<std::tuple<std::shared_ptr<ir::TensorType>, std::vector<int64_t>, float>>& info) {
+    const auto& [ir_data_type, shape, value] = info.param;
+
+    std::ostringstream shape_ss;
+    for (size_t i = 0; i < shape.size(); ++i) {
+        shape_ss << shape[i];
+        if (i < shape.size() - 1) shape_ss << "_";
+    }
+
+    std::ostringstream value_ss;
+    value_ss << static_cast<int>(value);   
+    std::string value_str = value_ss.str();
+    return ToString(ir_data_type) + "_" + shape_ss.str() + "_fill_" + value_str;
+}
+
 } // namespace galois::test
