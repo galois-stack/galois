@@ -16,7 +16,7 @@ class MatrixMultiplyKernel {
 
 class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
    public:
-    static std::shared_ptr<SimdMatrixMultiplyKernel>  Create(int64_t bits) {
+    static std::shared_ptr<SimdMatrixMultiplyKernel> Create(int64_t bits) {
         std::shared_ptr<SimdMatrixMultiplyKernel> self(new SimdMatrixMultiplyKernel);
         self->bits = bits;
         // self->sim_cols = simd_cols;
@@ -69,9 +69,11 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
             ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
 
         for (int64_t i = 0; i < lanes_a[0]; ++i) {
-            auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, ir_simd_type_b, i);
+            auto ir_vector_broadcast_a =
+                ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, ir_simd_type_b, i);
             auto ir_mul = ir_builder->Create<ir::Mul>(ir_vector_broadcast_a, ir_vec_bit_cast_b);
             auto ir_accessor_c = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
+            ir_accessor_c->transform_matrix.resize(0, 0);
             ir_accessor_c->shift_vector[0] = i;
             auto ir_sum = ir_builder->Create<ir::Add>(ir_mul, ir_accessor_c);
             auto ir_write =
@@ -80,9 +82,9 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
     }
 
    private:
-   int64_t bits = 128;
-   int64_t bytes = 16;
-   int64_t simd_cols;
+    int64_t bits = 128;
+    int64_t bytes = 16;
+    int64_t simd_cols;
 };
 
 class MatrixMultiplyCreator : public BinaryCreator {
