@@ -432,14 +432,6 @@ class PrajnaCodegen {
                 }
                 auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
                     ir_accessor->Indices()->pir_value, pir_builder->GetInt64Constant(i));
-                if (s_product_a[i] == 1) {
-                    auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
-                        pir::BinaryOperator::Operation::Add, pir_scalar_index, pir_linear_index);
-                    pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
-                    continue;
-                }
-                GALOIS_ASSERT(ir_accessor->Indices());
-
                 auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
                     pir::BinaryOperator::Operation::Mul, pir_s_product_a[i], pir_scalar_index);
                 auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
@@ -463,72 +455,6 @@ class PrajnaCodegen {
         auto pir_value_poitner = pir_builder->Create<pir::GetPointerElementPointer>(
             pir_builder->Create<pir::GetAddressOfVariableLiked>(pir_tensor_pointer_var),
             pir_linear_index);
-
-        // std::shared_ptr<pir::Value> pir_i64_value_address =
-        //     pir_builder->Create<pir::BinaryOperator>(
-        //         pir::BinaryOperator::Operation::Add,
-        //         pir_builder->Create<pir::CastInstruction>(
-        //             pir::CastInstruction::Operation::PtrToInt,
-        //             pir_tensor_pointer, pir_builder->GetInt64Type()),
-        //         pir_builder->Create<pir::BinaryOperator>(
-        //             pir::BinaryOperator::Operation::Mul,
-        //             pir_builder->GetInt64Constant(pir_tensor_value_type->bytes),
-        //             pir_linear_index));
-
-        // std::shared_ptr<pir::Tensor> pir_value_poitner = nullptr;
-        if (ir_accessor->simd_size == 1) {
-            // pir_value_poitner =
-            // pir_builder->Create<pir::CastInstruction>(
-            //     pir::CastInstruction::Operation::IntToPtr,
-            //     pir_i64_value_address,
-            //     pir::PointerType::Create(pir_tensor_value_type));
-        } else {
-            GALOIS_TODO;
-            // if (!ir_accessor->simd_shuffle) {
-            //     auto pir_simd_type =
-            //         pir::VectorType::CreateImp(prajna::Cast<pir::PointerType>(
-            //                                            ir_accessor->Tensor()->pir_value->type)
-            //                                            ->value_type,
-            //                                        ir_accessor->simd_size);
-            //     pir_data_ptr =
-            //     pir_builder->Create<pir::CastInstruction>(
-            //         pir::CastInstruction::Operation::IntToPtr, pir_data_address,
-            //         pir::PointerType::Create(pir_simd_type));
-            // } else {
-            //     auto pir_simd_type =
-            //         pir::VectorType::CreateImp(prajna::Cast<pir::PointerType>(
-            //                                            ir_accessor->Tensor()->pir_value->type)
-            //                                            ->value_type,
-            //                                        ir_accessor->simd_size);
-            //     std::list<std::shared_ptr<pir::Constant>> prajna_constant_zero_list;
-            //     for (int64_t i = 0; i < ir_accessor->simd_size; ++i) {
-            //         prajna_constant_zero_list.push_back(
-            //             pir_builder->GetInt32Constant(0));
-            //     }
-            //     auto pir_constant_vector_zero_mask =
-            //         pir_builder->Create<pir::ConstantVector>(
-            //             pir_simd_type, prajna_constant_zero_list);
-            //     pir_data_ptr =
-            //     pir_builder->Create<pir::CastInstruction>(
-            //         pir::CastInstruction::Operation::IntToPtr, pir_data_address,
-            //         ir_accessor->Tensor()->pir_value->type);
-            //     auto pir_vector =
-            //         pir_builder->Create<pir::LocalVariable>(pir_simd_type);
-            //     pir_builder->Create<pir::WriteVariableLiked>(
-            //         pir_builder->Create<pir::DeferencePointer>(
-            //             pir_data_ptr),
-            //         pir_builder->Create<pir::IndexArray>(
-            //             pir_vector, pir_builder->GetInt64Constant(0)));
-            //     pir_builder->Create<pir::WriteVariableLiked>(
-            //         pir_builder->Create<pir::ShuffleVector>(
-            //             pir_vector, pir_constant_vector_zero_mask),
-            //         pir_vector);
-            //     ir_accessor->pir_value = pir_vector;
-            //     PRAJNA_ASSERT(!ir_accessor->IsWritten());
-            //     return;
-            //     GALOIS_TODO;
-            // }
-        }
 
         ir_accessor->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
     }
