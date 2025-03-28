@@ -426,12 +426,13 @@ class PrajnaCodegen {
                 return pir_builder->Create<pir::ConstantInt>(pir_builder->GetInt64Type(), value);
             });
 
+            auto pir_index = grid_stack.top()->indices->pir_value;
             for (int64_t i = 0; i < pir_s_product_a.size(); ++i) {
                 if (s_product_a[i] == 0) {
                     continue;
                 }
                 auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
-                    ir_accessor->Indices()->pir_value, pir_builder->GetInt64Constant(i));
+                    pir_index, pir_builder->GetInt64Constant(i));
                 auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
                     pir::BinaryOperator::Operation::Mul, pir_s_product_a[i], pir_scalar_index);
                 auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(

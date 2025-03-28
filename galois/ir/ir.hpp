@@ -524,9 +524,6 @@ class Accessor : public Instruction {
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
-    std::shared_ptr<class Tensor> Indices() { return this->GetOperand(1); }
-    void Indices(std::shared_ptr<class Tensor> ir_indices) { this->SetOperand(1, ir_indices); }
-
     std::shared_ptr<ir::Tensor> Clone() override {
         std::shared_ptr<Accessor> ir_new(new Accessor(*this));
         return ir_new;
