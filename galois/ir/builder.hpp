@@ -143,9 +143,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
             Eigen::MatrixXi64 ::Zero(ir_tensor_type->shape.size(), grid_rank);
         auto ir_accessor = this->Create<Accessor>(
             ir_tensor, transform_matrix, Eigen::VectorXi64::Zero(ir_tensor_type->shape.size()));
-        if (!this->grid_stack.empty()) {
-            ir_accessor->Indices(this->grid_stack.top()->indices);
-        }
         return ir_accessor;
     }
 
@@ -155,7 +152,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
             ir_tensor_type->shape.size(), this->CurrentGrid()->shape.size());
         auto ir_accessor = this->Create<Accessor>(
             ir_tensor, transform_matrix, Eigen::VectorXi64::Zero(ir_tensor_type->shape.size()));
-        ir_accessor->Indices(this->grid_stack.top()->indices);
         return ir_accessor;
     }
 
