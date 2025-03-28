@@ -407,43 +407,46 @@ class PrajnaCodegen {
 
         auto pir_linear_index =
             pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
-        auto s_product_b = ir_accessor->Tensor()->type->stride * ir_accessor->shift_vector;
-
-        auto s_product_a = ir_accessor->Tensor()->type->stride * ir_accessor->transform_matrix;
-
-        RowVectorXprajna pir_s_product_a(s_product_a.size());
-        std::transform(RANGE(s_product_a), pir_s_product_a.begin(), [=](int64_t value) {
-            return pir_builder->Create<pir::ConstantInt>(pir_builder->GetInt64Type(), value);
-        });
-
         pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetInt64Constant(0),
                                                      pir_linear_index);
-        for (int64_t i = 0; i < pir_s_product_a.size(); ++i) {
-            if (s_product_a[i] == 0) {
-                continue;
-            }
-            auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
-                ir_accessor->Indices()->pir_value, pir_builder->GetInt64Constant(i));
-            if (s_product_a[i] == 1) {
-                auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
-                    pir::BinaryOperator::Operation::Add, pir_scalar_index, pir_linear_index);
-                pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
-                continue;
-            }
-            GALOIS_ASSERT(ir_accessor->Indices());
 
-            auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
-                pir::BinaryOperator::Operation::Mul, pir_s_product_a[i], pir_scalar_index);
-            auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
-                pir::BinaryOperator::Operation::Add, pir_mul_tmp, pir_linear_index);
-            pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
-        }
-
+        // Add shift vector offset
+        auto s_product_b = ir_accessor->Tensor()->type->stride * ir_accessor->shift_vector;
         pir_builder->Create<pir::WriteVariableLiked>(
             pir_builder->Create<pir::BinaryOperator>(pir::BinaryOperator::Operation::Add,
                                                      pir_linear_index,
                                                      pir_builder->GetInt64Constant(s_product_b)),
             pir_linear_index);
+
+        // transform is valid
+        if (ir_accessor->transform_matrix.size()) {
+            auto s_product_a = ir_accessor->Tensor()->type->stride * ir_accessor->transform_matrix;
+            RowVectorXprajna pir_s_product_a(s_product_a.size());
+            std::transform(RANGE(s_product_a), pir_s_product_a.begin(), [=](int64_t value) {
+                return pir_builder->Create<pir::ConstantInt>(pir_builder->GetInt64Type(), value);
+            });
+
+            for (int64_t i = 0; i < pir_s_product_a.size(); ++i) {
+                if (s_product_a[i] == 0) {
+                    continue;
+                }
+                auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
+                    ir_accessor->Indices()->pir_value, pir_builder->GetInt64Constant(i));
+                if (s_product_a[i] == 1) {
+                    auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
+                        pir::BinaryOperator::Operation::Add, pir_scalar_index, pir_linear_index);
+                    pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
+                    continue;
+                }
+                GALOIS_ASSERT(ir_accessor->Indices());
+
+                auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
+                    pir::BinaryOperator::Operation::Mul, pir_s_product_a[i], pir_scalar_index);
+                auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
+                    pir::BinaryOperator::Operation::Add, pir_mul_tmp, pir_linear_index);
+                pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
+            }
+        }
 
         auto pir_tensor_value_type = this->EmitType(ir_accessor->Tensor()->type->value_type);
 
