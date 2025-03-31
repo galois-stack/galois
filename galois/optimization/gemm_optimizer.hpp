@@ -5,6 +5,7 @@
 #include "fmt/format.h"
 #include "galois/ir/ir.hpp"
 #include "galois/op/op.hpp"
+#include "galois/transform/transform.hpp"
 
 namespace galois::optimization {
 
@@ -52,6 +53,72 @@ class NativeCpuInfo {
     std::vector<int64_t> cache_sizes;
 };
 
+inline std::shared_ptr<ir::Grid> GetInnerGrid3(std::shared_ptr<ir::Block> ir_block) {
+    auto ir_block_iter =
+        std::find_if(RANGE(ir_block->values), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
+            if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
+                if (ir_grid->shape.size() == 3) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+    if (ir_block_iter != ir_block->values.end()) {
+        return GetInnerGrid3(Cast<ir::Block>(*ir_block_iter));
+    } else {
+        return Cast<ir::Grid>(ir_block);
+    }
+}
+
+inline std::vector<Eigen::VectorXi64> GenerateIndexGrid(Eigen::VectorXi64 shape) {
+    std::vector<Eigen::VectorXi64> index_grid;
+    Eigen::VectorXi64 root;
+    index_grid.push_back(root);
+    for (int64_t i = 0; i < shape.size(); ++i) {
+        auto index_grid_copy = index_grid;
+        index_grid.clear();
+        for (auto index : index_grid_copy) {
+            for (int64_t j = 0; j < shape[i]; ++j) {
+                auto index_local = index;
+                index_local.conservativeResize(index.size() + 1, Eigen ::NoChange);
+                index_local.bottomRows(1)[0] = j;
+                index_grid.push_back(index_local);
+            }
+        }
+    }
+    return index_grid;
+}
+
+inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
+    auto index_grid = GenerateIndexGrid(ir_grid->shape);
+    GALOIS_ASSERT(ir_grid->parent_block);
+    auto ir_grid_iter = std::find(RANGE(ir_grid->parent_block->values), ir_grid);
+
+    auto cloner = ir::Cloner::Create();
+    auto ir_external_tensor_set = transform::CaptureExternalTensors(ir_grid);
+    for (auto ir_tensor : ir_external_tensor_set) {
+        cloner->tensor_dict[ir_tensor] = ir_tensor;
+    }
+
+    for (auto index : index_grid) {
+        for (auto ir_value : Clone(ir_grid->values)) {
+            auto ir_value_clone = ir_value->Clone(cloner);
+            if (auto ir_accessor = Cast<ir::Accessor>(ir_value_clone)) {
+                if (ir_accessor->transform_matrix.size()) {
+                    ir_accessor->shift_vector += ir_accessor->transform_matrix * index;
+                    ir_accessor->transform_matrix.resize(0, 0);
+                }
+            }
+
+            ir_grid->parent_block->values.insert(ir_grid_iter, ir_value_clone);
+        }
+    }
+
+    ir_grid->parent_block->values.remove(ir_grid);
+    ir_grid->Finalize();
+}
+
 class SimdLanesTilePolicy {
    public:
     static std::shared_ptr<SimdLanesTilePolicy> Create() {
@@ -76,7 +143,7 @@ class SimdLanesTilePolicy {
         z3_optimize.add(z3_simd_lanes_a > 0 && z3_simd_lanes_a <= int32_t(simd_lanes));
         // 需要是2的倍数， 为了方便后续的计算。 若去除此限制， 需要考虑内存对齐等更多问题
         // 约束：2 的幂，且范围在 1 到 32
-        z3_optimize.add((z3_simd_lanes_a & (z3_simd_lanes_a - 1)) == 0 );
+        z3_optimize.add((z3_simd_lanes_a & (z3_simd_lanes_a - 1)) == 0);
         // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化
         z3_optimize.add(z3_simd_lanes_a + 2 < simd_register_count);
         z3::optimize::handle z3_handle_x = z3_optimize.maximize(z3_simd_lanes_a);
@@ -189,6 +256,11 @@ class GemmOptimizer {
         // 将分块矩阵转为常规矩阵
         auto ir_packed_mat_c =
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
+        // TODO: 需要更通用的方式来定位grid
+        auto ir_register_tile_grid =
+            GetInnerGrid3(Cast<ir::Call>(ir_packed_mat_c)->OperatorFunction());
+        ExpandGrid(ir_register_tile_grid);
+
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸
         auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->output_type;
