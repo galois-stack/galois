@@ -68,6 +68,7 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
         auto ir_mat_bit_cast_c = ir_builder->Create<ir::BitCast>(
             ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
 
+        // auto cloner = ir::Cloner::Create();
         for (int64_t i = 0; i < lanes_a[0]; ++i) {
             auto ir_vector_broadcast_a =
                 ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, ir_simd_type_b, i);
@@ -76,8 +77,7 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
             ir_accessor_c->transform_matrix.resize(0, 0);
             ir_accessor_c->shift_vector[0] = i;
             auto ir_sum = ir_builder->Create<ir::Add>(ir_mul, ir_accessor_c);
-            auto ir_write =
-                ir_builder->Create<ir::Write>(ir_sum, Cast<ir::Accessor>(ir_accessor_c->Clone()));
+            auto ir_write = ir_builder->Create<ir::Write>(ir_sum, ir_accessor_c);
         }
     }
 

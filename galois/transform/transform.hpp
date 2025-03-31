@@ -7,7 +7,6 @@
 #include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
 #include "galois/transform/common.hpp"
-#include "galois/transform/matrix_multiply_optimization.hpp"
 
 namespace galois::transform {
 
@@ -96,6 +95,17 @@ inline void TileWithLayout(std::shared_ptr<ir::Grid> ir_grid, Eigen::VectorXi64 
     });
 }
 
+inline std::shared_ptr<ir::Block> GetInnerMostBlock(std::shared_ptr<ir::Block> ir_block) {
+    auto ir_block_iter = std::find_if(
+        RANGE(ir_block->values),
+        [&](std::shared_ptr<ir::Tensor> ir_tensor) { return Is<ir::Block>(ir_tensor); });
+    if (ir_block_iter != ir_block->values.end()) {
+        return GetInnerMostBlock(Cast<ir::Block>(*ir_block_iter));
+    } else {
+        return ir_block;
+    }
+}
+
 inline std::shared_ptr<ir::Grid> ExtractInnerGrid(std::shared_ptr<ir::Grid> ir_grid,
                                                   std::int64_t inner_dim_size) {
     auto ir_inner_grid = ir::Grid::Create(ir_grid->shape.bottomRows(inner_dim_size));
@@ -132,33 +142,33 @@ inline void Vectorize(std::shared_ptr<ir::Grid> ir_grid, std::int64_t simd_size)
     });
 }
 
-inline void ExpandInstruction(std::shared_ptr<ir::Grid> ir_grid, int64_t copy_size) {
-    for (auto ir_value : Clone(ir_grid->values)) {
-        if (!Is<ir::Write>(ir_value)) continue;
+// inline void ExpandInstruction(std::shared_ptr<ir::Grid> ir_grid, int64_t copy_size) {
+//     for (auto ir_value : Clone(ir_grid->values)) {
+//         if (!Is<ir::Write>(ir_value)) continue;
 
-        auto ir_value_iter = std::find(RANGE(ir_grid->values), ir_value);
+//         auto ir_value_iter = std::find(RANGE(ir_grid->values), ir_value);
 
-        for (int64_t i = 1; i < copy_size; ++i) {
-            auto ir_value_copy = ir_value->Clone();
-            EachTensor(ir_value_copy, [=](std::shared_ptr<ir::Tensor> ir_x) {
-                if (auto ir_accessor = Cast<ir::Accessor>(ir_x)) {
-                    ir_accessor->shift_vector += (ir_accessor->transform_matrix.rightCols(1) * i);
-                    ir_accessor->transform_matrix.rightCols(1) *= copy_size;
-                }
-            });
+//         for (int64_t i = 1; i < copy_size; ++i) {
+//             auto ir_value_copy = ir_value->Clone();
+//             EachTensor(ir_value_copy, [=](std::shared_ptr<ir::Tensor> ir_x) {
+//                 if (auto ir_accessor = Cast<ir::Accessor>(ir_x)) {
+//                     ir_accessor->shift_vector += (ir_accessor->transform_matrix.rightCols(1) *
+//                     i); ir_accessor->transform_matrix.rightCols(1) *= copy_size;
+//                 }
+//             });
 
-            ir_grid->values.insert(ir_value_iter, ir_value_copy);
-        }
+//             ir_grid->values.insert(ir_value_iter, ir_value_copy);
+//         }
 
-        EachTensor(ir_value, [=](std::shared_ptr<ir::Tensor> ir_x) {
-            if (auto ir_accessor = Cast<ir::Accessor>(ir_x)) {
-                ir_accessor->transform_matrix.rightCols(1) *= copy_size;
-            }
-        });
-    }
+//         EachTensor(ir_value, [=](std::shared_ptr<ir::Tensor> ir_x) {
+//             if (auto ir_accessor = Cast<ir::Accessor>(ir_x)) {
+//                 ir_accessor->transform_matrix.rightCols(1) *= copy_size;
+//             }
+//         });
+//     }
 
-    ir_grid->shape.bottomRows(1)[0] /= copy_size;
-}
+//     ir_grid->shape.bottomRows(1)[0] /= copy_size;
+// }
 
 inline void LayerMemory(std::shared_ptr<ir::OperatorFunction> ir_operator) {
     auto ir_grid = Cast<ir::Grid>(ir_operator->values.front());
