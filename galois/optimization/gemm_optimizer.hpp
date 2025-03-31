@@ -72,11 +72,11 @@ class SimdLanesTilePolicy {
         z3::optimize z3_optimize(z3_context);
         z3_optimize.set(z3_params);
         // a的simd lanes, 通过求解得来， 因为存在寄存器不够用的情况， 所以需要裁剪
-        z3::expr z3_simd_lanes_a = z3_context.int_const("z3_simd_lanes_a");
+        z3::expr z3_simd_lanes_a = z3_context.bv_const("z3_simd_lanes_a", 32);
         z3_optimize.add(z3_simd_lanes_a > 0 && z3_simd_lanes_a <= int32_t(simd_lanes));
         // 需要是2的倍数， 为了方便后续的计算。 若去除此限制， 需要考虑内存对齐等更多问题
-        z3_optimize.add(z3_simd_lanes_a == 2 || z3_simd_lanes_a == 4 || z3_simd_lanes_a == 8 ||
-                        z3_simd_lanes_a == 16 || z3_simd_lanes_a == 32);
+        // 约束：2 的幂，且范围在 1 到 32
+        z3_optimize.add((z3_simd_lanes_a & (z3_simd_lanes_a - 1)) == 0 );
         // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化
         z3_optimize.add(z3_simd_lanes_a + 2 < simd_register_count);
         z3::optimize::handle z3_handle_x = z3_optimize.maximize(z3_simd_lanes_a);
