@@ -1,36 +1,32 @@
-#include <Eigen/Dense>
-#include <chrono>
-#include <cstdlib>
+
 #include <functional>
 
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
-#include "tests/test_utils.h"
 
-class MatrixMultiplyGemmTest
+class TileMatrixMultiplyPerformanceTest
     : public testing::TestWithParam<
           std::tuple<std::shared_ptr<ir::TensorType>, int64_t, int64_t, int64_t>> {
    public:
     void SetUp() override {
         auto [ir_data_type, m, k, n] = GetParam();
+        auto native_cpu_info = optimization::NativeCpuInfo::Create();
+        auto mat_mul_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
 
-        auto ir_mat_type_a = ir_data_type->Tile(m, k);
-        auto ir_mat_type_b = ir_data_type->Tile(k, n);
+        auto [ir_mat_type_a, ir_mat_type_b, mat_mul_kernel] =
+            mat_mul_tile_policy->Tile(ir_data_type, native_cpu_info);
+        ir_mat_type_a = ir_mat_type_a->Tile(m, k);
+        ir_mat_type_b = ir_mat_type_b->Tile(k, n);
 
         auto ir_builder = ir::Builder::Create();
+        ir_builder->matrix_multiply_kernel_queue.push_back(mat_mul_kernel);
         auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-        auto ir_mat_type_c =
-            ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
-
         auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                                {ir_mat_type_a, ir_mat_type_b});
 
-        auto gemm_optimizer = optimization::GemmOptimizer::Create();
-        auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
-
         this->jit_engine = jit::Engine::Create();
-        mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_gemm_operator);
+        mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);
 
         auto normalize_m = ir_mat_type_a->NormalizeShape()[0];
         auto normalize_k = ir_mat_type_a->NormalizeShape()[1];
@@ -46,36 +42,32 @@ class MatrixMultiplyGemmTest
     }
 
     void TearDown() override {
-        fmt::print("Galois cost time: {}ns, galois flops: {:.04f}gops\n", galois_cost_time,
-                   items * 2 / galois_cost_time);
+        fmt::print("cost time: {}ns, galois glops: {:.04f}gops\n", this->cost_time,
+                   this->items * 2 / this->cost_time);
     }
 
     std::function<void *(void *, void *)> mat_mul_fun;
-    std::shared_ptr<galois::jit::Engine> jit_engine;
-
     std::shared_ptr<void> sp_aligned256_mem_a;
     std::shared_ptr<void> sp_aligned256_mem_b;
+    std::shared_ptr<jit::Engine> jit_engine;
 
     double items;
-    double galois_cost_time;
+    double cost_time;
 };
 
-TEST_P(MatrixMultiplyGemmTest, TestMatrixMultiplyGemm) {
-    // 执行 Galois 矩阵乘法
+TEST_P(TileMatrixMultiplyPerformanceTest, TestTilePolicy) {
     auto t0 = std::chrono::high_resolution_clock::now();
     auto mat_ptr_c = mat_mul_fun(this->sp_aligned256_mem_a.get(), this->sp_aligned256_mem_b.get());
     auto t1 = std::chrono::high_resolution_clock::now();
-    this->galois_cost_time = static_cast<double>((t1 - t0).count());
-    // 释放内存
+    this->cost_time = static_cast<double>((t1 - t0).count());
     free(mat_ptr_c);
 }
 
 // ir::i16不支持需要修复,
-INSTANTIATE_TEST_SUITE_P(MatrixMultiplyGemmTest, MatrixMultiplyGemmTest,
-                         testing::Combine(testing::Values(ir::f64, ir::f32, ir::i32,
-                                                          ir::i8),       //  f32
-                                          testing::Values(512, 1024),    // m
-                                          testing::Values(512, 1024),    // n
-                                          testing::Values(512, 2014)),   // k
-                                          galois::test::PrintTestName    // 自定义测试名称
-                                          ); 
+INSTANTIATE_TEST_SUITE_P(
+    General, TileMatrixMultiplyPerformanceTest,
+    testing::Combine(testing::Values(ir::f64, ir::f32, ir::i64, ir::i32, ir::i8),
+                     testing::Values(16, 64, 128), testing::Values(16, 64, 128),
+                     testing::Values(16, 64, 128)),
+    galois::test::PrintTestName  // 自定义测试名称
+);
