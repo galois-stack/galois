@@ -100,6 +100,9 @@ class GemmPerformanceTest
         this->sp_aligned256_mem_b = std::shared_ptr<void>(
             std::aligned_alloc(32, normalize_k * normalize_n * ir_data_type->bytes),
             [](void *p) { free(p); });
+
+        ASSERT_TRUE(this->sp_aligned256_mem_a);
+        ASSERT_TRUE(this->sp_aligned256_mem_b);
     }
 
     void TearDown() override {
@@ -127,15 +130,14 @@ TEST_P(GemmPerformanceTest, TestMatrixMultiplyGemm) {
     free(mat_ptr_c);
 }
 
-// TODO: has bug when i8
-// INSTANTIATE_TEST_SUITE_P(Large, GemmPerformanceTest,
-//                          testing::Combine(testing::Values(ir::f64, ir::f32, ir::i32,
-//                                                           ir::i8),      //  f32
-//                                           testing::Values(500, 1000),   // m
-//                                           testing::Values(500, 1000),   // n
-//                                           testing::Values(500, 1000)),  // k
-//                          galois::test::PrintTestName                    // 自定义测试名称
-// );
+INSTANTIATE_TEST_SUITE_P(Large, GemmPerformanceTest,
+                         testing::Combine(testing::Values(ir::f64, ir::f32, ir::i32,
+                                                          ir::i8),  //  f32
+                                          testing::Values(1),       // m
+                                          testing::Values(1),       // n
+                                          testing::Values(1)),      // k
+                         galois::test::PrintTestName                // 自定义测试名称
+);
 
 // ir::i16不支持需要修复,
 INSTANTIATE_TEST_SUITE_P(Large2, GemmPerformanceTest,
