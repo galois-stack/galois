@@ -21,13 +21,16 @@ inline std::string ToString(const std::shared_ptr<ir::TensorType>& type) {
     auto dtype = type->DataType();
 
     if (auto float_type = std::dynamic_pointer_cast<ir::FloatType>(dtype)) {
+        if (float_type->bits == 16) return "f16";
         if (float_type->bits == 32) return "f32";
         if (float_type->bits == 64) return "f64";
     }
 
     if (auto int_type = std::dynamic_pointer_cast<ir::IntType>(dtype)) {
-        if (int_type->bits == 32 && int_type->is_signed) return "i32";
         if (int_type->bits == 8 && int_type->is_signed) return "i8";
+        if (int_type->bits == 16 && int_type->is_signed) return "i16";
+        if (int_type->bits == 32 && int_type->is_signed) return "i32";
+       
     }
 
     return "unknown";
