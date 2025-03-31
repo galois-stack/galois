@@ -38,10 +38,14 @@ class Engine {
 
     template <typename Func>
     Func EmitOperatorSymbol(std::shared_ptr<ir::OperatorFunction> ir_operator) {
-        auto prajna_codegen =
-            std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
-        prajna_codegen->EmitOperatorFunction(ir_operator);
-        prajna_compiler->GenLlvm(prajna_codegen->pir_builder->module);
+        if (!ir_operator->pir_value) {
+            auto prajna_codegen =
+                std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
+            prajna_codegen->EmitOperatorFunction(ir_operator);
+            prajna_compiler->GenLlvm(prajna_codegen->pir_builder->module);
+        }
+
+        GALOIS_ASSERT(ir_operator->pir_value->llvm_value);
         return reinterpret_cast<Func>(
             prajna_compiler->GetSymbolValue("::" + ir_operator->fullname));
     }

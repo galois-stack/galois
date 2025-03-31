@@ -602,23 +602,23 @@ class PrajnaCodegen {
     }
 
     void EmitSliceView(std::shared_ptr<ir::SliceView> ir_slice) {
-        this->EmitAccessor(ir_slice->origin);
+        this->EmitAccessor(ir_slice->Origin());
 
         Eigen::RowVectorXi64 stride(ir_slice->type->shape.size());
         // stride使用被slice的tensor
         ir_slice->type->stride.resize(ir_slice->type->shape.size());
         int64_t i = stride.size() - 1;
-        int64_t j = ir_slice->origin->Tensor()->type->stride.size() - 1;
+        int64_t j = ir_slice->Origin()->Tensor()->type->stride.size() - 1;
         GALOIS_ASSERT(i <= j);  // 如果slice的同时降维, 需要将stride也处理下
         for (; i >= 0; --j, --i) {
-            stride[i] = ir_slice->origin->Tensor()->type->stride[j];
+            stride[i] = ir_slice->Origin()->Tensor()->type->stride[j];
         }
         //
         auto ir_slice_type =
             ir::TensorType::Create(ir_slice->type->value_type, ir_slice->shape, stride);
         ir_slice->type = ir_slice_type;
         // 偏移地址
-        ir_slice->pir_value = prajna::Cast<pir::VariableLiked>(ir_slice->origin->pir_value);
+        ir_slice->pir_value = prajna::Cast<pir::VariableLiked>(ir_slice->Origin()->pir_value);
     }
 
     void EmitCall(std::shared_ptr<ir::Call> ir_call) {

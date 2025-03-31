@@ -43,6 +43,21 @@ namespace pir = prajna::ir;
 class OperatorFunction;
 class Instruction;
 
+class Tensor;
+
+class Cloner {
+   private:
+    Cloner() = default;
+
+   public:
+    static std::shared_ptr<ir::Cloner> Create() {
+        std::shared_ptr<ir::Cloner> self(new Cloner);
+        return self;
+    }
+
+    std::unordered_map<std::shared_ptr<Tensor>, std::shared_ptr<Tensor>> tensor_dict;
+};
+
 enum struct MemoryType { Host, Stack };
 
 class TensorType : public Named, public std::enable_shared_from_this<TensorType> {
@@ -267,15 +282,15 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     Tensor() {}
 
    public:
-    static std::shared_ptr<ir::Tensor> Create(std::shared_ptr<TensorType> ir_type) {
-        std::shared_ptr<ir::Tensor> self(new Tensor);
+    static std::shared_ptr<Tensor> Create(std::shared_ptr<TensorType> ir_type) {
+        std::shared_ptr<Tensor> self(new Tensor);
         self->type = ir_type;
-        self->tag = "Value";
+        self->tag = "Tensor";
         return self;
     }
 
-    virtual std::shared_ptr<Tensor> Clone() {
-        GALOIS_UNREACHABLE;
+    virtual std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) {
+        GALOIS_UNIMPLEMENT;
         return nullptr;
     }
 
@@ -361,6 +376,12 @@ class ConstantInt : public ConstantRealNumber {
         return self;
     }
 
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<ConstantInt> ir_new(new ConstantInt(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        return ir_new;
+    }
+
    public:
     uint64_t value;
 };
@@ -381,12 +402,11 @@ class ConstantFloat : public Constant {
         return self;
     }
 
-    // std::shared_ptr<ir::Value> Clone(std::shared_ptr<FunctionCloner> function_cloner)
-    // override {
-    //     std::shared_ptr<ConstantFloat> ir_new(new ConstantFloat(*this));
-    //     function_cloner->value_dict[shared_from_this()] = ir_new;
-    //     return ir_new;
-    // }
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<ConstantFloat> ir_new(new ConstantFloat(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        return ir_new;
+    }
 
    public:
     double value;
@@ -408,13 +428,13 @@ class Instruction : virtual public Tensor {
 
     virtual int64_t OperandSize() const { return this->operands.size(); }
 
-    std::shared_ptr<ir::Tensor> GetOperand(int64_t i) const {
+    std::shared_ptr<Tensor> GetOperand(int64_t i) const {
         GALOIS_ASSERT(this->OperandSize() > i);
         return this->operands[i];
     };
 
     void SetOperand(int64_t i, std::shared_ptr<Tensor> ir_value) {
-        GALOIS_ASSERT(ir_value);
+        // GALOIS_ASSERT(ir_value);
         GALOIS_ASSERT(this->OperandSize() > i);
 
         auto ir_old_value = this->operands[i];
@@ -429,15 +449,17 @@ class Instruction : virtual public Tensor {
                 {Cast<Instruction>(this->shared_from_this()), i});
     }
 
-    std::shared_ptr<Tensor> Clone() override {
-        std::shared_ptr<Instruction> ir_new(new Instruction(this->OperandSize()));
-        ir_new->CloneOperands(Cast<ir::Instruction>(this->shared_from_this()));
-        return ir_new;
-    }
+    void CloneOperands(std::shared_ptr<Cloner> cloner) {
+        for (int64_t i = 0; i < this->operands.size(); ++i) {
+            auto ir_old = this->operands[i];
 
-    void CloneOperands(std::shared_ptr<ir::Instruction> ir_instrution) {
-        for (int64_t i = 0; i < this->OperandSize(); ++i) {
-            this->SetOperand(i, ir_instrution->GetOperand(i)->Clone());
+            if (!cloner->tensor_dict.count(ir_old)) {
+                ir_old->Clone(cloner);
+            }
+
+            operands[i] = nullptr;  // 置零以避免干扰原来的操作数
+            auto ir_new = cloner->tensor_dict[ir_old];
+            this->SetOperand(i, ir_new);
         }
     }
 
@@ -461,21 +483,6 @@ class Instruction : virtual public Tensor {
 
 class Write;
 
-class AffineIndex : public Tensor {
-   public:
-    static std::shared_ptr<AffineIndex> Create(Eigen::MatrixXi64 transform_matrix,
-                                               Eigen::VectorXi64 shift_vector) {
-        std::shared_ptr<AffineIndex> self(new AffineIndex);
-        self->tranform_matrix = transform_matrix;
-        self->shift_vector = shift_vector;
-        self->tag = "AffineIndex";
-        return self;
-    }
-
-    Eigen::MatrixXi64 tranform_matrix;
-    Eigen::VectorXi64 shift_vector;
-};
-
 class GridIndexVector : public Tensor {
    public:
     static std::shared_ptr<GridIndexVector> Create(int64_t rank) {
@@ -492,7 +499,7 @@ class Accessor : public Instruction {
                                             Eigen::MatrixXi64 transform_matrix,
                                             Eigen::VectorXi64 shift_vector) {
         std::shared_ptr<Accessor> self(new Accessor);
-        self->OperandResize(2);
+        self->OperandResize(1);
         self->Tensor(ir_tensor);
         self->transform_matrix = transform_matrix;
         self->shift_vector = shift_vector;
@@ -524,8 +531,10 @@ class Accessor : public Instruction {
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
-    std::shared_ptr<ir::Tensor> Clone() override {
+    std::shared_ptr<ir::Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
         std::shared_ptr<Accessor> ir_new(new Accessor(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
         return ir_new;
     }
 
@@ -536,7 +545,7 @@ class Accessor : public Instruction {
     int64_t simd_shuffle = false;
 };
 
-class Viewer : public Tensor {
+class Viewer : public Instruction {
    public:
     static std::shared_ptr<Viewer> Create(std::shared_ptr<Tensor> ir_tensor,
                                           Eigen::MatrixXi64 transform_matrix,
@@ -570,25 +579,42 @@ class Viewer : public Tensor {
         return Create(ir_tensor, transform_matrix, Eigen::VectorXi64::Zero(tensor_rank));
     }
 
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Viewer> ir_new(new Viewer(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
+
     Eigen::MatrixXi64 transform_matrix;
     Eigen::VectorXi64 shift_vector;
     std::shared_ptr<Tensor> ir_tensor = nullptr;
 };
 
-class SliceView : public Tensor {
+class SliceView : public Instruction {
    public:
     static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_accessor_origin,
                                              Eigen::VectorXi64 shape) {
         std::shared_ptr<SliceView> self(new SliceView);
         GALOIS_ASSERT(ir_accessor_origin->Tensor()->IsContinous());
-        self->origin = ir_accessor_origin;
+        self->OperandResize(1);
+        self->Origin(ir_accessor_origin);
         self->shape = shape;
         self->type = TensorType::Create(ir_accessor_origin->type, shape);
         self->tag = "Slice";
         return self;
     }
 
-    std::shared_ptr<Accessor> origin;
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<SliceView> ir_new(new SliceView(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
+
+    std::shared_ptr<Accessor> Origin() { return Cast<Accessor>(this->GetOperand(0)); }
+    void Origin(std::shared_ptr<ir::Accessor> ir_accessor) { this->SetOperand(0, ir_accessor); }
+
     Eigen::VectorXi64 shape;
 };
 
@@ -599,8 +625,8 @@ class ArithmeticInstruction : public Instruction {
 
 class Add : public ArithmeticInstruction {
    public:
-    static std::shared_ptr<Add> Create(std::shared_ptr<ir::Tensor> ir_operand0,
-                                       std::shared_ptr<ir::Tensor> ir_operand1) {
+    static std::shared_ptr<Add> Create(std::shared_ptr<Tensor> ir_operand0,
+                                       std::shared_ptr<Tensor> ir_operand1) {
         GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
         std::shared_ptr<Add> self(new Add);
         self->OperandResize(2);
@@ -610,12 +636,19 @@ class Add : public ArithmeticInstruction {
         self->tag = "Add";
         return self;
     }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Add> ir_new(new Add(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 };
 
 class Sub : public ArithmeticInstruction {
    public:
-    static std::shared_ptr<Sub> Create(std::shared_ptr<ir::Tensor> ir_operand0,
-                                       std::shared_ptr<ir::Tensor> ir_operand1) {
+    static std::shared_ptr<Sub> Create(std::shared_ptr<Tensor> ir_operand0,
+                                       std::shared_ptr<Tensor> ir_operand1) {
         GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
         std::shared_ptr<Sub> self(new Sub);
         self->OperandResize(2);
@@ -625,12 +658,19 @@ class Sub : public ArithmeticInstruction {
         self->tag = "Sub";
         return self;
     }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Sub> ir_new(new Sub(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 };
 
 class Mul : public ArithmeticInstruction {
    public:
-    static std::shared_ptr<Mul> Create(std::shared_ptr<ir::Tensor> ir_operand0,
-                                       std::shared_ptr<ir::Tensor> ir_operand1) {
+    static std::shared_ptr<Mul> Create(std::shared_ptr<Tensor> ir_operand0,
+                                       std::shared_ptr<Tensor> ir_operand1) {
         GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
         std::shared_ptr<Mul> self(new Mul);
         self->OperandResize(2);
@@ -640,12 +680,19 @@ class Mul : public ArithmeticInstruction {
         self->tag = "Mul";
         return self;
     }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Mul> ir_new(new Mul(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 };
 
 class Div : public ArithmeticInstruction {
    public:
-    static std::shared_ptr<Div> Create(std::shared_ptr<ir::Tensor> ir_operand0,
-                                       std::shared_ptr<ir::Tensor> ir_operand1) {
+    static std::shared_ptr<Div> Create(std::shared_ptr<Tensor> ir_operand0,
+                                       std::shared_ptr<Tensor> ir_operand1) {
         GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
         std::shared_ptr<Div> self(new Div);
         self->OperandResize(2);
@@ -654,6 +701,13 @@ class Div : public ArithmeticInstruction {
         self->type = ir_operand0->type;
         self->tag = "Div";
         return self;
+    }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Div> ir_new(new Div(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
     }
 };
 
@@ -679,7 +733,7 @@ class Broadcast : public Instruction {
     Broadcast() = default;
 
    public:
-    static std::shared_ptr<Broadcast> Create(std::shared_ptr<ir::Tensor> ir_value,
+    static std::shared_ptr<Broadcast> Create(std::shared_ptr<Tensor> ir_value,
                                              Eigen::VectorXi64 shape) {
         std::shared_ptr<Broadcast> self(new Broadcast);
         self->shape = shape;
@@ -690,7 +744,7 @@ class Broadcast : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
+    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<ir::Tensor> ir_value) { this->SetOperand(0, ir_value); }
 
     Eigen::VectorXi64 shape;
@@ -703,7 +757,7 @@ class VectorBroadcast : public Instruction {
 
    public:
     /// TODO: 需要进一步处理
-    static std::shared_ptr<VectorBroadcast> Create(std::shared_ptr<ir::Tensor> ir_value,
+    static std::shared_ptr<VectorBroadcast> Create(std::shared_ptr<Tensor> ir_value,
                                                    std::shared_ptr<ir::TensorType> ir_type,
                                                    int64_t lane_id) {
         std::shared_ptr<VectorBroadcast> self(new VectorBroadcast);
@@ -715,9 +769,15 @@ class VectorBroadcast : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Vector() { return this->GetOperand(0); }
-    void Vector(std::shared_ptr<ir::Tensor> ir_value) { this->SetOperand(0, ir_value); }
-    // Eigen::VectorXi64 shape;
+    std::shared_ptr<Tensor> Vector() { return this->GetOperand(0); }
+    void Vector(std::shared_ptr<Tensor> ir_value) { this->SetOperand(0, ir_value); }
+
+    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<VectorBroadcast> ir_new(new VectorBroadcast(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 
     int64_t lane_id;
 };
@@ -735,15 +795,18 @@ class Write : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() const { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> value) { this->SetOperand(0, value); }
+    std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<class Tensor> value) { this->SetOperand(0, value); }
 
-    std::shared_ptr<ir::Tensor> Variable() const { return Cast<ir::Tensor>(this->GetOperand(1)); }
-    void Variable(std::shared_ptr<ir::Tensor> accessor) { this->SetOperand(1, accessor); }
+    std::shared_ptr<class Tensor> Variable() const {
+        return Cast<class Tensor>(this->GetOperand(1));
+    }
+    void Variable(std::shared_ptr<class Tensor> accessor) { this->SetOperand(1, accessor); }
 
-    std::shared_ptr<ir::Tensor> Clone() override {
+    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
         std::shared_ptr<Write> ir_new(new Write(*this));
-        ir_new->CloneOperands(Cast<Instruction>(this->shared_from_this()));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
         return ir_new;
     }
 };
@@ -880,12 +943,13 @@ class BitCast : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() const { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_value) { this->SetOperand(0, ir_value); }
+    std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
 
-    std::shared_ptr<ir::Tensor> Clone() override {
+    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
         std::shared_ptr<BitCast> ir_new(new BitCast(*this));
-        ir_new->CloneOperands(Cast<Instruction>(this->shared_from_this()));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
         return ir_new;
     }
 };
@@ -902,7 +966,7 @@ class Call : public Instruction {
 
    public:
     static std::shared_ptr<Call> Create(std::shared_ptr<OperatorFunction> ir_operator,
-                                        std::vector<std::shared_ptr<ir::Tensor>> ir_inputs) {
+                                        std::vector<std::shared_ptr<Tensor>> ir_inputs) {
         std::shared_ptr<Call> self(new Call);
         self->input_size = ir_inputs.size();
         self->OperandResize(1 + self->input_size);
@@ -924,11 +988,18 @@ class Call : public Instruction {
         this->SetOperand(0, ir_operator);
     }
 
-    std::shared_ptr<ir::Tensor> Input(int64_t i) { return this->GetOperand(1 + i); }
-    void Input(int64_t i, std::shared_ptr<ir::Tensor> ir_argument) {
+    std::shared_ptr<Tensor> Input(int64_t i) { return this->GetOperand(1 + i); }
+    void Input(int64_t i, std::shared_ptr<Tensor> ir_argument) {
         this->SetOperand(1 + i, ir_argument);
     }
     int64_t InputSize() { return this->input_size; }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Call> ir_new(new Call(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 
    private:
     int64_t input_size;
@@ -945,6 +1016,13 @@ class Alloca : public Instruction {
         self->type = ir_type;
         self->tag = "Alloca";
         return self;
+    }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Alloca> ir_new(new Alloca(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
     }
 };
 
@@ -963,6 +1041,13 @@ class Free : public Instruction {
 
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Free> ir_new(new Free(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 };
 
 class Return : public Instruction {
@@ -981,6 +1066,13 @@ class Return : public Instruction {
 
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<Return> ir_new(new Return(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
 };
 
 class UnaryIntrinsic : public Instruction {
@@ -998,6 +1090,13 @@ class UnaryIntrinsic : public Instruction {
         self->type = ir_oprand->type;
         self->tag = "UnaryIntrinsic";
         return self;
+    }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<UnaryIntrinsic> ir_new(new UnaryIntrinsic(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
     }
 
    public:

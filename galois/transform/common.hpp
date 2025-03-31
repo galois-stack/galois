@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <map>
@@ -13,20 +12,20 @@ namespace galois::transform {
 inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback);
 
-inline void EachTensor(std::shared_ptr<ir::Tensor> ir_value,
+inline void EachTensor(std::shared_ptr<ir::Tensor> ir_tensor,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    if (auto ir_block = Cast<ir::Block>(ir_value)) {
+    if (auto ir_block = Cast<ir::Block>(ir_tensor)) {
         EachTensor(ir_block, callback);
     } else {
-        callback(ir_value);
+        callback(ir_tensor);
     }
 }
 
 inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
     callback(ir_block);
-    for (auto ir_value : ir_block->values) {
-        EachTensor(ir_value, callback);
+    for (auto ir_tensor : ir_block->values) {
+        EachTensor(ir_tensor, callback);
     }
 }
 
@@ -54,6 +53,15 @@ inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
     });
 
     return ir_captured_tensor_set;
+}
+
+template <typename Tensor_>
+inline std::list<std::shared_ptr<Tensor_>> GetAll(std::shared_ptr<ir::Block> ir_block) {
+    std::list<std::shared_ptr<Tensor_>> ir_values;
+    Each<Tensor_>(ir_block, [&ir_values](std::shared_ptr<Tensor_> ir_tensor) {
+        ir_values.push_back(ir_tensor);
+    });
+    return ir_values;
 }
 
 template <typename Matrix_>

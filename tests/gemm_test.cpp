@@ -139,7 +139,8 @@ TEST_P(GemmPerformanceTest, TestMatrixMultiplyGemm) {
 
 // ir::i16不支持需要修复,
 INSTANTIATE_TEST_SUITE_P(Large2, GemmPerformanceTest,
-                         testing::Combine(testing::Values(ir::f64, ir::f32, ir::i32,
+                         testing::Combine(testing::Values(ir::f64, ir::f32, ir::f16, ir::i32,
+                                                          ir::i16,
                                                           ir::i8),      //  f32
                                           testing::Values(512, 1024),   // m
                                           testing::Values(512, 1024),   // n
