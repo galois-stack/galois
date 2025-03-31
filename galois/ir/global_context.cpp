@@ -9,6 +9,7 @@ GlobalContext::GlobalContext(int64_t target_bits) {
 }
 
 GlobalContext global_context = GlobalContext(64);
+std::shared_ptr<TensorType> f16(FloatType::Create(16));
 std::shared_ptr<TensorType> f32(FloatType::Create(32));
 std::shared_ptr<TensorType> f64(FloatType::Create(64));
 std::shared_ptr<TensorType> i8(IntType::Create(8, true));

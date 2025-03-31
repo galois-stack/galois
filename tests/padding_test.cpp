@@ -1,5 +1,6 @@
 #include "galois/op/padding.hpp"
 
+#include "gtest/gtest.h"
 #include "tests/galois_test.hpp"
 
 
@@ -19,12 +20,15 @@ TEST(GaloisTests, TestPadding) {
     std::vector<float> input(1 * 1);
     input[0] = 42.0f;
     auto padded_value = padding_fun(input.data());
-    std::cout << "打印填充后的矩阵(top-left 8x48):\n";
     for (int i = 0; i < 8; ++i) {
         for (int j = 0; j < 8; ++j) {
-            std::cout << std::setw(6) << padded_value[i * 32 + j] << " ";
+            if (i == 0 && j == 0) {
+                GALOIS_ASSERT(padded_value[0] == input[0]);
+            } else {
+                GALOIS_ASSERT(padded_value[i * 8 + j] == 0.0f);
+            }
+            
         }
-        std::cout << "\n";
     }
 
 }

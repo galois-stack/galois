@@ -64,10 +64,10 @@ TEST_P(TileMatrixMultiplyPerformanceTest, TestTilePolicy) {
 }
 
 // ir::i16不支持需要修复,
-INSTANTIATE_TEST_SUITE_P(
-    General, TileMatrixMultiplyPerformanceTest,
-    testing::Combine(testing::Values(ir::f64, ir::f32, ir::i64, ir::i32, ir::i8),
-                     testing::Values(16, 64, 128), testing::Values(16, 64, 128),
-                     testing::Values(16, 64, 128)),
-    galois::test::PrintTestName  // 自定义测试名称
-);
+INSTANTIATE_TEST_SUITE_P(General, TileMatrixMultiplyPerformanceTest,
+                         testing::Combine(testing::Values(ir::f64, ir::f32, ir::f16, ir::i32, ir::i8, ir::i16),
+                                          testing::Values(16, 32, 64, 128),
+                                          testing::Values(16, 32, 64, 128),
+                                          testing::Values(16, 32, 64, 128)),
+                                          galois::test::PrintTestName 
+                                        );

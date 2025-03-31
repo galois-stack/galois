@@ -23,6 +23,7 @@ class GlobalContext {
 };
 
 extern GlobalContext global_context;
+extern std::shared_ptr<TensorType> f16;
 extern std::shared_ptr<TensorType> f32;
 extern std::shared_ptr<TensorType> f64;
 extern std::shared_ptr<TensorType> i8;
