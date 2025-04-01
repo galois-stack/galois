@@ -2,55 +2,119 @@
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
 
-TEST(GaloisTests, TestGemmF32) {
-    using DataType = float;
-    auto ir_mat_type_a = ir::f32->Tile(1536, 1024);
-    auto ir_mat_type_b = ir::f32->Tile(1024, 1024);
+template <typename DataType>
+class GetGaloisIrType;
 
-    auto ir_builder = ir::Builder::Create();
-    auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-    auto ir_mat_type_c =
-        ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
+template <>
+class GetGaloisIrType<float> {
+   public:
+    static std::shared_ptr<ir::TensorType> GetType() { return ir::f32; }
+};
+template <>
+class GetGaloisIrType<double> {
+   public:
+    static std::shared_ptr<ir::TensorType> GetType() { return ir::f64; }
+};
 
-    auto ir_operator_type = ir::OperatorType::Create({ir_mat_type_a, ir_mat_type_b}, ir_mat_type_c);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
-                                                           {ir_mat_type_a, ir_mat_type_b});
-    auto gemm_optimizer = optimization::GemmOptimizer::Create();
-    auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
+template <>
+class GetGaloisIrType<int8_t> {
+   public:
+    static std::shared_ptr<ir::TensorType> GetType() { return ir::i8; }
+};
+template <>
+class GetGaloisIrType<int16_t> {
+   public:
+    static std::shared_ptr<ir::TensorType> GetType() { return ir::i16; }
+};
 
-    auto jit_engine = jit::Engine::Create();
-    auto mat_mul_fun =
-        jit_engine->EmitOperatorSymbol<DataType *(*)(DataType *, DataType *)>(ir_gemm_operator);
+template <>
+class GetGaloisIrType<int32_t> {
+   public:
+    static std::shared_ptr<ir::TensorType> GetType() { return ir::i32; }
+};
 
-    auto shape_a = ir_mat_type_a->NormalizeShape();
-    auto shape_b = ir_mat_type_b->NormalizeShape();
+template <typename T>
+class TestGemm : public testing::Test {
+   public:
+    using DataType = T;
+    static std::shared_ptr<ir::TensorType> GetIrType() {
+        return GetGaloisIrType<DataType>::GetType();
+    }
+
+    void SetUp() override {
+        auto ir_mat_type_a = GetIrType()->Tile(1536, 1024);
+        auto ir_mat_type_b = GetIrType()->Tile(1024, 1024);
+
+        auto ir_builder = ir::Builder::Create();
+        auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
+        auto ir_mat_type_c =
+            ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
+
+        auto ir_operator_type =
+            ir::OperatorType::Create({ir_mat_type_a, ir_mat_type_b}, ir_mat_type_c);
+        auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
+                                                               {ir_mat_type_a, ir_mat_type_b});
+        auto gemm_optimizer = optimization::GemmOptimizer::Create();
+        auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
+
+        this->jit_engine = jit::Engine::Create();
+        this->mat_mul_fun =
+            jit_engine->EmitOperatorSymbol<DataType *(*)(DataType *, DataType *)>(ir_gemm_operator);
+
+        this->normalize_m = ir_mat_type_a->NormalizeShape()[0];
+        this->normalize_k = ir_mat_type_a->NormalizeShape()[1];
+        this->normalize_n = ir_mat_type_b->NormalizeShape()[1];
+        this->items = normalize_m * normalize_k * normalize_n;
+
+        this->eigen_matrix_a = EigenMatrixType::Random(this->normalize_m, this->normalize_k);
+        this->eigen_matrix_b = EigenMatrixType::Random(this->normalize_k, this->normalize_n);
+        this->shape_c = ir_mat_type_c->shape;
+    }
+    void TearDown() override {
+        fmt::print("cost time: {}ns, eigen glops: {:.04f}gops\n", this->eigen_cost_time,
+                   this->items * 2 / static_cast<double>(this->eigen_cost_time));
+
+        fmt::print("cost time: {}ns, galois glops: {:.04f}gops\n", this->galois_cost_time,
+                   this->items * 2 / static_cast<double>(this->galois_cost_time));
+    }
+
+    std::shared_ptr<jit::Engine> jit_engine;
+    std::function<DataType *(DataType *, DataType *)> mat_mul_fun;
+    double galois_cost_time = 0;
+    double eigen_cost_time = 0;
 
     using EigenMatrixType = Eigen::Matrix<DataType, -1, -1, Eigen::RowMajor>;
-    EigenMatrixType eigen_matrix_a = EigenMatrixType::Random(shape_a[0], shape_a[1]);
-    EigenMatrixType eigen_matrix_b = EigenMatrixType::Random(shape_b[0], shape_b[1]);
-    auto shape_c = ir_mat_type_c->shape;
+    EigenMatrixType eigen_matrix_a;
+    EigenMatrixType eigen_matrix_b;
 
+    Eigen::VectorXi64 shape_c;
+
+    int64_t normalize_m;
+    int64_t normalize_k;
+    int64_t normalize_n;
+    double items;
+};
+
+TYPED_TEST_SUITE_P(TestGemm);
+
+TYPED_TEST_P(TestGemm, MatrixMultiplyCorrectness) {
     auto t0_eigen = std::chrono::high_resolution_clock::now();
-    auto eigen_matrix_f32_expect = (eigen_matrix_a * eigen_matrix_b).eval();
+    auto eigen_matrix_f32_expect = (this->eigen_matrix_a * this->eigen_matrix_b).eval();
     auto t1_eigen = std::chrono::high_resolution_clock::now();
-    fmt::print("cost time: {}ns, eigen flops: {:.04f}gops\n", (t1_eigen - t0_eigen).count(),
-               shape_a[0] * shape_a[1] * shape_b[1] * 2 /
-                   static_cast<double>((t1_eigen - t0_eigen).count()));
+    this->eigen_cost_time = static_cast<double>((t1_eigen - t0_eigen).count());
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    auto p_mat_c = mat_mul_fun(eigen_matrix_a.data(), eigen_matrix_b.data());
+    auto p_mat_c = this->mat_mul_fun(this->eigen_matrix_a.data(), this->eigen_matrix_b.data());
     auto t1 = std::chrono::high_resolution_clock::now();
+    this->galois_cost_time = static_cast<double>((t1 - t0).count());
 
-    fmt::print("cost time: {}ns, galois glops: {:.04f}gops\n", (t1 - t0).count(),
-               shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
-
-    auto get_galois_re = [=](int64_t i, int64_t j) -> DataType {
-        return p_mat_c[i * shape_c[1] + j];
+    auto get_galois_re = [=](int64_t i, int64_t j) -> TypeParam {
+        return p_mat_c[i * this->shape_c[1] + j];
     };
 
     int64_t error_count = 0;
-    for (int64_t i = 0; i < shape_c[0]; ++i) {
-        for (int64_t j = 0; j < shape_c[1]; ++j) {
+    for (int64_t i = 0; i < this->shape_c[0]; ++i) {
+        for (int64_t j = 0; j < this->shape_c[1]; ++j) {
             auto galois_re = get_galois_re(i, j);
             auto eigen_re = eigen_matrix_f32_expect(i, j);
             double epllise = std::max(std::abs(0.2 * eigen_re), 0.5);
@@ -68,137 +132,11 @@ TEST(GaloisTests, TestGemmF32) {
     free(static_cast<void *>(p_mat_c));
 }
 
-TEST(GaloisTests, TestGemmI8) {
-    using DataType = int8_t;
-    auto ir_mat_type_a = ir::i8->Tile(1536, 1024);
-    auto ir_mat_type_b = ir::i8->Tile(1024, 1024);
+using ScalarTypes = ::testing::Types<double, float, int8_t, int16_t, int32_t>;
 
-    auto ir_builder = ir::Builder::Create();
-    auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-    auto ir_mat_type_c =
-        ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
+REGISTER_TYPED_TEST_SUITE_P(TestGemm, MatrixMultiplyCorrectness);
 
-    auto ir_operator_type = ir::OperatorType::Create({ir_mat_type_a, ir_mat_type_b}, ir_mat_type_c);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
-                                                           {ir_mat_type_a, ir_mat_type_b});
-    auto gemm_optimizer = optimization::GemmOptimizer::Create();
-    auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
-
-    auto jit_engine = jit::Engine::Create();
-    auto mat_mul_fun =
-        jit_engine->EmitOperatorSymbol<DataType *(*)(DataType *, DataType *)>(ir_gemm_operator);
-
-    auto shape_a = ir_mat_type_a->NormalizeShape();
-    auto shape_b = ir_mat_type_b->NormalizeShape();
-
-    using EigenMatrixType = Eigen::Matrix<DataType, -1, -1, Eigen::RowMajor>;
-    EigenMatrixType eigen_matrix_a = EigenMatrixType::Random(shape_a[0], shape_a[1]);
-    EigenMatrixType eigen_matrix_b = EigenMatrixType::Random(shape_b[0], shape_b[1]);
-    auto shape_c = ir_mat_type_c->shape;
-
-    auto t0_eigen = std::chrono::high_resolution_clock::now();
-    auto eigen_matrix_f32_expect = (eigen_matrix_a * eigen_matrix_b).eval();
-    auto t1_eigen = std::chrono::high_resolution_clock::now();
-    fmt::print("cost time: {}ns, eigen flops: {:.04f}gops\n", (t1_eigen - t0_eigen).count(),
-               shape_a[0] * shape_a[1] * shape_b[1] * 2 /
-                   static_cast<double>((t1_eigen - t0_eigen).count()));
-
-    auto t0 = std::chrono::high_resolution_clock::now();
-    auto p_mat_c = mat_mul_fun(eigen_matrix_a.data(), eigen_matrix_b.data());
-    auto t1 = std::chrono::high_resolution_clock::now();
-
-    fmt::print("cost time: {}ns, galois glops: {:.04f}gops\n", (t1 - t0).count(),
-               shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
-
-    auto get_galois_re = [=](int64_t i, int64_t j) -> DataType {
-        return p_mat_c[i * shape_c[1] + j];
-    };
-
-    int64_t error_count = 0;
-    for (int64_t i = 0; i < shape_c[0]; ++i) {
-        for (int64_t j = 0; j < shape_c[1]; ++j) {
-            auto galois_re = get_galois_re(i, j);
-            auto eigen_re = eigen_matrix_f32_expect(i, j);
-            double epllise = std::max(std::abs(0.2 * eigen_re), 0.5);
-            if (std::abs(galois_re - eigen_re) > epllise) {
-                fmt::print("{}, {} | galois: {}, expect: {}\n", i, j, double(galois_re),
-                           double(eigen_re));
-                error_count++;
-                if (error_count > 20) {
-                    ASSERT_TRUE(false);
-                }
-            }
-        }
-    }
-
-    free(static_cast<void *>(p_mat_c));
-}
-
-TEST(GaloisTests, TestGemmF16) {
-    using DataType = Eigen::half;
-    auto ir_mat_type_a = ir::f16->Tile(1024, 1024);
-    auto ir_mat_type_b = ir::f16->Tile(1024, 1024);
-
-    auto ir_builder = ir::Builder::Create();
-    auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-    auto ir_mat_type_c =
-        ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
-
-    auto ir_operator_type = ir::OperatorType::Create({ir_mat_type_a, ir_mat_type_b}, ir_mat_type_c);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
-                                                           {ir_mat_type_a, ir_mat_type_b});
-    auto gemm_optimizer = optimization::GemmOptimizer::Create();
-    auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
-
-    auto jit_engine = jit::Engine::Create();
-    auto mat_mul_fun =
-        jit_engine->EmitOperatorSymbol<DataType *(*)(DataType *, DataType *)>(ir_gemm_operator);
-
-    auto shape_a = ir_mat_type_a->NormalizeShape();
-    auto shape_b = ir_mat_type_b->NormalizeShape();
-
-    using EigenMatrixType = Eigen::Matrix<DataType, -1, -1, Eigen::RowMajor>;
-    EigenMatrixType eigen_matrix_a = EigenMatrixType::Random(shape_a[0], shape_a[1]);
-    EigenMatrixType eigen_matrix_b = EigenMatrixType::Random(shape_b[0], shape_b[1]);
-    auto shape_c = ir_mat_type_c->shape;
-
-    auto t0_eigen = std::chrono::high_resolution_clock::now();
-    auto eigen_matrix_f32_expect = (eigen_matrix_a * eigen_matrix_b).eval();
-    auto t1_eigen = std::chrono::high_resolution_clock::now();
-    fmt::print("cost time: {}ns, eigen flops: {:.04f}gops\n", (t1_eigen - t0_eigen).count(),
-               shape_a[0] * shape_a[1] * shape_b[1] * 2 /
-                   static_cast<double>((t1_eigen - t0_eigen).count()));
-
-    auto t0 = std::chrono::high_resolution_clock::now();
-    auto p_mat_c = mat_mul_fun(eigen_matrix_a.data(), eigen_matrix_b.data());
-    auto t1 = std::chrono::high_resolution_clock::now();
-
-    fmt::print("cost time: {}ns, galois glops: {:.04f}gops\n", (t1 - t0).count(),
-               shape_a[0] * shape_a[1] * shape_b[1] * 2 / static_cast<double>((t1 - t0).count()));
-
-    auto get_galois_re = [=](int64_t i, int64_t j) -> DataType {
-        return p_mat_c[i * shape_c[1] + j];
-    };
-
-    int64_t error_count = 0;
-    for (int64_t i = 0; i < shape_c[0]; ++i) {
-        for (int64_t j = 0; j < shape_c[1]; ++j) {
-            auto galois_re = get_galois_re(i, j);
-            auto eigen_re = eigen_matrix_f32_expect(i, j);
-            double epllise = std::max(std::abs(0.2 * eigen_re), 0.5);
-            if (std::abs(galois_re - eigen_re) > epllise) {
-                fmt::print("{}, {} | galois: {}, expect: {}\n", i, j, double(galois_re),
-                           double(eigen_re));
-                error_count++;
-                if (error_count > 20) {
-                    ASSERT_TRUE(false);
-                }
-            }
-        }
-    }
-
-    free(static_cast<void *>(p_mat_c));
-}
+INSTANTIATE_TYPED_TEST_SUITE_P(GaloisGemmTests, TestGemm, ScalarTypes);
 
 class GemmPerformanceTest
     : public testing::TestWithParam<
