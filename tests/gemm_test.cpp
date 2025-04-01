@@ -93,12 +93,11 @@ class GemmPerformanceTest
         auto normalize_k = ir_mat_type_a->NormalizeShape()[1];
         auto normalize_n = ir_mat_type_b->NormalizeShape()[1];
         this->items = normalize_m * normalize_k * normalize_n;
-
         this->sp_aligned256_mem_a = std::shared_ptr<void>(
-            std::aligned_alloc(32, normalize_m * normalize_k * ir_data_type->bytes),
+            galois::auto_aligned_alloc(normalize_m * normalize_k * ir_data_type->bytes),
             [](void *p) { free(p); });
         this->sp_aligned256_mem_b = std::shared_ptr<void>(
-            std::aligned_alloc(32, normalize_k * normalize_n * ir_data_type->bytes),
+            galois::auto_aligned_alloc(normalize_k * normalize_n * ir_data_type->bytes),
             [](void *p) { free(p); });
     }
 
@@ -127,23 +126,25 @@ TEST_P(GemmPerformanceTest, TestMatrixMultiplyGemm) {
     free(mat_ptr_c);
 }
 
-// TODO: has bug when i8
-// INSTANTIATE_TEST_SUITE_P(Large, GemmPerformanceTest,
-//                          testing::Combine(testing::Values(ir::f64, ir::f32, ir::i32,
-//                                                           ir::i8),      //  f32
-//                                           testing::Values(500, 1000),   // m
-//                                           testing::Values(500, 1000),   // n
-//                                           testing::Values(500, 1000)),  // k
-//                          galois::test::PrintTestName                    // 自定义测试名称
-// );
+auto ir_types = testing::Values(ir::f64, ir::f32, ir::f16, ir::i32, ir::i16, ir::i8);
 
-// ir::i16不支持需要修复,
+INSTANTIATE_TEST_SUITE_P(Scalar, GemmPerformanceTest,
+                         testing::Combine(ir_types,
+                                          testing::Values(1),   // m
+                                          testing::Values(1),   // k
+                                          testing::Values(1)),  // n
+                         galois::test::PrintTestName);
+
+INSTANTIATE_TEST_SUITE_P(Large, GemmPerformanceTest,
+                         testing::Combine(ir_types,                     //
+                                          testing::Values(500, 1000),   // m
+                                          testing::Values(500, 1000),   // k
+                                          testing::Values(500, 1000)),  // n
+                         galois::test::PrintTestName);
+
 INSTANTIATE_TEST_SUITE_P(Large2, GemmPerformanceTest,
-                         testing::Combine(testing::Values(ir::f64, ir::f32, ir::f16, ir::i32,
-                                                          ir::i16,
-                                                          ir::i8),      //  f32
+                         testing::Combine(ir_types,                     //
                                           testing::Values(512, 1024),   // m
-                                          testing::Values(512, 1024),   // n
-                                          testing::Values(512, 1024)),  // k
-                         galois::test::PrintTestName                    // 自定义测试名称
-);
+                                          testing::Values(512, 1024),   // k
+                                          testing::Values(512, 1024)),  // n
+                         galois::test::PrintTestName);
