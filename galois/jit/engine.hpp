@@ -5,6 +5,7 @@
 #include "prajna/bindings/core.hpp"
 #include "prajna/jit/execution_engine.h"
 #include "thpool.h"
+#include "galois/helper.hpp"
 
 namespace galois::jit {
 
@@ -33,6 +34,8 @@ class Engine {
                                                    "aligned_alloc");
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(malloc), "malloc");
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(free), "free");
+        prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(auto_aligned_alloc),
+                                                  "auto_aligned_alloc");
         return prajna_compiler;
     }
 

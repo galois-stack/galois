@@ -46,7 +46,6 @@ class TileMatrixMultiplyPerformanceTest
         auto [ir_data_type, m, k, n] = GetParam();
         auto native_cpu_info = optimization::NativeCpuInfo::Create();
         auto mat_mul_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
-
         auto [ir_mat_type_a, ir_mat_type_b, mat_mul_kernel] =
             mat_mul_tile_policy->Tile(ir_data_type, native_cpu_info);
         ir_mat_type_a = ir_mat_type_a->Tile(m, k);
@@ -67,10 +66,10 @@ class TileMatrixMultiplyPerformanceTest
         this->items = normalize_m * normalize_k * normalize_n;
 
         this->sp_aligned256_mem_a = std::shared_ptr<void>(
-            std::aligned_alloc(32, normalize_m * normalize_k * ir_data_type->bytes),
+            galois::auto_aligned_alloc(normalize_m * normalize_k * ir_data_type->bytes),
             [](void *p) { free(p); });
         this->sp_aligned256_mem_b = std::shared_ptr<void>(
-            std::aligned_alloc(32, normalize_k * normalize_n * ir_data_type->bytes),
+            galois::auto_aligned_alloc(normalize_k * normalize_n * ir_data_type->bytes),
             [](void *p) { free(p); });
     }
 

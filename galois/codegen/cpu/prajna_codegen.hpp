@@ -558,7 +558,7 @@ class PrajnaCodegen {
             auto pir_function_type = pir::FunctionType::Create(
                 {pir::IntType::Create(64, true), pir::IntType::Create(64, true)},
                 pir::PointerType::Create(pir::IntType::Create(8, false)));
-            auto pir_aligned_alloc = pir_builder->GetIntrinsic("aligned_alloc", pir_function_type);
+            auto pir_aligned_alloc = pir_builder->GetIntrinsic("auto_aligned_alloc", pir_function_type);
             auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
                 pir_builder->Create<pir::Call>(pir_aligned_alloc, pir_arguments),
                 pir::PointerType::Create(this->EmitType(ir_tensor_type)));
