@@ -74,23 +74,18 @@ inline std::vector<std::string> split(const std::string& s, char delim) {
 inline bool IsPowerOfTwo(int64_t x) { return (x & (x - 1)) == 0; }
 
 inline void* auto_aligned_alloc(size_t len) {
-    // 可用的对齐值，从高到底
-    const size_t alignments[] = {32, 16, 8, 4, 2};
-    const size_t num_alignments = sizeof(alignments) / sizeof(alignments[0]);
-
-    for (size_t i = 0; i < num_alignments; ++i) {
-        size_t alignment = alignments[i];
-        // 检查长度是否是对齐值的倍数
-        if (len % alignment == 0) {
-            void* ptr = std::aligned_alloc(alignment, len);
+    // 可能需要进一步的调整
+    std::array<size_t, 7> alignments = {128, 64, 32, 16, 8, 4, 2};
+    for (size_t i = 0; i < alignments.size(); ++i) {
+        if (len % alignments[i] == 0) {
+            void* ptr = std::aligned_alloc(alignments[i], len);
             if (ptr) {
                 return ptr;
             }
         }
     }
-    void* ptr = std::malloc(len);
-    GALOIS_ASSERT(ptr != nullptr);
-    return ptr;
+
+    return std::malloc(len);
 }
 
 }  // namespace galois
