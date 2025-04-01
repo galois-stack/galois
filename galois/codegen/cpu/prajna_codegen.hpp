@@ -544,21 +544,13 @@ class PrajnaCodegen {
     void EmitAlloca(std::shared_ptr<ir::Alloca> ir_alloca) {
         auto ir_tensor_type = ir_alloca->type;
         if (ir_alloca->type->memory_type == ir::MemoryType::Host) {
-            auto tensor_bytes = ir_tensor_type->bytes;
-            int64_t alignment = 16;
-            if (tensor_bytes % 32 == 0) {
-                alignment = 32;
-            } else if (tensor_bytes % 16 == 0) {
-                alignment = 16;
-            }
-            tensor_bytes = (tensor_bytes + alignment - 1) / alignment * alignment;
             std::list<std::shared_ptr<pir::Value>> pir_arguments = {
-                pir_builder->GetInt64Constant(alignment),  // alignment
-                pir_builder->GetInt64Constant(tensor_bytes)};
-            auto pir_function_type = pir::FunctionType::Create(
-                {pir::IntType::Create(64, true), pir::IntType::Create(64, true)},
-                pir::PointerType::Create(pir::IntType::Create(8, false)));
-            auto pir_aligned_alloc = pir_builder->GetIntrinsic("aligned_alloc", pir_function_type);
+                pir_builder->GetInt64Constant(ir_tensor_type->bytes)};
+            auto pir_function_type =
+                pir::FunctionType::Create({pir::IntType::Create(64, true)},
+                                          pir::PointerType::Create(pir::IntType::Create(8, false)));
+            auto pir_aligned_alloc =
+                pir_builder->GetIntrinsic("auto_aligned_alloc", pir_function_type);
             auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
                 pir_builder->Create<pir::Call>(pir_aligned_alloc, pir_arguments),
                 pir::PointerType::Create(this->EmitType(ir_tensor_type)));
