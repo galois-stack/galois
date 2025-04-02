@@ -11,6 +11,13 @@ class GetGaloisIrType<float> {
    public:
     static std::shared_ptr<ir::TensorType> GetType() { return ir::f32; }
 };
+
+template <>
+class GetGaloisIrType<Eigen::half> {
+   public:
+    static std::shared_ptr<ir::TensorType> GetType() { return ir::f16; }
+};
+
 template <>
 class GetGaloisIrType<double> {
    public:
@@ -129,7 +136,7 @@ TYPED_TEST_P(TestGemm, MatrixMultiplyCorrectness) {
     }
 }
 
-using ScalarTypes = ::testing::Types<double, float, int8_t, int16_t, int32_t>;
+using ScalarTypes = ::testing::Types<double, float, Eigen::half, int32_t, int16_t, int8_t>;
 
 REGISTER_TYPED_TEST_SUITE_P(TestGemm, MatrixMultiplyCorrectness);
 
