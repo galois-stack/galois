@@ -61,13 +61,13 @@ class TestGemm : public testing::Test {
         this->mat_mul_fun =
             jit_engine->EmitOperatorSymbol<DataType *(*)(DataType *, DataType *)>(ir_gemm_operator);
 
-        this->normalize_m = ir_mat_type_a->NormalizeShape()[0];
-        this->normalize_k = ir_mat_type_a->NormalizeShape()[1];
-        this->normalize_n = ir_mat_type_b->NormalizeShape()[1];
+        auto normalize_m = ir_mat_type_a->NormalizeShape()[0];
+        auto normalize_k = ir_mat_type_a->NormalizeShape()[1];
+        auto normalize_n = ir_mat_type_b->NormalizeShape()[1];
         this->items = normalize_m * normalize_k * normalize_n;
 
-        this->eigen_matrix_a = EigenMatrixType::Random(this->normalize_m, this->normalize_k);
-        this->eigen_matrix_b = EigenMatrixType::Random(this->normalize_k, this->normalize_n);
+        this->eigen_matrix_a = EigenMatrixType::Random(normalize_m, normalize_k);
+        this->eigen_matrix_b = EigenMatrixType::Random(normalize_k, normalize_n);
         this->shape_c = ir_mat_type_c->shape;
     }
     void TearDown() override {
@@ -89,9 +89,6 @@ class TestGemm : public testing::Test {
 
     Eigen::VectorXi64 shape_c;
 
-    int64_t normalize_m;
-    int64_t normalize_k;
-    int64_t normalize_n;
     double items;
 };
 
