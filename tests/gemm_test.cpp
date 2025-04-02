@@ -1,3 +1,4 @@
+#include "boost/scope/scope_exit.hpp"
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
@@ -102,6 +103,7 @@ TYPED_TEST_P(TestGemm, MatrixMultiplyCorrectness) {
 
     auto t0 = std::chrono::high_resolution_clock::now();
     auto p_mat_c = this->mat_mul_fun(this->eigen_matrix_a.data(), this->eigen_matrix_b.data());
+    boost::scope::scope_exit free_mem([p_mat_c] { free(p_mat_c); });
     auto t1 = std::chrono::high_resolution_clock::now();
     this->galois_cost_time = static_cast<double>((t1 - t0).count());
 
@@ -125,8 +127,6 @@ TYPED_TEST_P(TestGemm, MatrixMultiplyCorrectness) {
             }
         }
     }
-
-    free(static_cast<void *>(p_mat_c));
 }
 
 using ScalarTypes = ::testing::Types<double, float, int8_t, int16_t, int32_t>;
@@ -189,11 +189,10 @@ class GemmPerformanceTest
 TEST_P(GemmPerformanceTest, TestMatrixMultiplyGemm) {
     // 执行 Galois 矩阵乘法
     auto t0 = std::chrono::high_resolution_clock::now();
-    auto mat_ptr_c = mat_mul_fun(this->sp_aligned256_mem_a.get(), this->sp_aligned256_mem_b.get());
+    auto p_mat_c = mat_mul_fun(this->sp_aligned256_mem_a.get(), this->sp_aligned256_mem_b.get());
+    boost::scope::scope_exit free_mem([p_mat_c] { free(p_mat_c); });
     auto t1 = std::chrono::high_resolution_clock::now();
     this->galois_cost_time = static_cast<double>((t1 - t0).count());
-    // 释放内存
-    free(mat_ptr_c);
 }
 
 auto ir_types = testing::Values(ir::f64, ir::f32, ir::f16, ir::i32, ir::i16, ir::i8);
