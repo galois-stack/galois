@@ -13,7 +13,7 @@ class TileMatrixMultiplyPerformanceTest
     void SetUp() override {
         auto [ir_data_type, m, k, n] = GetParam();
         auto native_cpu_info = optimization::NativeCpuInfo::Create();
-        auto mat_mul_tile_policy = optimization::MatrixMultiplyTilePolicy::Create();
+        auto mat_mul_tile_policy = optimization::GemmTilePolicy::Create();
         auto [ir_mat_type_a, ir_mat_type_b, mat_mul_kernel] =
             mat_mul_tile_policy->Tile(ir_data_type, native_cpu_info);
         ir_mat_type_a = ir_mat_type_a->Tile(m, k);
@@ -24,7 +24,8 @@ class TileMatrixMultiplyPerformanceTest
         auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
         auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                                {ir_mat_type_a, ir_mat_type_b});
-
+        auto ir_register_tile_grid = optimization::GetInnerGrid3(ir_operator);
+        optimization::ExpandGrid(ir_register_tile_grid);
         this->jit_engine = jit::Engine::Create();
         mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);
 
