@@ -120,10 +120,10 @@ inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
     ir_grid->Finalize();
 }
 
-class GemmTilePolicy {
+class NeonGemmTilePolicy {
    public:
-    static std::shared_ptr<GemmTilePolicy> Create() {
-        std::shared_ptr<GemmTilePolicy> self(new GemmTilePolicy);
+    static std::shared_ptr<NeonGemmTilePolicy> Create() {
+        std::shared_ptr<NeonGemmTilePolicy> self(new NeonGemmTilePolicy);
         return self;
     };
 
@@ -171,6 +171,8 @@ class GemmTilePolicy {
         z3_optimize.add(z3_register_cols > 0);
         z3_optimize.add(z3_register_rows >= z3_register_cols);
         // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化， 因为底层llvm怎么生成不好说
+        // z3_register_rows + z3_register_cols : 行和列的寄存器都需要保留， 这样才能复用数据
+        // z3_register_rows * z3_register_cols * int32_t(simd_lanes_a)： 用于存储外积的结果
         z3_optimize.add(z3_register_rows + z3_register_cols +
                             z3_register_rows * z3_register_cols * int32_t(simd_lanes_a) <
                         simd_register_count);
@@ -198,6 +200,90 @@ class GemmTilePolicy {
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
     }
+};
+
+class AvxGemmTilePolicy {
+   public:
+    static std::shared_ptr<AvxGemmTilePolicy> Create() {
+        std::shared_ptr<AvxGemmTilePolicy> self(new AvxGemmTilePolicy);
+        return self;
+    };
+
+    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
+               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+    Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
+        int32_t simd_register_count = cpu_info->SimdRegisterCount();
+
+        auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
+        int64_t simd_lanes_a = 1;  // 因为avx不支持vector * vector[lane]这种形式， 故赋值1
+        auto simd_lanes_b = simd_lanes;  // b的simd lanes是固定的
+
+        z3::context z3_context;
+        z3::params z3_params(z3_context);
+        z3_params.set("priority", z3_context.str_symbol("register tile"));
+        z3::optimize z3_optimize(z3_context);
+        z3_optimize.set(z3_params);
+        // a的simd lanes, 通过求解得来， 因为存在寄存器不够用的情况， 所以需要裁剪
+        z3::expr z3_register_rows = z3_context.bv_const("z3_register_rows", 32);
+        z3::expr z3_register_cols = z3_context.bv_const("z3_register_cols", 32);
+        z3_optimize.add((z3_register_rows & (z3_register_rows - 1)) ==
+                        0);  // 为2的power， 该条件可能过强
+        z3_optimize.add((z3_register_cols & (z3_register_cols - 1)) ==
+                        0);  // 为2的power， 该条件可能过强
+        z3_optimize.add(z3_register_rows > 0 && z3_register_rows < simd_register_count);
+        z3_optimize.add(z3_register_cols > 0 && z3_register_cols < simd_register_count);
+        z3_optimize.add(z3_register_rows >= z3_register_cols);
+        // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化， 因为底层llvm怎么生成不好说
+        // 1 用于将标量shufflevector到向量参与计算
+        // z3_register_cols 需要保留寄存器， 防止反复加载
+        // z3_register_rows * z3_register_cols 用于存放外积的结果
+        z3_optimize.add(1 + z3_register_cols + z3_register_rows * z3_register_cols <=
+                        simd_register_count);
+
+        // 最大化尺寸
+        // z3_register_rows * z3_register_cols: 为了尽可能多的计算数目
+        // z3_register_cols： 为了尽可能的复用“标量拓展向量后”的数据， 因为该步骤需要消耗一个指令
+        // 多目标优化，后期可能需要调整二者的权重
+        z3::optimize::handle z3_handle_x =
+            z3_optimize.maximize(z3_register_rows * z3_register_cols + z3_register_cols);
+        GALOIS_ASSERT(z3_optimize.check() == z3::sat);
+        z3::model z3_model = z3_optimize.get_model();
+        auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
+        auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
+
+        auto ir_tile_mat_type_a =
+            ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b =
+            ir_data_type->Tile(1, simd_lanes_b)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
+        return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
+                               op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
+    }
+};
+
+class GemmTilePolicy {
+   public:
+    static std::shared_ptr<GemmTilePolicy> Create() {
+        std::shared_ptr<GemmTilePolicy> self(new GemmTilePolicy);
+        self->ir_neon_gemm_tile_poly = NeonGemmTilePolicy::Create();
+        self->ir_avx_gemm_tile_poly = AvxGemmTilePolicy::Create();
+        return self;
+    };
+
+    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
+               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+    Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
+        // 当i8时， Neon不支持"mla.16b v1 v2 v3[0]"形式， 必须“mla.16b v1 v2
+        // v3”的形式，这应该和avx采用一样的策略
+        if (cpu_info->SimdBits() == 256 || ir_data_type == ir::i8) {
+            return this->ir_avx_gemm_tile_poly->Tile(ir_data_type, cpu_info);
+        } else {
+            return this->ir_neon_gemm_tile_poly->Tile(ir_data_type, cpu_info);
+        }
+    }
+
+   private:
+    std::shared_ptr<NeonGemmTilePolicy> ir_neon_gemm_tile_poly = nullptr;
+    std::shared_ptr<AvxGemmTilePolicy> ir_avx_gemm_tile_poly = nullptr;
 };
 
 class GemmOptimizer {
