@@ -120,15 +120,15 @@ inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
     ir_grid->Finalize();
 }
 
-class SimdLanesTilePolicy {
+class GemmTilePolicy {
    public:
-    static std::shared_ptr<SimdLanesTilePolicy> Create() {
-        std::shared_ptr<SimdLanesTilePolicy> self(new SimdLanesTilePolicy);
+    static std::shared_ptr<GemmTilePolicy> Create() {
+        std::shared_ptr<GemmTilePolicy> self(new GemmTilePolicy);
         return self;
-    }
+    };
 
-    std::tuple<int64_t, int64_t> Tile(std::shared_ptr<ir::TensorType> ir_data_type,
-                                      std::shared_ptr<NativeCpuInfo> cpu_info) {
+    std::tuple<int64_t, int64_t> GetSimdTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
+                                                  std::shared_ptr<NativeCpuInfo> cpu_info) {
         auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
         auto simd_lanes_b = simd_lanes;  // b的simd lanes是固定的
         int32_t simd_register_count = cpu_info->SimdRegisterCount();
@@ -153,21 +153,10 @@ class SimdLanesTilePolicy {
         auto simd_lanes_a = z3_model.eval(z3_simd_lanes_a).get_numeral_int64();
         return {simd_lanes_a, simd_lanes_b};
     }
-};
 
-class MatrixMultiplyTilePolicy {
-   public:
-    static std::shared_ptr<MatrixMultiplyTilePolicy> Create() {
-        std::shared_ptr<MatrixMultiplyTilePolicy> self(new MatrixMultiplyTilePolicy);
-        return self;
-    };
-
-    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
-               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
-    Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
-        auto simd_lanes_tile_policy = SimdLanesTilePolicy::Create();
-        auto [simd_lanes_a, simd_lanes_b] = simd_lanes_tile_policy->Tile(ir_data_type, cpu_info);
-
+    std::tuple<int64_t, int64_t> GetRegisterTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
+                                                      int64_t simd_lanes_a,
+                                                      std::shared_ptr<NativeCpuInfo> cpu_info) {
         int32_t simd_register_count = cpu_info->SimdRegisterCount();
         /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
         z3::context z3_context;
@@ -192,6 +181,15 @@ class MatrixMultiplyTilePolicy {
         z3::model z3_model = z3_optimize.get_model();
         auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
         auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
+        return {register_rows, register_cols};
+    }
+
+    std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
+               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+    Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
+        auto [simd_lanes_a, simd_lanes_b] = this->GetSimdTileShape(ir_data_type, cpu_info);
+        auto [register_rows, register_cols] =
+            this->GetRegisterTileShape(ir_data_type, simd_lanes_a, cpu_info);
 
         auto ir_tile_mat_type_a =
             ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
@@ -210,7 +208,7 @@ class GemmOptimizer {
     static std::shared_ptr<GemmOptimizer> Create() {
         std::shared_ptr<GemmOptimizer> self(new GemmOptimizer);
         self->cpu_info = NativeCpuInfo::Create();
-        self->tile_policy = MatrixMultiplyTilePolicy::Create();
+        self->tile_policy = GemmTilePolicy::Create();
         return self;
     }
 
@@ -285,7 +283,7 @@ class GemmOptimizer {
 
    private:
     std::shared_ptr<NativeCpuInfo> cpu_info = nullptr;
-    std::shared_ptr<MatrixMultiplyTilePolicy> tile_policy = nullptr;
+    std::shared_ptr<GemmTilePolicy> tile_policy = nullptr;
 };
 
 }  // namespace galois::optimization
