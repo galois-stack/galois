@@ -44,7 +44,7 @@ class Engine {
         if (!ir_operator->pir_value) {
             auto prajna_codegen =
                 codegen::cpu::PrajnaCodegen::Create(prajna_compiler->_symbol_table);
-            prajna_codegen->EmitOperatorFunction(ir_operator);
+            prajna_codegen->EmitOperator(ir_operator);
             prajna_compiler->GenLlvm(prajna_codegen->pir_builder->module);
         }
 
