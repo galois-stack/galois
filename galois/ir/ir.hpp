@@ -36,6 +36,28 @@ typedef Eigen::RowVector<std::shared_ptr<prajna::ir::Value>, -1> RowVectorXprajn
 
 namespace galois::ir {
 
+template <typename Matrix_>
+inline void RemoveRow(Matrix_& matrix, int64_t index) {
+    unsigned int numRows = matrix.rows() - 1;
+    unsigned int numCols = matrix.cols();
+
+    if (index < numRows)
+        matrix.block(index, 0, numRows - index, numCols) = matrix.bottomRows(numRows - index);
+
+    matrix.conservativeResize(numRows, numCols);
+}
+
+template <typename Matrix_>
+inline void RemoveColumn(Matrix_& matrix, int64_t index) {
+    unsigned int numRows = matrix.rows();
+    unsigned int numCols = matrix.cols() - 1;
+
+    if (index < numCols)
+        matrix.block(0, index, numRows, numCols - index) = matrix.rightCols(numCols - index);
+
+    matrix.conservativeResize(numRows, numCols);
+}
+
 namespace pir = prajna::ir;
 
 class Operator;
@@ -103,6 +125,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
                                               Eigen::VectorXi64 shape,
                                               Eigen::RowVectorXi64 stride) {
+        // 如果shape为0， 直接退化为value_type
+        if (!shape.size()) {
+            return value_type;
+        }
+
         for (auto ir_type : global_context.created_types) {
             if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
                 if (ir_tensor_type->value_type == value_type &&
@@ -607,6 +634,68 @@ class SliceView : public Instruction {
     void Origin(std::shared_ptr<ir::Accessor> ir_accessor) { this->SetOperand(0, ir_accessor); }
 
     Eigen::VectorXi64 shape;
+};
+
+class SqueezeDimView : public Instruction {
+   public:
+    static std::shared_ptr<SqueezeDimView> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
+        std::shared_ptr<SqueezeDimView> self(new SqueezeDimView);
+        self->OperandResize(1);
+        self->Tensor(ir_tensor);
+
+        auto shape = ir_tensor->type->shape;
+        auto stride = ir_tensor->type->stride;
+        RemoveRow(shape, dim);
+        RemoveColumn(stride, dim);
+        self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
+        self->tag = "Squeeze";
+        return self;
+    }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<SqueezeDimView> ir_new(new SqueezeDimView(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
+
+    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+};
+
+class SqueezeView : public Instruction {
+   public:
+    static std::shared_ptr<SqueezeView> Create(std::shared_ptr<Tensor> ir_tensor) {
+        std::shared_ptr<SqueezeView> self(new SqueezeView);
+        self->OperandResize(1);
+        self->Tensor(ir_tensor);
+
+        int64_t valid_shape_size = 0;
+        Eigen::VectorXi64 shape(ir_tensor->type->shape.size());
+        Eigen::VectorXi64 stride(ir_tensor->type->stride.size());
+        for (int64_t i = 0; i < ir_tensor->type->shape.size(); ++i) {
+            if (ir_tensor->type->shape[i] != 1) {
+                shape[valid_shape_size] = ir_tensor->type->shape[i];
+                stride[valid_shape_size] = ir_tensor->type->stride[i];
+                valid_shape_size++;
+            }
+        }
+        shape.conservativeResize(valid_shape_size);
+        stride.conservativeResize(valid_shape_size);
+        self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
+        self->tag = "Squeeze";
+        return self;
+    }
+
+    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
+        std::shared_ptr<SqueezeView> ir_new(new SqueezeView(*this));
+        cloner->tensor_dict[this->shared_from_this()] = ir_new;
+        ir_new->CloneOperands(cloner);
+        return ir_new;
+    }
+
+    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 };
 
 class ArithmeticInstruction : public Instruction {
