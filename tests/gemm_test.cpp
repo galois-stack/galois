@@ -4,54 +4,46 @@
 #include "tests/galois_test.hpp"
 
 template <typename DataType>
-class GetGaloisIrType;
+struct GetIrTypeTraits;
 
 template <>
-class GetGaloisIrType<float> {
-   public:
+struct GetIrTypeTraits<float> {
     static std::shared_ptr<ir::TensorType> GetType() { return ir::f32; }
 };
 
 template <>
-class GetGaloisIrType<Eigen::half> {
-   public:
+struct GetIrTypeTraits<Eigen::half> {
     static std::shared_ptr<ir::TensorType> GetType() { return ir::f16; }
 };
 
 template <>
-class GetGaloisIrType<double> {
-   public:
+struct GetIrTypeTraits<double> {
     static std::shared_ptr<ir::TensorType> GetType() { return ir::f64; }
 };
 
 template <>
-class GetGaloisIrType<int8_t> {
-   public:
+struct GetIrTypeTraits<int8_t> {
     static std::shared_ptr<ir::TensorType> GetType() { return ir::i8; }
 };
 template <>
-class GetGaloisIrType<int16_t> {
-   public:
+struct GetIrTypeTraits<int16_t> {
     static std::shared_ptr<ir::TensorType> GetType() { return ir::i16; }
 };
 
 template <>
-class GetGaloisIrType<int32_t> {
-   public:
+struct GetIrTypeTraits<int32_t> {
     static std::shared_ptr<ir::TensorType> GetType() { return ir::i32; }
 };
 
 template <typename T>
-class TestGemm : public testing::Test {
+class GemmVsEigenTest : public testing::Test {
    public:
     using DataType = T;
-    static std::shared_ptr<ir::TensorType> GetIrType() {
-        return GetGaloisIrType<DataType>::GetType();
-    }
 
     void SetUp() override {
-        auto ir_mat_type_a = GetIrType()->Tile(1536, 1024);
-        auto ir_mat_type_b = GetIrType()->Tile(1024, 1024);
+        auto ir_data_type = GetIrTypeTraits<T>::GetType();
+        auto ir_mat_type_a = ir_data_type->Tile(1536, 1024);
+        auto ir_mat_type_b = ir_data_type->Tile(1024, 1024);
 
         auto ir_builder = ir::Builder::Create();
         auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
@@ -100,9 +92,9 @@ class TestGemm : public testing::Test {
     double items;
 };
 
-TYPED_TEST_SUITE_P(TestGemm);
+TYPED_TEST_SUITE_P(GemmVsEigenTest);
 
-TYPED_TEST_P(TestGemm, MatrixMultiplyCorrectness) {
+TYPED_TEST_P(GemmVsEigenTest, TestGemm) {
     auto t0_eigen = std::chrono::high_resolution_clock::now();
     auto eigen_matrix_f32_expect = (this->eigen_matrix_a * this->eigen_matrix_b).eval();
     auto t1_eigen = std::chrono::high_resolution_clock::now();
@@ -138,9 +130,9 @@ TYPED_TEST_P(TestGemm, MatrixMultiplyCorrectness) {
 
 using ScalarTypes = ::testing::Types<double, float, Eigen::half, int32_t, int16_t, int8_t>;
 
-REGISTER_TYPED_TEST_SUITE_P(TestGemm, MatrixMultiplyCorrectness);
+REGISTER_TYPED_TEST_SUITE_P(GemmVsEigenTest, TestGemm);
 
-INSTANTIATE_TYPED_TEST_SUITE_P(GaloisGemmTests, TestGemm, ScalarTypes);
+INSTANTIATE_TYPED_TEST_SUITE_P(GaloisGemmTests, GemmVsEigenTest, ScalarTypes);
 
 class GemmPerformanceTest
     : public testing::TestWithParam<
