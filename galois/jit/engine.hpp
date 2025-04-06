@@ -43,7 +43,7 @@ class Engine {
     Func EmitOperatorSymbol(std::shared_ptr<ir::Operator> ir_operator) {
         if (!ir_operator->pir_value) {
             auto prajna_codegen =
-                std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);
+                codegen::cpu::PrajnaCodegen::Create(prajna_compiler->_symbol_table);
             prajna_codegen->EmitOperatorFunction(ir_operator);
             prajna_compiler->GenLlvm(prajna_codegen->pir_builder->module);
         }
