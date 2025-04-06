@@ -63,7 +63,8 @@ class PrajnaCodegen {
         }
 
         if (ir_type->shape.size() == 1 && ir_type->value_type->IsScalar() &&
-            IsPowerOfTwo(ir_type->shape[0])) {
+            IsPowerOfTwo(ir_type->shape[0]) &&
+            ir_type->shape[0] > 0) {  // llvm::VectorType不支持长度为0
             ir_type->pir_type =
                 pir::VectorType::Create(this->EmitType(ir_type->value_type), ir_type->Size());
             return ir_type->pir_type;
@@ -283,6 +284,16 @@ class PrajnaCodegen {
 
         if (auto ir_slice = Cast<ir::SliceView>(ir_tensor)) {
             this->EmitSliceView(ir_slice);
+            return;
+        }
+
+        if (auto ir_squeeze_view = Cast<ir::SqueezeView>(ir_tensor)) {
+            this->EmitSqueezeView(ir_squeeze_view);
+            return;
+        }
+
+        if (auto ir_squeeze_dim_view = Cast<ir::SqueezeDimView>(ir_tensor)) {
+            this->EmitSqueezeDimView(ir_squeeze_dim_view);
             return;
         }
 
@@ -613,6 +624,28 @@ class PrajnaCodegen {
         ir_slice->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
                 prajna::Cast<pir::DeferencePointer>(ir_slice->Origin()->pir_value)->Pointer(),
+                pir_pointer_type));
+    }
+
+    void EmitSqueezeView(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) {
+        this->EmitType(ir_squeeze_view->type);
+        auto pir_pointer_type = pir::PointerType::Create(ir_squeeze_view->type->pir_type);
+
+        ir_squeeze_view->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
+                prajna::Cast<pir::DeferencePointer>(ir_squeeze_view->Tensor()->pir_value)
+                    ->Pointer(),
+                pir_pointer_type));
+    }
+
+    void EmitSqueezeDimView(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) {
+        this->EmitType(ir_squeeze_dim_view->type);
+        auto pir_pointer_type = pir::PointerType::Create(ir_squeeze_dim_view->type->pir_type);
+
+        ir_squeeze_dim_view->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
+                prajna::Cast<pir::DeferencePointer>(ir_squeeze_dim_view->Tensor()->pir_value)
+                    ->Pointer(),
                 pir_pointer_type));
     }
 

@@ -41,22 +41,28 @@ class PaddingCreator : public UnaryCreator {
 
             auto ir_input_left_origin = ir_builder->CreateAccessor(ir_input);
             ir_input_left_origin->transform_matrix(0) = 1;
-            Eigen::VectorXi64 input_slice_shape(input_shape.size() - 1);
-            for (int64_t i = 0; i < input_slice_shape.size(); ++i) {
-                input_slice_shape[i] = input_shape[i + 1];
+            Eigen::VectorXi64 input_slice_shape(input_shape.size());
+            input_slice_shape[0] = 1;
+            for (int64_t i = 1; i < input_slice_shape.size(); ++i) {
+                input_slice_shape[i] = input_shape[i];
             }
             auto ir_input_slice =
                 ir_builder->Create<ir::SliceView>(ir_input_left_origin, input_slice_shape);
 
             auto ir_output_left_origin = ir_builder->CreateAccessor(ir_output);
             ir_output_left_origin->transform_matrix(0) = 1;
-            Eigen::VectorXi64 output_slice_shape(output_shape.size() - 1);
-            for (int64_t i = 0; i < output_slice_shape.size(); ++i) {
-                output_slice_shape[i] = output_shape[i + 1];
+            Eigen::VectorXi64 output_slice_shape(output_shape.size());
+            output_slice_shape[0] = 1;
+            for (int64_t i = 1; i < output_slice_shape.size(); ++i) {
+                output_slice_shape[i] = output_shape[i];
             }
             auto ir_output_slice =
                 ir_builder->Create<ir::SliceView>(ir_output_left_origin, output_slice_shape);
-            this->AffineExpressImpl(ir_input_slice, ir_output_slice, ir_builder);
+
+            auto ir_input_slice_squeeze = ir_builder->Create<ir::SqueezeDimView>(ir_input_slice, 0);
+            auto ir_output_slice_squeeze =
+                ir_builder->Create<ir::SqueezeDimView>(ir_output_slice, 0);
+            this->AffineExpressImpl(ir_input_slice_squeeze, ir_output_slice_squeeze, ir_builder);
         }
         {
             Eigen::VectorXi64 remainder_shape = output_shape;
