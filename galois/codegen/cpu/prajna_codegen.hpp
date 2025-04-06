@@ -588,6 +588,7 @@ class PrajnaCodegen {
     }
 
     void EmitSliceView(std::shared_ptr<ir::SliceView> ir_slice) {
+        this->EmitType(ir_slice->type);
         this->EmitAccessor(ir_slice->Origin());
 
         Eigen::RowVectorXi64 stride(ir_slice->type->shape.size());
@@ -599,12 +600,20 @@ class PrajnaCodegen {
         for (; i >= 0; --j, --i) {
             stride[i] = ir_slice->Origin()->Tensor()->type->stride[j];
         }
-        //
-        auto ir_slice_type =
-            ir::TensorType::Create(ir_slice->type->value_type, ir_slice->shape, stride);
-        ir_slice->type = ir_slice_type;
+
+        if (ir_slice->type->value_type) {
+            auto ir_slice_type =
+                ir::TensorType::Create(ir_slice->type->value_type, ir_slice->shape, stride);
+            ir_slice->type = ir_slice_type;
+            this->EmitType(ir_slice->type);
+        }
+
+        auto pir_pointer_type = pir::PointerType::Create(ir_slice->type->pir_type);
         // 偏移地址
-        ir_slice->pir_value = prajna::Cast<pir::VariableLiked>(ir_slice->Origin()->pir_value);
+        ir_slice->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
+                prajna::Cast<pir::DeferencePointer>(ir_slice->Origin()->pir_value)->Pointer(),
+                pir_pointer_type));
     }
 
     void EmitCall(std::shared_ptr<ir::Call> ir_call) {
