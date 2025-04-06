@@ -47,11 +47,6 @@ class GemmVsEigenTest : public testing::Test {
 
         auto ir_builder = ir::Builder::Create();
         auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-        auto ir_mat_type_c =
-            ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
-
-        auto ir_operator_type =
-            ir::OperatorType::Create({ir_mat_type_a, ir_mat_type_b}, ir_mat_type_c);
         auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                                {ir_mat_type_a, ir_mat_type_b});
         auto gemm_optimizer = optimization::GemmOptimizer::Create();
@@ -68,7 +63,6 @@ class GemmVsEigenTest : public testing::Test {
 
         this->eigen_matrix_a = EigenMatrixType::Random(normalize_m, normalize_k);
         this->eigen_matrix_b = EigenMatrixType::Random(normalize_k, normalize_n);
-        this->shape_c = ir_mat_type_c->shape;
     }
     void TearDown() override {
         fmt::print("cost time: {}ns, eigen glops: {:.04f}gops\n", this->eigen_cost_time,
@@ -86,9 +80,6 @@ class GemmVsEigenTest : public testing::Test {
     using EigenMatrixType = Eigen::Matrix<DataType, -1, -1, Eigen::RowMajor>;
     EigenMatrixType eigen_matrix_a;
     EigenMatrixType eigen_matrix_b;
-
-    Eigen::VectorXi64 shape_c;
-
     double items;
 };
 
@@ -100,6 +91,9 @@ TYPED_TEST_P(GemmVsEigenTest, TestGemm) {
     auto t1_eigen = std::chrono::high_resolution_clock::now();
     this->eigen_cost_time = static_cast<double>((t1_eigen - t0_eigen).count());
 
+    auto mat_c_rows = eigen_matrix_f32_expect.rows();
+    auto mat_c_cols = eigen_matrix_f32_expect.cols();
+
     auto t0 = std::chrono::high_resolution_clock::now();
     auto p_mat_c = this->mat_mul_fun(this->eigen_matrix_a.data(), this->eigen_matrix_b.data());
     boost::scope::scope_exit free_mem([p_mat_c] { free(p_mat_c); });
@@ -107,12 +101,12 @@ TYPED_TEST_P(GemmVsEigenTest, TestGemm) {
     this->galois_cost_time = static_cast<double>((t1 - t0).count());
 
     auto get_galois_re = [=](int64_t i, int64_t j) -> TypeParam {
-        return p_mat_c[i * this->shape_c[1] + j];
+        return p_mat_c[i * mat_c_cols + j];
     };
 
     int64_t error_count = 0;
-    for (int64_t i = 0; i < this->shape_c[0]; ++i) {
-        for (int64_t j = 0; j < this->shape_c[1]; ++j) {
+    for (int64_t i = 0; i < mat_c_rows; ++i) {
+        for (int64_t j = 0; j < mat_c_cols; ++j) {
             auto galois_re = get_galois_re(i, j);
             auto eigen_re = eigen_matrix_f32_expect(i, j);
             double epllise = std::max(std::abs(0.2 * eigen_re), 0.5);
