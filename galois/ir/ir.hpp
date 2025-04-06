@@ -306,10 +306,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
         this->is_finalized = true;
     }
 
-    bool IsTensor() { return Is<TensorType>(this->type); }
-
-    bool IsContinous() { return this->IsTensor() && !Is<Viewer>(this->shared_from_this()); }
-
     std::shared_ptr<Block> ParentBlock() {
         if (!this->parent_block) {
             // GALOIS_ASSERT(Is<Block>(this->shared_from_this()));
@@ -548,7 +544,6 @@ class Viewer : public Instruction {
                                           Eigen::MatrixXi64 transform_matrix,
                                           Eigen::VectorXi64 shift_vector) {
         std::shared_ptr<Viewer> self(new Viewer);
-        GALOIS_ASSERT(ir_tensor->IsTensor());
         self->ir_tensor = ir_tensor;
         self->transform_matrix = transform_matrix;
         self->type = ir_tensor->type;
@@ -593,7 +588,6 @@ class SliceView : public Instruction {
     static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_accessor_origin,
                                              Eigen::VectorXi64 shape) {
         std::shared_ptr<SliceView> self(new SliceView);
-        GALOIS_ASSERT(ir_accessor_origin->Tensor()->IsContinous());
         self->OperandResize(1);
         self->Origin(ir_accessor_origin);
         self->shape = shape;
