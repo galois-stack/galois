@@ -77,7 +77,7 @@ class PrajnaCodegen {
         return nullptr;
     }
 
-    void EmitGridIndexVector(std::shared_ptr<ir::GridIndex> ir_indices) {
+    void EmitGridIndex(std::shared_ptr<ir::GridIndex> ir_indices) {
         this->EmitType(ir_indices->type);
         ir_indices->pir_value = pir_builder->Create<pir::LocalVariable>(ir_indices->type->pir_type);
     }
@@ -111,7 +111,7 @@ class PrajnaCodegen {
             }));
         }
 
-        this->EmitGridIndexVector(ir_grid->index);
+        this->EmitGridIndex(ir_grid->index);
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
             auto pir_first_value = pir_builder->GetInt64Constant(0);
