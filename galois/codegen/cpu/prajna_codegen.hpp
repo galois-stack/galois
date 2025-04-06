@@ -137,7 +137,7 @@ class PrajnaCodegen {
         }
     }
 
-    void EmitOperatorFunction(std::shared_ptr<ir::OperatorFunction> ir_operator) {
+    void EmitOperatorFunction(std::shared_ptr<ir::Operator> ir_operator) {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
@@ -287,7 +287,7 @@ class PrajnaCodegen {
             return;
         }
 
-        if (auto ir_operator = Cast<ir::OperatorFunction>(ir_tensor)) {
+        if (auto ir_operator = Cast<ir::Operator>(ir_tensor)) {
             this->EmitOperatorFunction(ir_operator);
             return;
         }
@@ -622,11 +622,11 @@ class PrajnaCodegen {
                     pir_builder->VariableLikedNormalize(ir_call->Input(i)->pir_value)));
             }
 
-            ir_call->pir_value = pir_builder->Create<pir::Call>(
-                ir_call->OperatorFunction()->pir_value, pir_arguments);
+            ir_call->pir_value =
+                pir_builder->Create<pir::Call>(ir_call->Operator()->pir_value, pir_arguments);
 
             // TODO: warlaround
-            auto ir_operator_type = ir_call->OperatorFunction()->GetOperatorType();
+            auto ir_operator_type = ir_call->Operator()->GetOperatorType();
             if (!Is<ir::VoidType>(ir_operator_type->output_type)) {
                 ir_call->pir_value = pir_builder->Create<pir::DeferencePointer>(ir_call->pir_value);
             }
@@ -665,8 +665,7 @@ class PrajnaCodegen {
                                    return pir_builder->Create<pir::AccessField>(
                                        pir_async_parameter_deference, pir_field);
                                });
-                pir_builder->Create<pir::Call>(ir_call->OperatorFunction()->pir_value,
-                                               pir_inner_arguments);
+                pir_builder->Create<pir::Call>(ir_call->Operator()->pir_value, pir_inner_arguments);
                 this->PirFree(pir_builder->Create<pir::AccessField>(
                     pir_async_parameter_deference,
                     *std::next(pir_fields.begin(), grid_argument_index)));
@@ -755,7 +754,7 @@ class PrajnaCodegen {
 
    public:
     std::stack<std::shared_ptr<ir::Grid>> grid_stack;
-    std::stack<std::shared_ptr<ir::OperatorFunction>> operator_stack;
+    std::stack<std::shared_ptr<ir::Operator>> operator_stack;
 
     std::shared_ptr<pir::Value> pir_thpool = nullptr;
     std::shared_ptr<prajna::lowering::IrBuilder> pir_builder = nullptr;

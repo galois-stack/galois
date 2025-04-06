@@ -1,11 +1,11 @@
 #pragma once
 
 #include "galois/codegen/cpu/prajna_codegen.hpp"
+#include "galois/helper.hpp"
 #include "galois/ir/ir.hpp"
 #include "prajna/bindings/core.hpp"
 #include "prajna/jit/execution_engine.h"
 #include "thpool.h"
-#include "galois/helper.hpp"
 
 namespace galois::jit {
 
@@ -35,12 +35,12 @@ class Engine {
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(malloc), "malloc");
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(free), "free");
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(auto_aligned_alloc),
-                                                  "auto_aligned_alloc");
+                                                   "auto_aligned_alloc");
         return prajna_compiler;
     }
 
     template <typename Func>
-    Func EmitOperatorSymbol(std::shared_ptr<ir::OperatorFunction> ir_operator) {
+    Func EmitOperatorSymbol(std::shared_ptr<ir::Operator> ir_operator) {
         if (!ir_operator->pir_value) {
             auto prajna_codegen =
                 std::make_shared<codegen::cpu::PrajnaCodegen>(prajna_compiler->_symbol_table);

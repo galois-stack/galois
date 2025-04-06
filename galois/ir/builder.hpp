@@ -44,7 +44,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return this->grid_stack.top();
     }
 
-    std::shared_ptr<ir::OperatorFunction> CurrentOperator() {
+    std::shared_ptr<ir::Operator> CurrentOperator() {
         GALOIS_ASSERT(this->operator_stack.size());
         return this->operator_stack.top();
     }
@@ -80,9 +80,9 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return {ir_pthread_block, std::move(scope_guard)};
     }
 
-    std::tuple<std::shared_ptr<OperatorFunction>, std::unique_ptr<ScopeGuard>> CreateOperator(
+    std::tuple<std::shared_ptr<Operator>, std::unique_ptr<ScopeGuard>> CreateOperator(
         std::shared_ptr<OperatorType> ir_operator_type, std::string name) {
-        auto ir_operator = OperatorFunction::Create(ir_operator_type);
+        auto ir_operator = Operator::Create(ir_operator_type);
         ir_operator->name = name;
         ir_operator->fullname = this->operator_stack.size()
                                     ? ir_operator->name + this->operator_stack.top()->fullname
@@ -105,7 +105,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return {ir_operator, std::move(scope_guard)};
     }
 
-    std::shared_ptr<OperatorFunction> CreateOperatorByCreator(
+    std::shared_ptr<Operator> CreateOperatorByCreator(
         std::shared_ptr<op::Creator> op_creator,
         std::vector<std::shared_ptr<TensorType>> input_types) {
         auto ir_output_type = op_creator->InferType(input_types);
@@ -124,7 +124,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
                        [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });
         auto ir_output_type = sp_creator->InferType(input_types);
         auto ir_operator_type = OperatorType::Create(input_types, ir_output_type);
-        std::shared_ptr<OperatorFunction> ir_operator;
+        std::shared_ptr<Operator> ir_operator;
         {
             // TODO: give a valid name
             auto [ir_tmp_operator, op_scope] =
@@ -173,7 +173,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
 
    public:
     std::stack<std::shared_ptr<Grid>> grid_stack;
-    std::stack<std::shared_ptr<OperatorFunction>> operator_stack;
+    std::stack<std::shared_ptr<Operator>> operator_stack;
     std::stack<std::shared_ptr<Block>> block_stack;
     std::stack<std::list<std::shared_ptr<Tensor>>::iterator> iterator_stack;
     std::stack<std::vector<std::shared_ptr<Tensor>>> temp_tensors_stack;

@@ -170,7 +170,7 @@ inline void Vectorize(std::shared_ptr<ir::Grid> ir_grid, std::int64_t simd_size)
 //     ir_grid->shape.bottomRows(1)[0] /= copy_size;
 // }
 
-inline void LayerMemory(std::shared_ptr<ir::OperatorFunction> ir_operator) {
+inline void LayerMemory(std::shared_ptr<ir::Operator> ir_operator) {
     auto ir_grid = Cast<ir::Grid>(ir_operator->values.front());
     auto ir_inner_grid = Cast<ir::Grid>(ir_grid->values.front());
 
@@ -273,7 +273,7 @@ inline void LayerMemory(std::shared_ptr<ir::OperatorFunction> ir_operator) {
     }
 }
 
-inline void LayerMemory2(std::shared_ptr<ir::OperatorFunction> ir_operator) {
+inline void LayerMemory2(std::shared_ptr<ir::Operator> ir_operator) {
     auto ir_outer_grid = Cast<ir::Grid>(ir_operator->values.front());
     auto ir_inner_grid = Cast<ir::Grid>(ir_outer_grid->values.front());
 
@@ -416,7 +416,7 @@ inline void RemoveUselessDim(std::shared_ptr<ir::Grid> ir_grid) {
     }
 }
 
-inline void Repeat(std::shared_ptr<ir::OperatorFunction> ir_operator, int64_t times) {
+inline void Repeat(std::shared_ptr<ir::Operator> ir_operator, int64_t times) {
     Eigen::VectorXi64 grid_shape(1);
     grid_shape[0] = times;
     auto ir_repeat_grid = ir::Grid::Create(grid_shape);
@@ -438,7 +438,7 @@ inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
     //                        return ir_tensor->type;
     //                    });
     //     std::vector<std::shared_ptr<ir::TensorType>> output_types;
-    //     auto ir_operator_function = ir::OperatorFunction::Create(input_types, output_types);
+    //     auto ir_operator_function = ir::Operator::Create(input_types, output_types);
     //     ir_operator_function->name = "__tmp_todo";
     //     ir_operator_function->fullname = ir_operator_function->name;
     //     std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>>
