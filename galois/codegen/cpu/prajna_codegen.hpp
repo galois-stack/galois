@@ -141,7 +141,7 @@ class PrajnaCodegen {
         }
     }
 
-    void EmitOperatorFunction(std::shared_ptr<ir::Operator> ir_operator) {
+    void EmitOperator(std::shared_ptr<ir::Operator> ir_operator) {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
@@ -292,7 +292,7 @@ class PrajnaCodegen {
         }
 
         if (auto ir_operator = Cast<ir::Operator>(ir_tensor)) {
-            this->EmitOperatorFunction(ir_operator);
+            this->EmitOperator(ir_operator);
             return;
         }
 
