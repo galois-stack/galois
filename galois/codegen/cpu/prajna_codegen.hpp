@@ -14,14 +14,19 @@ namespace galois::codegen::cpu {
 namespace pir = prajna::ir;
 
 class PrajnaCodegen {
+   protected:
+    PrajnaCodegen() = default;
+
    public:
-    PrajnaCodegen(std::shared_ptr<prajna::lowering::SymbolTable> prajna_symbol_table) {
-        // auto ir_symbol_table = prajna::lowering::SymbolTable::Create(nullptr);
+    static std::shared_ptr<PrajnaCodegen> Create(
+        std::shared_ptr<prajna::lowering::SymbolTable> prajna_symbol_table) {
+        auto self = std::shared_ptr<PrajnaCodegen>(new PrajnaCodegen);
         auto pir_module = pir::Module::Create();
         auto pir_logger = prajna::Logger::Create("");
         pir_module->symbol_table = prajna_symbol_table;
-        this->pir_builder =
+        self->pir_builder =
             prajna::lowering::IrBuilder::Create(prajna_symbol_table, pir_module, pir_logger);
+        return self;
     }
 
     void DeclareIntrinsic() {
