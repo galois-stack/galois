@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdarg.h>
-
 #include <algorithm>
 #include <list>
 #include <memory>
@@ -57,8 +55,6 @@ class Cloner {
 
     std::unordered_map<std::shared_ptr<Tensor>, std::shared_ptr<Tensor>> tensor_dict;
 };
-
-enum struct MemoryType { Host, Stack };
 
 class TensorType : public Named, public std::enable_shared_from_this<TensorType> {
    public:
@@ -154,6 +150,8 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
             if (this->value_type->IsScalar()) {
                 return this->shape;
             } else {
+                // 需要同一维度的，NormalizeShape才有意义
+                GALOIS_ASSERT(this->shape.size() == value_type_normalize_shape.size());
                 return this->shape.array() * value_type_normalize_shape.array();
             }
         }
@@ -165,6 +163,10 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         shape[0] = rows;
         shape[1] = cols;
         return TensorType::Create(value_type, shape);
+    }
+
+    std::shared_ptr<TensorType> Tile(Eigen::VectorXi64 shape) {
+        return TensorType::Create(this->shared_from_this(), shape);
     }
 
     template <typename... Dims>
@@ -186,14 +188,9 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
 
     virtual bool IsScalar() { return this->shape.size() == 0; }
 
-    std::shared_ptr<TensorType> Tile(Eigen::VectorXi64 shape) {
-        return TensorType::Create(this->shared_from_this(), shape);
-    }
-
    public:
     Eigen::VectorXi64 shape;
     std::shared_ptr<TensorType> value_type;
-    MemoryType memory_type = MemoryType::Host;
     int64_t bytes = 0;
     bool enable_multi_thread = false;
     Eigen::RowVectorXi64 stride;
@@ -469,8 +466,8 @@ class Instruction : virtual public Tensor {
         for (int64_t i = 0; i < OperandSize(); ++i) {
             auto ir_old_value = this->operands[i];
             if (ir_old_value) {
-                // ir_old_value->instruction_with_index_list.remove(
-                //     {Cast<Instruction>(this->shared_from_this()), i});
+                ir_old_value->instruction_with_index_list.remove(
+                    {Cast<Instruction>(this->shared_from_this()), i});
             }
         }
 
