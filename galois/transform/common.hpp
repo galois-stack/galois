@@ -46,7 +46,7 @@ inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
     Each<ir::Instruction>(ir_block, [&](std::shared_ptr<ir::Instruction> ir_instruction) {
         for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
             auto ir_operand = ir_instruction->GetOperand(i);
-            if (!ir_operand->IsInsideOf(ir_block) && !Is<ir::OperatorFunction>(ir_operand)) {
+            if (!ir_operand->IsInsideOf(ir_block) && !Is<ir::Operator>(ir_operand)) {
                 ir_captured_tensor_set.insert(ir_operand);
             }
         }

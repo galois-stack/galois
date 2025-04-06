@@ -40,7 +40,7 @@ namespace galois::ir {
 
 namespace pir = prajna::ir;
 
-class OperatorFunction;
+class Operator;
 class Instruction;
 
 class Tensor;
@@ -343,8 +343,8 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::list<InstructionAndOperandIndex> instruction_with_index_list;
     std::shared_ptr<Block> parent_block = nullptr;
 
-    std::shared_ptr<OperatorFunction> outputted_operator = nullptr;
-    std::shared_ptr<OperatorFunction> inputted_operator = nullptr;
+    std::shared_ptr<Operator> outputted_operator = nullptr;
+    std::shared_ptr<Operator> inputted_operator = nullptr;
 
     std::shared_ptr<pir::Value> pir_value = nullptr;
     std::string tag = "Tensor";
@@ -865,17 +865,16 @@ class OperatorType : public TensorType {
 };
 
 /// @brief An operator of tensors, which is liked as a node of ComputingGraph
-class OperatorFunction : public Block {
+class Operator : public Block {
    public:
-    static std::shared_ptr<OperatorFunction> Create(
-        std::shared_ptr<OperatorType> ir_operator_type) {
-        std::shared_ptr<OperatorFunction> self(new OperatorFunction);
+    static std::shared_ptr<Operator> Create(std::shared_ptr<OperatorType> ir_operator_type) {
+        std::shared_ptr<Operator> self(new Operator);
         self->type = ir_operator_type;
 
         std::transform(RANGE(ir_operator_type->input_types), std::back_inserter(self->inputs),
                        [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
 
-        self->tag = "OperatorFunction";
+        self->tag = "Operator";
         return self;
     }
 
@@ -907,7 +906,7 @@ class Grid : public Block {
 
     Eigen::VectorXi64 shape;
     std::shared_ptr<GridIndexVector> indices = nullptr;
-    std::shared_ptr<OperatorFunction> parent_operator = nullptr;
+    std::shared_ptr<Operator> parent_operator = nullptr;
     std::shared_ptr<Grid> parent_grid = nullptr;
     bool enable_multi_thread = false;
 
@@ -965,12 +964,12 @@ class Call : public Instruction {
     Call() = default;
 
    public:
-    static std::shared_ptr<Call> Create(std::shared_ptr<OperatorFunction> ir_operator,
+    static std::shared_ptr<Call> Create(std::shared_ptr<Operator> ir_operator,
                                         std::vector<std::shared_ptr<Tensor>> ir_inputs) {
         std::shared_ptr<Call> self(new Call);
         self->input_size = ir_inputs.size();
         self->OperandResize(1 + self->input_size);
-        self->OperatorFunction(ir_operator);
+        self->Operator(ir_operator);
         auto iter_inputs = ir_inputs.begin();
         for (int64_t i = 0; i < self->InputSize(); ++i, ++iter_inputs) {
             GALOIS_ASSERT(ir_operator->GetOperatorType()->input_types[i] == ir_inputs[i]->type);
@@ -981,12 +980,8 @@ class Call : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::OperatorFunction> OperatorFunction() {
-        return Cast<class OperatorFunction>(this->GetOperand(0));
-    }
-    void OperatorFunction(std::shared_ptr<ir::OperatorFunction> ir_operator) {
-        this->SetOperand(0, ir_operator);
-    }
+    std::shared_ptr<ir::Operator> Operator() { return Cast<class Operator>(this->GetOperand(0)); }
+    void Operator(std::shared_ptr<ir::Operator> ir_operator) { this->SetOperand(0, ir_operator); }
 
     std::shared_ptr<Tensor> Input(int64_t i) { return this->GetOperand(1 + i); }
     void Input(int64_t i, std::shared_ptr<Tensor> ir_argument) {

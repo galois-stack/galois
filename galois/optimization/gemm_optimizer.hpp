@@ -325,8 +325,7 @@ class GemmOptimizer {
         return ir_packed_mat;
     }
 
-    std::shared_ptr<ir::OperatorFunction> Optimize(
-        std::shared_ptr<ir::OperatorFunction> ir_matrix_multiply) {
+    std::shared_ptr<ir::Operator> Optimize(std::shared_ptr<ir::Operator> ir_matrix_multiply) {
         ir_matrix_multiply->values.clear();
         auto ir_builder = ir::Builder::Create();
         auto [ir_gemm_operator, scope] = ir_builder->CreateOperator(
@@ -346,8 +345,7 @@ class GemmOptimizer {
         auto ir_packed_mat_c =
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
         // TODO: 需要更通用的方式来定位grid
-        auto ir_register_tile_grid =
-            GetInnerGrid3(Cast<ir::Call>(ir_packed_mat_c)->OperatorFunction());
+        auto ir_register_tile_grid = GetInnerGrid3(Cast<ir::Call>(ir_packed_mat_c)->Operator());
         ExpandGrid(ir_register_tile_grid);
 
         ir_builder->Create<ir::Free>(ir_packed_mat_a);
