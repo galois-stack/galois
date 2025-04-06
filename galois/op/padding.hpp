@@ -1,8 +1,8 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/unary.hpp"
 #include "galois/op/fill.hpp"
+#include "galois/op/unary.hpp"
 
 namespace galois::op {
 
@@ -65,14 +65,8 @@ class PaddingCreator : public UnaryCreator {
             ir_output_left_origin->shift_vector[0] = input_shape[0];
             auto ir_output_slice =
                 ir_builder->Create<ir::SliceView>(ir_output_left_origin, remainder_shape);
-
-            auto fill_creator = op::FillCreator::Create();
-            fill_creator->AffineExpress(
-                {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())},
-                ir_builder);
-            // TODO:(存在问题， 需要修复）
-            // ir_builder->Express<op::FillCreator>(
-            //     {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())});
+            ir_builder->Express<op::FillCreator>(
+                {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())});
         }
     }
 

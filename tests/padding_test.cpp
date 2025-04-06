@@ -3,9 +3,7 @@
 #include "gtest/gtest.h"
 #include "tests/galois_test.hpp"
 
-
 TEST(GaloisTests, TestPadding) {
-
     auto ir_input_type = ir::f32->Tile(1, 1);
     Eigen::VectorXi64 shape(2);
     shape[0] = 32;
@@ -27,8 +25,22 @@ TEST(GaloisTests, TestPadding) {
             } else {
                 GALOIS_ASSERT(padded_value[i * 8 + j] == 0.0f);
             }
-            
         }
     }
+}
 
+TEST(GaloisTests, TestPaddingIdentity) {
+    auto ir_input_type = ir::f32->Tile(32, 32);
+    Eigen::VectorXi64 shape(2);
+    shape[0] = 32;
+    shape[1] = 32;
+
+    auto ir_builder = ir::Builder::Create();
+    auto ir_padding_creator = op::PaddingCreator::Create(shape);
+    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_padding_creator, {ir_input_type});
+    auto jit_engine = jit::Engine::Create();
+    auto padding_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
+
+    std::vector<float> input(ir_input_type->Size());
+    auto padded_value = padding_fun(input.data());
 }
