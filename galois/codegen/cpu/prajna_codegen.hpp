@@ -72,7 +72,7 @@ class PrajnaCodegen {
         return nullptr;
     }
 
-    void EmitGridIndexVector(std::shared_ptr<ir::GridIndexVector> ir_indices) {
+    void EmitGridIndexVector(std::shared_ptr<ir::GridIndex> ir_indices) {
         this->EmitType(ir_indices->type);
         ir_indices->pir_value = pir_builder->Create<pir::LocalVariable>(ir_indices->type->pir_type);
     }
@@ -106,7 +106,7 @@ class PrajnaCodegen {
             }));
         }
 
-        this->EmitGridIndexVector(ir_grid->indices);
+        this->EmitGridIndexVector(ir_grid->index);
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
             auto pir_first_value = pir_builder->GetInt64Constant(0);
@@ -123,9 +123,8 @@ class PrajnaCodegen {
             pir_builder->PushBlock(ir_loop_block);
 
             pir_builder->Create<pir::WriteVariableLiked>(
-                pir_scalar_index,
-                pir_builder->Create<pir::IndexArray>(ir_grid->indices->pir_value,
-                                                     pir_builder->GetInt64Constant(i)));
+                pir_scalar_index, pir_builder->Create<pir::IndexArray>(
+                                      ir_grid->index->pir_value, pir_builder->GetInt64Constant(i)));
         }
 
         for (auto ir_tensor : ir_grid->values) {
@@ -302,7 +301,7 @@ class PrajnaCodegen {
             return;
         }
 
-        if (Is<ir::GridIndexVector>(ir_tensor)) {
+        if (Is<ir::GridIndex>(ir_tensor)) {
             // 在EmitGrid中处理
             return;
         }
@@ -426,7 +425,7 @@ class PrajnaCodegen {
                 return pir_builder->Create<pir::ConstantInt>(pir_builder->GetInt64Type(), value);
             });
 
-            auto pir_index = grid_stack.top()->indices->pir_value;
+            auto pir_index = grid_stack.top()->index->pir_value;
             for (int64_t i = 0; i < pir_s_product_a.size(); ++i) {
                 if (s_product_a[i] == 0) {
                     continue;
@@ -626,7 +625,7 @@ class PrajnaCodegen {
             for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
                 pir_arguments.push_back(pir_builder->Create<pir::GetAddressOfVariableLiked>(
                     prajna::Cast<pir::VariableLiked>(ir_call->Input(i)->pir_value)));
-                if (ir_call->Input(i) == this->grid_stack.top()->indices) {
+                if (ir_call->Input(i) == this->grid_stack.top()->index) {
                     grid_argument_index = i;
                 }
             }
