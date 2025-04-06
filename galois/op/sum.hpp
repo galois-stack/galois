@@ -33,7 +33,7 @@ class SumCreator : public op::Creator {
     void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_re,
                            std::shared_ptr<ir::Builder> ir_builder) {
         if (ir_input->type->IsScalar()) {
-            auto ir_add = ir_builder->Create<ir::Add>(ir_input, ir_re);
+            auto ir_add = ir_builder->Add(ir_input, ir_re);
             ir_builder->Create<ir::Write>(ir_add, ir_re);
         } else {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_input->type->shape);

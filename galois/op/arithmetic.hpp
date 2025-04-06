@@ -4,7 +4,7 @@
 
 namespace galois::op {
 
-template <typename Instruction>
+template <ir::ArithmeticInstruction::Operation Operation>
 class ArithmeticCreator : public BinaryCreator {
    public:
     static std::shared_ptr<ArithmeticCreator> Create() {
@@ -29,14 +29,15 @@ class ArithmeticCreator : public BinaryCreator {
         auto ir_accessor_out = ir_builder->CreateIdentityAccessor(ir_output);
         auto ir_accessor_in0 = ir_builder->CreateIdentityAccessor(ir_input0);
         auto ir_accessor_in1 = ir_builder->CreateIdentityAccessor(ir_input1);
-        auto ir_add = ir_builder->Create<Instruction>(ir_accessor_in0, ir_accessor_in1);
+        auto ir_add = ir_builder->Create<ir::ArithmeticInstruction>(Operation, ir_accessor_in0,
+                                                                    ir_accessor_in1);
         ir_builder->Create<ir::Write>(ir_add, ir_accessor_out);
     }
 };
 
-using AddCreator = ArithmeticCreator<ir::Add>;
-using SubCreator = ArithmeticCreator<ir::Sub>;
-using MulCreator = ArithmeticCreator<ir::Mul>;
-using DivCreator = ArithmeticCreator<ir::Div>;
+using AddCreator = ArithmeticCreator<ir::ArithmeticInstruction::Add>;
+using SubCreator = ArithmeticCreator<ir::ArithmeticInstruction::Sub>;
+using MulCreator = ArithmeticCreator<ir::ArithmeticInstruction::Mul>;
+using DivCreator = ArithmeticCreator<ir::ArithmeticInstruction::Div>;
 
 }  // namespace galois::op

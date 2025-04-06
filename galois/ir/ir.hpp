@@ -610,96 +610,37 @@ class SliceView : public Instruction {
 };
 
 class ArithmeticInstruction : public Instruction {
-    //    protected:
-    // BinaryInstruction() = delete;
-};
-
-class Add : public ArithmeticInstruction {
    public:
-    static std::shared_ptr<Add> Create(std::shared_ptr<Tensor> ir_operand0,
-                                       std::shared_ptr<Tensor> ir_operand1) {
+    enum Operation {
+        Add,
+        Sub,
+        Mul,
+        Div,
+    };
+
+    static std::shared_ptr<ArithmeticInstruction> Create(Operation op,
+                                                         std::shared_ptr<Tensor> ir_operand0,
+                                                         std::shared_ptr<Tensor> ir_operand1) {
         GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
-        std::shared_ptr<Add> self(new Add);
+        std::shared_ptr<ArithmeticInstruction> self(new ArithmeticInstruction);
+        self->operation = op;
         self->OperandResize(2);
         self->SetOperand(0, ir_operand0);
         self->SetOperand(1, ir_operand1);
         self->type = ir_operand0->type;
-        self->tag = "Add";
+        self->tag = "ArithmeticInstruction";
         return self;
     }
 
     std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Add> ir_new(new Add(*this));
+        std::shared_ptr<ArithmeticInstruction> ir_new(new ArithmeticInstruction(*this));
         cloner->tensor_dict[this->shared_from_this()] = ir_new;
         ir_new->CloneOperands(cloner);
         return ir_new;
     }
-};
 
-class Sub : public ArithmeticInstruction {
    public:
-    static std::shared_ptr<Sub> Create(std::shared_ptr<Tensor> ir_operand0,
-                                       std::shared_ptr<Tensor> ir_operand1) {
-        GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
-        std::shared_ptr<Sub> self(new Sub);
-        self->OperandResize(2);
-        self->SetOperand(0, ir_operand0);
-        self->SetOperand(1, ir_operand1);
-        self->type = ir_operand0->type;
-        self->tag = "Sub";
-        return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Sub> ir_new(new Sub(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-};
-
-class Mul : public ArithmeticInstruction {
-   public:
-    static std::shared_ptr<Mul> Create(std::shared_ptr<Tensor> ir_operand0,
-                                       std::shared_ptr<Tensor> ir_operand1) {
-        GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
-        std::shared_ptr<Mul> self(new Mul);
-        self->OperandResize(2);
-        self->SetOperand(0, ir_operand0);
-        self->SetOperand(1, ir_operand1);
-        self->type = ir_operand0->type;
-        self->tag = "Mul";
-        return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Mul> ir_new(new Mul(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-};
-
-class Div : public ArithmeticInstruction {
-   public:
-    static std::shared_ptr<Div> Create(std::shared_ptr<Tensor> ir_operand0,
-                                       std::shared_ptr<Tensor> ir_operand1) {
-        GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
-        std::shared_ptr<Div> self(new Div);
-        self->OperandResize(2);
-        self->SetOperand(0, ir_operand0);
-        self->SetOperand(1, ir_operand1);
-        self->type = ir_operand0->type;
-        self->tag = "Div";
-        return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Div> ir_new(new Div(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
+    Operation operation;
 };
 
 class Prefetch : public Instruction {
