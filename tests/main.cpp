@@ -14,9 +14,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    ::benchmark::Initialize(&argc, argv);
-    ::benchmark::RunSpecifiedBenchmarks();
-    ::benchmark::Shutdown();
+    // ::benchmark::Initialize(&argc, argv);
+    // ::benchmark::RunSpecifiedBenchmarks();
+    // ::benchmark::Shutdown();
 
     return 0;
 }
