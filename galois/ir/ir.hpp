@@ -907,7 +907,6 @@ class Grid : public Block {
     std::shared_ptr<Grid> parent_grid = nullptr;
     bool enable_multi_thread = false;
 
-    // VectorXprajna pir_index_vector;
     bool is_local = true;
 };
 
@@ -925,13 +924,8 @@ class BitCast : public Instruction {
     static std::shared_ptr<BitCast> Create(std::shared_ptr<Tensor> ir_value,
                                            std::shared_ptr<TensorType> ir_type) {
         GALOIS_ASSERT(ir_type);
-        GALOIS_ASSERT(ir_value->IsContinous());
         std::shared_ptr<BitCast> self(new BitCast);
         GALOIS_ASSERT(ir_value->type->bytes == ir_type->bytes);
-        // auto ir_old_tensor_type = ir_value->type;
-        // GALOIS_ASSERT(ir_old_tensor_type->Size() * ir_old_tensor_type->value_type->bytes
-        // ==
-        //                 ir_tensor_type->Size() * ir_tensor_type->value_type->bytes);
         self->OperandResize(1);
         self->Tensor(ir_value);
         self->type = ir_type;
