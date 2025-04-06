@@ -480,12 +480,12 @@ class Instruction : virtual public Tensor {
 
 class Write;
 
-class GridIndexVector : public Tensor {
+class GridIndex : public Tensor {
    public:
-    static std::shared_ptr<GridIndexVector> Create(int64_t rank) {
-        std::shared_ptr<GridIndexVector> self(new GridIndexVector);
+    static std::shared_ptr<GridIndex> Create(int64_t rank) {
+        std::shared_ptr<GridIndex> self(new GridIndex);
         self->type = i64->Tile(rank);
-        self->tag = "GridIndexVector";
+        self->tag = "GridIndex";
         return self;
     }
 };
@@ -887,7 +887,7 @@ class Grid : public Block {
    public:
     static std::shared_ptr<Grid> Create(Eigen::VectorXi64 shape) {
         std::shared_ptr<Grid> self(new Grid);
-        self->indices = GridIndexVector::Create(shape.size());
+        self->index = GridIndex::Create(shape.size());
         self->shape = shape;
         self->tag = "Grid";
         return self;
@@ -902,7 +902,7 @@ class Grid : public Block {
     }
 
     Eigen::VectorXi64 shape;
-    std::shared_ptr<GridIndexVector> indices = nullptr;
+    std::shared_ptr<GridIndex> index = nullptr;
     std::shared_ptr<Operator> parent_operator = nullptr;
     std::shared_ptr<Grid> parent_grid = nullptr;
     bool enable_multi_thread = false;
