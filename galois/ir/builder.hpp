@@ -171,6 +171,30 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return nullptr;
     }
 
+    std::shared_ptr<ir::Tensor> Add(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Add, ir_tensor1,
+                                                       ir_tensor2);
+    }
+
+    std::shared_ptr<ir::Tensor> Sub(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Sub, ir_tensor1,
+                                                       ir_tensor2);
+    }
+
+    std::shared_ptr<ir::Tensor> Mul(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Mul, ir_tensor1,
+                                                       ir_tensor2);
+    }
+
+    std::shared_ptr<ir::Tensor> Div(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Div, ir_tensor1,
+                                                       ir_tensor2);
+    }
+
    public:
     std::stack<std::shared_ptr<Grid>> grid_stack;
     std::stack<std::shared_ptr<Operator>> operator_stack;

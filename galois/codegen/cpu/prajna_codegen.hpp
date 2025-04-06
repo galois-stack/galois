@@ -220,7 +220,7 @@ class PrajnaCodegen {
         GALOIS_ASSERT(Is<ir::RealNumberType>(ir_value_type));
 
         auto pir_binary_operation = pir::BinaryOperator::Operation::None;
-        if (auto ir_add = Cast<ir::Add>(ir_arithmetic_instruction)) {
+        if (ir_arithmetic_instruction->operation == ir::ArithmeticInstruction::Operation::Add) {
             if (Is<ir::FloatType>(ir_value_type)) {
                 pir_binary_operation = pir::BinaryOperator::Operation::FAdd;
             }
@@ -228,7 +228,7 @@ class PrajnaCodegen {
                 pir_binary_operation = pir::BinaryOperator::Operation::Add;
             }
         }
-        if (auto ir_sub = Cast<ir::Sub>(ir_arithmetic_instruction)) {
+        if (ir_arithmetic_instruction->operation == ir::ArithmeticInstruction::Operation::Sub) {
             if (Is<ir::FloatType>(ir_value_type)) {
                 pir_binary_operation = pir::BinaryOperator::Operation::FSub;
             }
@@ -236,7 +236,7 @@ class PrajnaCodegen {
                 pir_binary_operation = pir::BinaryOperator::Operation::Sub;
             }
         }
-        if (auto ir_mul = Cast<ir::Mul>(ir_arithmetic_instruction)) {
+        if (ir_arithmetic_instruction->operation == ir::ArithmeticInstruction::Operation::Mul) {
             if (Is<ir::FloatType>(ir_value_type)) {
                 pir_binary_operation = pir::BinaryOperator::Operation::FMul;
             }
@@ -244,7 +244,7 @@ class PrajnaCodegen {
                 pir_binary_operation = pir::BinaryOperator::Operation::Mul;
             }
         }
-        if (auto ir_div = Cast<ir::Div>(ir_arithmetic_instruction)) {
+        if (ir_arithmetic_instruction->operation == ir::ArithmeticInstruction::Operation::Div) {
             if (Is<ir::FloatType>(ir_value_type)) {
                 pir_binary_operation = pir::BinaryOperator::Operation::FDiv;
             }
