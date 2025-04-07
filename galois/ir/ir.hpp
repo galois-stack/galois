@@ -80,46 +80,20 @@ class Cloner {
 
 class TensorType : public Named, public std::enable_shared_from_this<TensorType> {
    public:
-    static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
-                                              Eigen::VectorXi64 shape) {
-        // 如果shape为0， 直接退化为value_type
-        if (!shape.size()) {
-            return value_type;
-        }
-
-        for (auto ir_type : global_context.created_types) {
-            if (auto ir_tensor_type = Cast<TensorType>(ir_type)) {
-                if (ir_tensor_type->value_type == value_type &&
-                    shape.size() == ir_tensor_type->shape.size() &&
-                    shape == ir_tensor_type->shape) {
-                    return ir_tensor_type;
-                }
-            }
-        }
-
-        std::shared_ptr<TensorType> self(new TensorType);
-        self->value_type = value_type;
-        self->shape = shape;
-
-        self->stride.resize(shape.size());
+    static Eigen::VectorXi64 GetStride(Eigen::VectorXi64 shape) {
+        Eigen::VectorXi64 stride(shape.size());
         auto i = shape.size() - 1;
-        self->stride[i] = 1;
+        stride[i] = 1;
         while (i > 0) {
             i = i - 1;
-            self->stride[i] = shape[i + 1] * self->stride[i + 1];
+            stride[i] = shape[i + 1] * stride[i + 1];
         }
+        return stride;
+    }
 
-        self->name = value_type->name + "[";
-        for (auto i : shape) {
-            self->name += std::to_string(i);
-            self->name.push_back('x');
-        }
-        self->name.back() = ']';
-        self->fullname = self->name;
-        self->bytes = self->Size() * self->value_type->bytes;
-
-        global_context.created_types.push_back(self);
-        return self;
+    static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
+                                              Eigen::VectorXi64 shape) {
+        return TensorType::Create(value_type, shape, TensorType::GetStride(shape));
     }
 
     static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
@@ -612,14 +586,18 @@ class Viewer : public Instruction {
 
 class SliceView : public Instruction {
    public:
-    static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_accessor_origin,
+    static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_origin,
                                              Eigen::VectorXi64 shape) {
+        GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
         std::shared_ptr<SliceView> self(new SliceView);
         self->OperandResize(1);
-        self->Origin(ir_accessor_origin);
+        self->Origin(ir_origin);
         self->shape = shape;
-        self->type = TensorType::Create(ir_accessor_origin->type, shape);
-        self->tag = "Slice";
+
+        auto stride = ir_origin->Tensor()->type->stride;
+        GALOIS_ASSERT(ir_origin->Tensor()->type->value_type);
+        self->type = ir::TensorType::Create(ir_origin->Tensor()->type->value_type, shape, stride);
+        self->tag = "SliceView";
         return self;
     }
 
