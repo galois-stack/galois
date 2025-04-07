@@ -120,27 +120,27 @@ inline std::shared_ptr<ir::Grid> ExtractInnerGrid(std::shared_ptr<ir::Grid> ir_g
     return ir_inner_grid;
 }
 
-inline void Vectorize(std::shared_ptr<ir::Grid> ir_grid, std::int64_t simd_size) {
-    bool is_valide = true;
-    Each<ir::Accessor>(ir_grid, [&](std::shared_ptr<ir::Accessor> ir_accessor) {
-        auto right_cols1 = ir_accessor->transform_matrix.rightCols(1);
-        auto tmp = right_cols1.bottomRows(1)(0, 0);
-        is_valide = is_valide && (tmp == 1 || (tmp == 0 && !ir_accessor->IsWritten())) &&
-                    right_cols1.topRows(right_cols1.size() - 1).isZero();
-    });
+// inline void Vectorize(std::shared_ptr<ir::Grid> ir_grid, std::int64_t simd_size) {
+//     bool is_valide = true;
+//     Each<ir::Accessor>(ir_grid, [&](std::shared_ptr<ir::Accessor> ir_accessor) {
+//         auto right_cols1 = ir_accessor->transform_matrix.rightCols(1);
+//         auto tmp = right_cols1.bottomRows(1)(0, 0);
+//         is_valide = is_valide && (tmp == 1 || (tmp == 0 && !ir_accessor->IsWritten())) &&
+//                     right_cols1.topRows(right_cols1.size() - 1).isZero();
+//     });
 
-    if (!is_valide) return;
+//     if (!is_valide) return;
 
-    ir_grid->shape.bottomRows(1)[0] /= simd_size;
+//     ir_grid->shape.bottomRows(1)[0] /= simd_size;
 
-    Each<ir::Accessor>(ir_grid, [=](std::shared_ptr<ir::Accessor> ir_accessor) {
-        ir_accessor->transform_matrix.bottomRightCorner(1, 1)(0, 0) *= simd_size;
-        ir_accessor->simd_size = simd_size;
-        if (ir_accessor->transform_matrix.bottomRightCorner(1, 1).isZero()) {
-            ir_accessor->simd_shuffle = true;
-        }
-    });
-}
+//     Each<ir::Accessor>(ir_grid, [=](std::shared_ptr<ir::Accessor> ir_accessor) {
+//         ir_accessor->transform_matrix.bottomRightCorner(1, 1)(0, 0) *= simd_size;
+//         ir_accessor->simd_size = simd_size;
+//         if (ir_accessor->transform_matrix.bottomRightCorner(1, 1).isZero()) {
+//             ir_accessor->simd_shuffle = true;
+//         }
+//     });
+// }
 
 // inline void ExpandInstruction(std::shared_ptr<ir::Grid> ir_grid, int64_t copy_size) {
 //     for (auto ir_value : Clone(ir_grid->values)) {
@@ -226,12 +226,8 @@ inline void LayerMemory(std::shared_ptr<ir::Operator> ir_operator) {
             local_accessor_a.leftCols(ir_grid->shape.size()).setZero();
             auto ir_local_accessor =
                 ir::Accessor::Create(ir_local_tensor, local_accessor_a, ir_accessor->shift_vector);
-            ir_local_accessor->simd_size = ir_accessor->simd_size;
-            ir_local_accessor->simd_shuffle = ir_accessor->simd_shuffle;
             auto ir_global_accessor = ir::Accessor::Create(
                 ir_accessor->Tensor(), ir_accessor->transform_matrix, ir_accessor->shift_vector);
-            ir_global_accessor->simd_size = ir_accessor->simd_size;
-            ir_global_accessor->simd_shuffle = ir_accessor->simd_shuffle;
             auto ir_write_accessor = ir::Write::Create(ir_global_accessor, ir_local_accessor);
             ir_load_grid->values.push_back(ir_write_accessor);
             ir_grid->values.push_front(ir_load_grid);
@@ -247,13 +243,9 @@ inline void LayerMemory(std::shared_ptr<ir::Operator> ir_operator) {
             local_accessor_a.leftCols(ir_grid->shape.size()).setZero();
             auto ir_local_accessor =
                 ir::Accessor::Create(ir_local_tensor, local_accessor_a, ir_accessor->shift_vector);
-            ir_local_accessor->simd_size = ir_accessor->simd_size;
-            ir_local_accessor->simd_shuffle = ir_accessor->simd_shuffle;
             auto ir_global_accessor = ir::Accessor::Create(
                 ir_accessor->Tensor(), ir_accessor->transform_matrix, ir_accessor->shift_vector);
             auto ir_write_accessor = ir::Write::Create(ir_local_accessor, ir_global_accessor);
-            ir_global_accessor->simd_size = ir_accessor->simd_size;
-            ir_global_accessor->simd_shuffle = ir_accessor->simd_shuffle;
             ir_store_grid->values.push_back(ir_write_accessor);
             ir_store_grid->parent_grid = ir_grid;
             ir_grid->values.push_back(ir_store_grid);

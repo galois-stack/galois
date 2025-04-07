@@ -535,8 +535,6 @@ class Accessor : public Instruction {
    public:
     Eigen::MatrixXi64 transform_matrix;
     Eigen::VectorXi64 shift_vector;
-    int64_t simd_size = 1;
-    int64_t simd_shuffle = false;
 };
 
 class Viewer : public Instruction {
