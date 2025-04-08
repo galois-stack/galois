@@ -29,15 +29,6 @@ class PrajnaCodegen {
         return self;
     }
 
-    void DeclareIntrinsic() {
-        auto pir_i32_type = pir_builder->GetInt32Type();
-        auto pir_i32_pointer_type = pir::PointerType::Create(pir_i32_type);
-        auto pir_llvm_prefetch_function_type = pir::FunctionType::Create(
-            {pir_i32_pointer_type, pir_i32_type, pir_i32_type}, pir::VoidType::Create());
-        pir_builder->CreateFunction(prajna::ast::Identifier("llvm.prefetch"),
-                                    pir_llvm_prefetch_function_type);
-    }
-
     std::shared_ptr<pir::Type> EmitType(std::shared_ptr<ir::TensorType> ir_type) {
         if (ir_type->pir_type) {
             return ir_type->pir_type;
