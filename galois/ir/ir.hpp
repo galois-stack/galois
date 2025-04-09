@@ -280,13 +280,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     Tensor() {}
 
    public:
-    static std::shared_ptr<Tensor> Create(std::shared_ptr<TensorType> ir_type) {
-        std::shared_ptr<Tensor> self(new Tensor);
-        self->type = ir_type;
-        self->tag = "Tensor";
-        return self;
-    }
-
     virtual std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) {
         GALOIS_UNIMPLEMENT;
         return nullptr;
@@ -812,10 +805,14 @@ class Grid;
 
 class Block : public Tensor {
    public:
-    virtual ~Block() {}
+    static std::shared_ptr<Block> Create() {
+        std::shared_ptr<Block> self(new Block);
+        self->tag = "Block";
+        return self;
+    }
 
    public:
-    std::list<std::shared_ptr<Tensor>> values;
+    std::list<std::shared_ptr<Tensor>> tensors;
 };
 
 class VoidType : public TensorType {
@@ -861,15 +858,25 @@ class OperatorType : public TensorType {
     std::shared_ptr<TensorType> output_type;
 };
 
+class Input : public Tensor {
+   public:
+    static std::shared_ptr<Input> Create(std::shared_ptr<TensorType> ir_type) {
+        std::shared_ptr<Input> self(new Input);
+        self->type = ir_type;
+        self->tag = "Input";
+        return self;
+    }
+};
+
 /// @brief An operator of tensors, which is liked as a node of ComputingGraph
-class Operator : public Block {
+class Operator : public Tensor {
    public:
     static std::shared_ptr<Operator> Create(std::shared_ptr<OperatorType> ir_operator_type) {
         std::shared_ptr<Operator> self(new Operator);
         self->type = ir_operator_type;
-
+        self->block = Block::Create();
         std::transform(RANGE(ir_operator_type->input_types), std::back_inserter(self->inputs),
-                       [](std::shared_ptr<TensorType> ir_type) { return Tensor::Create(ir_type); });
+                       [](std::shared_ptr<TensorType> ir_type) { return Input::Create(ir_type); });
 
         self->tag = "Operator";
         return self;
@@ -878,8 +885,8 @@ class Operator : public Block {
     std::shared_ptr<OperatorType> GetOperatorType() { return Cast<OperatorType>(this->type); }
 
    public:
-    std::vector<std::shared_ptr<Tensor>> inputs;
-
+    std::shared_ptr<Block> block = nullptr;
+    std::vector<std::shared_ptr<Input>> inputs;
     std::shared_ptr<pir::Function> pir_function = nullptr;
 };
 
@@ -943,12 +950,6 @@ class BitCast : public Instruction {
         return ir_new;
     }
 };
-
-inline std::shared_ptr<Tensor> CreateTensor(std::shared_ptr<TensorType> ir_value_type,
-                                            Eigen::VectorXi64 shape) {
-    auto self = Tensor::Create(TensorType::Create(ir_value_type, shape));
-    return self;
-}
 
 class Call : public Instruction {
    protected:
@@ -1089,19 +1090,19 @@ class UnaryIntrinsic : public Instruction {
     std::string intrinsic_name;
 };
 
-class SparseType : public TensorType {
-   public:
-    std::shared_ptr<SparseType> Create(std::shared_ptr<TensorType> ir_tensor_type) {
-        std::shared_ptr<SparseType> self(new SparseType);
-        self->value_type = ir_tensor_type->value_type;
+// class SparseType : public TensorType {
+//    public:
+//     std::shared_ptr<SparseType> Create(std::shared_ptr<TensorType> ir_tensor_type) {
+//         std::shared_ptr<SparseType> self(new SparseType);
+//         self->value_type = ir_tensor_type->value_type;
 
-        auto ir_mask_type = TensorType::Create(bool_, ir_tensor_type->shape);
-        self->mask_tensor = Tensor::Create(ir_mask_type);
-        return self;
-    }
+//         auto ir_mask_type = TensorType::Create(bool_, ir_tensor_type->shape);
+//         self->mask_tensor = Tensor::Create(ir_mask_type);
+//         return self;
+//     }
 
-    std::shared_ptr<Tensor> mask_tensor;
-};
+//     std::shared_ptr<Tensor> mask_tensor;
+// };
 
 class Builder;
 
