@@ -51,7 +51,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
 
     void Insert(std::shared_ptr<Tensor> ir_tensor) {
         GALOIS_ASSERT(this->iterator_stack.size());
-        this->CurrentBlock()->values.insert(this->iterator_stack.top(), ir_tensor);
+        this->CurrentBlock()->tensors.insert(this->iterator_stack.top(), ir_tensor);
         ir_tensor->parent_block = this->CurrentBlock();
     }
 
@@ -60,7 +60,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
         auto ir_grid = Cast<Grid>(this->Create<Grid>(shape));
         this->grid_stack.push(ir_grid);
         this->block_stack.push(ir_grid);
-        this->iterator_stack.push(ir_grid->values.end());
+        this->iterator_stack.push(ir_grid->tensors.end());
         auto scope_guard = ScopeGuard::Create([&]() {
             this->grid_stack.pop();
             this->block_stack.pop();
@@ -72,7 +72,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
     std::tuple<std::shared_ptr<PthreadBlock>, std::unique_ptr<ScopeGuard>> CreatePthreadBlock() {
         auto ir_pthread_block = Cast<PthreadBlock>(this->Create<PthreadBlock>());
         this->block_stack.push(ir_pthread_block);
-        this->iterator_stack.push(ir_pthread_block->values.end());
+        this->iterator_stack.push(ir_pthread_block->tensors.end());
         auto scope_guard = ScopeGuard::Create([&]() {
             this->block_stack.pop();
             this->iterator_stack.pop();
@@ -92,8 +92,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
         }
 
         this->operator_stack.push(ir_operator);
-        this->block_stack.push(ir_operator);
-        this->iterator_stack.push(ir_operator->values.end());
+        this->block_stack.push(ir_operator->block);
+        this->iterator_stack.push(ir_operator->block->tensors.end());
         this->temp_tensors_stack.push(std::vector<std::shared_ptr<Tensor>>());
 
         auto scope_guard = ScopeGuard::Create([&]() {
@@ -111,7 +111,10 @@ class Builder : public std::enable_shared_from_this<Builder> {
         auto ir_output_type = op_creator->InferType(input_types);
         auto [ir_operator, operator_scope] = this->CreateOperator(
             OperatorType::Create(input_types, ir_output_type), op_creator->fullname);
-        op_creator->AffineExpress(ir_operator->inputs, this->shared_from_this());
+        std::vector<std::shared_ptr<Tensor>> ir_inputs;
+        std::transform(RANGE(ir_operator->inputs), std::back_inserter(ir_inputs),
+                       [](std::shared_ptr<Tensor> ir_input) { return ir_input; });
+        op_creator->AffineExpress(ir_inputs, this->shared_from_this());
         return ir_operator;
     }
 
@@ -130,7 +133,10 @@ class Builder : public std::enable_shared_from_this<Builder> {
             auto [ir_tmp_operator, op_scope] =
                 this->CreateOperator(ir_operator_type, "unname" + std::to_string(this->id++));
             ir_operator = ir_tmp_operator;
-            sp_creator->AffineExpress(ir_tmp_operator->inputs, this->shared_from_this());
+            std::vector<std::shared_ptr<Tensor>> ir_inputs;
+            std::transform(RANGE(ir_tmp_operator->inputs), std::back_inserter(ir_inputs),
+                           [](std::shared_ptr<Tensor> ir_input) { return ir_input; });
+            sp_creator->AffineExpress(ir_inputs, this->shared_from_this());
         }
         return this->Create<Call>(ir_operator, inputs);
     };

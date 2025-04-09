@@ -24,7 +24,7 @@ inline void EachTensor(std::shared_ptr<ir::Tensor> ir_tensor,
 inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
                        std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
     callback(ir_block);
-    for (auto ir_tensor : ir_block->values) {
+    for (auto ir_tensor : ir_block->tensors) {
         EachTensor(ir_tensor, callback);
     }
 }
