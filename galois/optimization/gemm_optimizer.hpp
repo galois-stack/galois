@@ -4,6 +4,7 @@
 #include "c++/z3++.h"
 #include "cpuinfo.h"
 #include "fmt/format.h"
+#include "galois/ir/clone_visitor.hpp"
 #include "galois/ir/ir.hpp"
 #include "galois/op/op.hpp"
 #include "galois/transform/transform.hpp"
@@ -96,15 +97,18 @@ inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
     GALOIS_ASSERT(ir_grid->parent_block);
     auto ir_grid_iter = std::find(RANGE(ir_grid->parent_block->tensors), ir_grid);
 
-    auto cloner = ir::Cloner::Create();
     auto ir_external_tensor_set = transform::CaptureExternalTensors(ir_grid);
+    std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>> tensor_dict;
     for (auto ir_tensor : ir_external_tensor_set) {
-        cloner->tensor_dict[ir_tensor] = ir_tensor;
+        tensor_dict[ir_tensor] = ir_tensor;
     }
 
     for (auto index : index_grid) {
+        auto ir_clone_visitor = ir::CloneVisitor::Create();
+        ir_clone_visitor->tensor_dict = tensor_dict;
         for (auto ir_value : Clone(ir_grid->tensors)) {
-            auto ir_value_clone = ir_value->Clone(cloner);
+            auto ir_value_clone = ir_clone_visitor->Clone(ir_value);
+            GALOIS_ASSERT(ir_value_clone->tag == ir_value->tag);
             if (auto ir_accessor = Cast<ir::Accessor>(ir_value_clone)) {
                 if (ir_accessor->transform_matrix.size()) {
                     ir_accessor->shift_vector += ir_accessor->transform_matrix * index;

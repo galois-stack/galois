@@ -50,18 +50,6 @@ inline bool operator==(galois::ir::InstructionAndOperandIndex lhs,
                        galois::ir::InstructionAndOperandIndex rhs) {
     return lhs.instruction == rhs.instruction && lhs.operand_index == rhs.operand_index;
 }
-class Cloner {
-   private:
-    Cloner() = default;
-
-   public:
-    static std::shared_ptr<ir::Cloner> Create() {
-        std::shared_ptr<ir::Cloner> self(new Cloner);
-        return self;
-    }
-
-    std::unordered_map<std::shared_ptr<Tensor>, std::shared_ptr<Tensor>> tensor_dict;
-};
 
 class Viewer;
 class Block;
@@ -71,13 +59,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     Tensor() {}
 
    public:
-    virtual std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) {
-        GALOIS_UNIMPLEMENT;
-        return nullptr;
-    }
-
-    virtual ~Tensor() {}
-
     /// @brief 释放不必要的依赖, 解除循环引用
     virtual void Detach() {
         // 只是解除依赖, 不是销毁数据,
@@ -113,6 +94,8 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     }
 
     virtual void ApplyVisitor(std::shared_ptr<Visitor> interpreter) { GALOIS_UNREACHABLE; }
+
+    virtual ~Tensor() {}
 
    private:
     bool is_finalized = false;
@@ -164,12 +147,6 @@ class ConstantInt : public ConstantRealNumber {
         return self;
     }
 
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<ConstantInt> ir_new(new ConstantInt(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<ConstantInt>(this->shared_from_this()));
     }
@@ -192,12 +169,6 @@ class ConstantFloat : public Constant {
         self->value = value;
         self->tag = "ConstantFloat";
         return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<ConstantFloat> ir_new(new ConstantFloat(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        return ir_new;
     }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
@@ -243,20 +214,6 @@ class Instruction : virtual public Tensor {
         if (ir_value)
             ir_value->instruction_with_index_list.push_back(
                 {Cast<Instruction>(this->shared_from_this()), i});
-    }
-
-    void CloneOperands(std::shared_ptr<Cloner> cloner) {
-        for (int64_t i = 0; i < this->operands.size(); ++i) {
-            auto ir_old = this->operands[i];
-
-            if (!cloner->tensor_dict.count(ir_old)) {
-                ir_old->Clone(cloner);
-            }
-
-            operands[i] = nullptr;  // 置零以避免干扰原来的操作数
-            auto ir_new = cloner->tensor_dict[ir_old];
-            this->SetOperand(i, ir_new);
-        }
     }
 
     void Finalize() override {
@@ -331,13 +288,6 @@ class Accessor : public Instruction {
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
-    std::shared_ptr<ir::Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Accessor> ir_new(new Accessor(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Accessor>(this->shared_from_this()));
     }
@@ -380,13 +330,6 @@ class Viewer : public Instruction {
         return Create(ir_tensor, transform_matrix, Eigen::VectorXi64::Zero(tensor_rank));
     }
 
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Viewer> ir_new(new Viewer(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Viewer>(this->shared_from_this()));
     }
@@ -413,13 +356,6 @@ class SliceView : public Instruction {
         return self;
     }
 
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<SliceView> ir_new(new SliceView(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     std::shared_ptr<Accessor> Origin() { return Cast<Accessor>(this->GetOperand(0)); }
     void Origin(std::shared_ptr<ir::Accessor> ir_accessor) { this->SetOperand(0, ir_accessor); }
 
@@ -442,15 +378,9 @@ class SqueezeDimView : public Instruction {
         RemoveRow(shape, dim);
         RemoveColumn(stride, dim);
         self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
+        self->dim = dim;
         self->tag = "Squeeze";
         return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<SqueezeDimView> ir_new(new SqueezeDimView(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
     }
 
     std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
@@ -459,6 +389,8 @@ class SqueezeDimView : public Instruction {
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<SqueezeDimView>(this->shared_from_this()));
     }
+
+    int64_t dim;
 };
 
 class SqueezeView : public Instruction {
@@ -483,13 +415,6 @@ class SqueezeView : public Instruction {
         self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
         self->tag = "Squeeze";
         return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<SqueezeView> ir_new(new SqueezeView(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
     }
 
     std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
@@ -521,13 +446,6 @@ class ArithmeticInstruction : public Instruction {
         self->type = ir_operand0->type;
         self->tag = "ArithmeticInstruction";
         return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<ArithmeticInstruction> ir_new(new ArithmeticInstruction(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
     }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
@@ -607,13 +525,6 @@ class VectorBroadcast : public Instruction {
     std::shared_ptr<Tensor> Vector() { return this->GetOperand(0); }
     void Vector(std::shared_ptr<Tensor> ir_value) { this->SetOperand(0, ir_value); }
 
-    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<VectorBroadcast> ir_new(new VectorBroadcast(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<VectorBroadcast>(this->shared_from_this()));
     }
@@ -641,13 +552,6 @@ class Write : public Instruction {
         return Cast<class Tensor>(this->GetOperand(1));
     }
     void Variable(std::shared_ptr<class Tensor> accessor) { this->SetOperand(1, accessor); }
-
-    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Write> ir_new(new Write(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Write>(this->shared_from_this()));
@@ -815,13 +719,6 @@ class BitCast : public Instruction {
     std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
 
-    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<BitCast> ir_new(new BitCast(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<BitCast>(this->shared_from_this()));
     }
@@ -857,13 +754,6 @@ class Call : public Instruction {
     }
     int64_t InputSize() { return this->input_size; }
 
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Call> ir_new(new Call(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Call>(this->shared_from_this()));
     }
@@ -883,13 +773,6 @@ class Alloca : public Instruction {
         self->type = ir_type;
         self->tag = "Alloca";
         return self;
-    }
-
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Alloca> ir_new(new Alloca(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
     }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
@@ -913,13 +796,6 @@ class Free : public Instruction {
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
-    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Free> ir_new(new Free(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Free>(this->shared_from_this()));
     }
@@ -941,13 +817,6 @@ class Return : public Instruction {
 
     std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
     void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
-    std::shared_ptr<class Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<Return> ir_new(new Return(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Return>(this->shared_from_this()));
@@ -971,16 +840,12 @@ class UnaryIntrinsic : public Instruction {
         return self;
     }
 
-    std::shared_ptr<Tensor> Clone(std::shared_ptr<Cloner> cloner) override {
-        std::shared_ptr<UnaryIntrinsic> ir_new(new UnaryIntrinsic(*this));
-        cloner->tensor_dict[this->shared_from_this()] = ir_new;
-        ir_new->CloneOperands(cloner);
-        return ir_new;
-    }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<UnaryIntrinsic>(this->shared_from_this()));
     }
+
+    std::shared_ptr<Tensor> Operand() { return this->GetOperand(0); }
+    void Operand(std::shared_ptr<Tensor> ir_oprand) { this->SetOperand(0, ir_oprand); }
 
    public:
     std::string intrinsic_name;
