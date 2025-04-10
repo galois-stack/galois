@@ -498,7 +498,6 @@ class PrajnaCodegen {
         pir_arguments.push_back(pir_builder->GetInt32Constant(1));
         pir_builder->Create<pir::Call>(pir_prefetch_function, pir_arguments);
     }
-
     void EmitBroadcast(std::shared_ptr<ir::Broadcast> ir_broadcast) {
         this->EmitTensor(ir_broadcast->Tensor());
         this->EmitType(ir_broadcast->type);
