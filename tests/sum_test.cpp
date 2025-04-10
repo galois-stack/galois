@@ -1,7 +1,5 @@
 #include "galois/op/sum.hpp"
 
-#include <cstdint>
-
 #include "tests/galois_test.hpp"
 
 // 定义基准测试函数 BM_Sum::State &state 用于控制基准测试的运行
