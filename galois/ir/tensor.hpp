@@ -51,9 +51,6 @@ inline bool operator==(galois::ir::InstructionAndOperandIndex lhs,
     return lhs.instruction == rhs.instruction && lhs.operand_index == rhs.operand_index;
 }
 
-class Viewer;
-class Block;
-
 class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
    protected:
     Tensor() {}
@@ -233,8 +230,6 @@ class Instruction : virtual public Tensor {
    protected:
     std::vector<std::shared_ptr<Tensor>> operands;
 };
-
-class Write;
 
 class GridIndex : public Tensor {
    public:
@@ -558,8 +553,6 @@ class Write : public Instruction {
     }
 };
 
-class Grid;
-
 class Block : public Tensor {
    public:
     static std::shared_ptr<Block> Create() {
@@ -658,11 +651,12 @@ class Operator : public Tensor {
     std::shared_ptr<pir::Function> pir_function = nullptr;
 };
 
-class Grid : public Block {
+class Grid : public Tensor {
    public:
     static std::shared_ptr<Grid> Create(Eigen::VectorXi64 shape) {
         std::shared_ptr<Grid> self(new Grid);
         self->index = GridIndex::Create(shape.size());
+        self->block = Block::Create();
         self->shape = shape;
         self->tag = "Grid";
         return self;
@@ -681,6 +675,7 @@ class Grid : public Block {
     }
 
     Eigen::VectorXi64 shape;
+    std::shared_ptr<Block> block = nullptr;
     std::shared_ptr<GridIndex> index = nullptr;
     std::shared_ptr<Operator> parent_operator = nullptr;
     std::shared_ptr<Grid> parent_grid = nullptr;
