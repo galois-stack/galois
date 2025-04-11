@@ -32,7 +32,10 @@ class CloneVisitor : public Visitor {
             return;
         }
 
-        GALOIS_UNIMPLEMENT;
+        ir_grid->block->ApplyVisitor(this->shared_from_this());
+        auto ir_new = Grid::Create(ir_grid->shape);
+        ir_new->block = Cast<Block>(tensor_dict[ir_grid->block]);
+        tensor_dict[ir_grid] = ir_new;
     }
 
     void Visit(std::shared_ptr<Accessor> ir_accessor) override {

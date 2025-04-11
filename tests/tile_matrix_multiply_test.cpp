@@ -25,8 +25,8 @@ class TileMatrixMultiplyPerformanceTest
         auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
                                                                {ir_mat_type_a, ir_mat_type_b});
 
-        auto ir_register_tile_grid = optimization::GetInnerGrid3(ir_operator->block);
-        optimization::ExpandGrid(ir_register_tile_grid);
+        // auto ir_register_tile_grid = optimization::GetInnerGrid3(ir_operator->block);
+        // optimization::ExpandGrid(ir_register_tile_grid);
 
         this->jit_engine = jit::Engine::Create();
         mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);

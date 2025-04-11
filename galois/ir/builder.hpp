@@ -59,8 +59,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
         Eigen::VectorXi64 shape) {
         auto ir_grid = Cast<Grid>(this->Create<Grid>(shape));
         this->grid_stack.push(ir_grid);
-        this->block_stack.push(ir_grid);
-        this->iterator_stack.push(ir_grid->tensors.end());
+        this->block_stack.push(ir_grid->block);
+        this->iterator_stack.push(ir_grid->block->tensors.end());
         auto scope_guard = ScopeGuard::Create([&]() {
             this->grid_stack.pop();
             this->block_stack.pop();

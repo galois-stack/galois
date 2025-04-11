@@ -124,7 +124,7 @@ class PrajnaCodegen {
                                       ir_grid->index->pir_value, pir_builder->GetInt64Constant(i)));
         }
 
-        for (auto ir_tensor : ir_grid->tensors) {
+        for (auto ir_tensor : ir_grid->block->tensors) {
             this->EmitTensor(ir_tensor);
         }
 
