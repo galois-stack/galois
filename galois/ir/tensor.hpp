@@ -152,7 +152,7 @@ class ConstantInt : public ConstantRealNumber {
     uint64_t value;
 };
 
-class ConstantFloat : public Constant {
+class ConstantFloat : public ConstantRealNumber {
    protected:
     ConstantFloat() = default;
 

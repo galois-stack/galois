@@ -13,7 +13,7 @@ namespace galois::codegen::cpu {
 
 namespace pir = prajna::ir;
 
-class PrajnaCodegen {
+class PrajnaCodegen : public galois::ir::Visitor {
    protected:
     PrajnaCodegen() = default;
 
@@ -27,6 +27,12 @@ class PrajnaCodegen {
         self->pir_builder =
             prajna::lowering::IrBuilder::Create(prajna_symbol_table, pir_module, pir_logger);
         return self;
+    }
+
+    void EmitOperator(std::shared_ptr<ir::Tensor> ir_tensor) {
+        if (ir_tensor) {
+            ir_tensor->ApplyVisitor(this->shared_from_this());
+        }
     }
 
     std::shared_ptr<pir::Type> EmitType(std::shared_ptr<ir::TensorType> ir_type) {
@@ -69,12 +75,12 @@ class PrajnaCodegen {
         return nullptr;
     }
 
-    void EmitGridIndex(std::shared_ptr<ir::GridIndex> ir_indices) {
+    void Visit(std::shared_ptr<ir::GridIndex> ir_indices) override {
         this->EmitType(ir_indices->type);
         ir_indices->pir_value = pir_builder->Create<pir::LocalVariable>(ir_indices->type->pir_type);
     }
 
-    void EmitGrid(std::shared_ptr<ir::Grid> ir_grid) {
+    void Visit(std::shared_ptr<ir::Grid> ir_grid) override {
         GALOIS_ASSERT(!ir_grid->pir_value);
         if (this->grid_stack.size()) {
             ir_grid->parent_grid = this->grid_stack.top();
@@ -103,7 +109,7 @@ class PrajnaCodegen {
             }));
         }
 
-        this->EmitGridIndex(ir_grid->index);
+        ir_grid->index->ApplyVisitor(this->shared_from_this());
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
             auto pir_first_value = pir_builder->GetInt64Constant(0);
@@ -125,7 +131,7 @@ class PrajnaCodegen {
         }
 
         for (auto ir_tensor : ir_grid->block->tensors) {
-            this->EmitTensor(ir_tensor);
+            ir_tensor->ApplyVisitor(this->shared_from_this());
         }
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
@@ -133,7 +139,7 @@ class PrajnaCodegen {
         }
     }
 
-    void EmitOperator(std::shared_ptr<ir::Operator> ir_operator) {
+    void Visit(std::shared_ptr<ir::Operator> ir_operator)  override {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
@@ -189,24 +195,24 @@ class PrajnaCodegen {
         // }
 
         for (auto ir_tensor : ir_operator->block->tensors) {
-            this->EmitTensor(ir_tensor);
+            ir_tensor->ApplyVisitor(this->shared_from_this());
         }
 
         pir_builder->ReturnVoid();
     }
 
-    void EmitWrite(std::shared_ptr<ir::Write> ir_write_accessor) {
-        this->EmitTensor(ir_write_accessor->Variable());
-        this->EmitTensor(ir_write_accessor->Tensor());
+    void Visit(std::shared_ptr<ir::Write> ir_write_accessor) override {
+        ir_write_accessor->Variable()->ApplyVisitor(this->shared_from_this());
+        ir_write_accessor->Tensor()->ApplyVisitor(this->shared_from_this());
         pir_builder->Create<pir::WriteVariableLiked>(
             ir_write_accessor->Tensor()->pir_value,
             prajna::Cast<pir::VariableLiked>(ir_write_accessor->Variable()->pir_value));
     }
 
-    void EmitArithmeticInstruction(
-        std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) {
-        this->EmitTensor(ir_arithmetic_instruction->GetOperand(0));
-        this->EmitTensor(ir_arithmetic_instruction->GetOperand(1));
+    void Visit(
+        std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) override {
+        ir_arithmetic_instruction->GetOperand(0)->ApplyVisitor(this->shared_from_this());
+        ir_arithmetic_instruction->GetOperand(1)->ApplyVisitor(this->shared_from_this());
 
         auto ir_value_type = ir_arithmetic_instruction->type->DataType();
         GALOIS_ASSERT(Is<ir::RealNumberType>(ir_value_type));
@@ -255,150 +261,170 @@ class PrajnaCodegen {
             ir_arithmetic_instruction->GetOperand(1)->pir_value);
     }
 
-    void EmitTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
-        if (!ir_tensor) {  // indices may nullptr
-            return;
-        }
+    // void EmitTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
+    //     if (!ir_tensor) {  // indices may nullptr
+    //         return;
+    //     }
 
-        if (ir_tensor->pir_value) {
-            return;
-        }
+    //     if (ir_tensor->pir_value) {
+    //         return;
+    //     }
 
-        // if (auto ir_affine_index = Cast<ir::AffineIndex>(ir_tensor)) {
-        //     this->EmitAffineIndex(ir_affine_index);
+    //     // if (auto ir_affine_index = Cast<ir::AffineIndex>(ir_tensor)) {
+    //     //     this->EmitAffineIndex(ir_affine_index);
+    //     //     return;
+    //     // }
+
+    //     if (auto ir_pthread_block = Cast<ir::PthreadBlock>(ir_tensor)) {
+    //         this->EmitPthreadBlock(ir_pthread_block);
+    //     }
+
+    //     if (auto ir_slice = Cast<ir::SliceView>(ir_tensor)) {
+    //         this->EmitSliceView(ir_slice);
+    //         return;
+    //     }
+
+    //     if (auto ir_squeeze_view = Cast<ir::SqueezeView>(ir_tensor)) {
+    //         this->EmitSqueezeView(ir_squeeze_view);
+    //         return;
+    //     }
+
+    //     if (auto ir_squeeze_dim_view = Cast<ir::SqueezeDimView>(ir_tensor)) {
+    //         this->EmitSqueezeDimView(ir_squeeze_dim_view);
+    //         return;
+    //     }
+
+    //     if (auto ir_instruction = Cast<ir::Instruction>(ir_tensor)) {
+    //         this->EmitInstruction(ir_instruction);
+    //         return;
+    //     }
+
+    //     if (auto ir_operator = Cast<ir::Operator>(ir_tensor)) {
+    //         this->EmitOperator(ir_operator);
+    //         return;
+    //     }
+
+    //     if (auto ir_constant = Cast<ir::Constant>(ir_tensor)) {
+    //         this->EmitConstant(ir_constant);
+    //         return;
+    //     }
+
+    //     if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
+    //         this->EmitGrid(ir_grid);
+    //         return;
+    //     }
+
+    //     if (Is<ir::GridIndex>(ir_tensor)) {
+    //         // 在EmitGrid中处理
+    //         return;
+    //     }
+
+    //     GALOIS_UNREACHABLE;
+    // }
+
+    // void Visit(std::shared_ptr<ir::Instruction> ir_instruction) override {
+    //     for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
+    //         this->EmitTensor(ir_instruction->GetOperand(i));
+
+    //     }
+
+        // if (auto ir_arithmetic_instruction = Cast<ir::ArithmeticInstruction>(ir_instruction)) {
+        //     this->EmitArithmeticInstruction(ir_arithmetic_instruction);
         //     return;
         // }
 
-        if (auto ir_pthread_block = Cast<ir::PthreadBlock>(ir_tensor)) {
-            this->EmitPthreadBlock(ir_pthread_block);
-        }
+        // if (auto ir_accessor = Cast<ir::Accessor>(ir_instruction)) {
+        //     this->EmitAccessor(ir_accessor);
+        //     return;
+        // }
 
-        if (auto ir_slice = Cast<ir::SliceView>(ir_tensor)) {
-            this->EmitSliceView(ir_slice);
-            return;
-        }
+        // if (auto ir_write_accessor = Cast<ir::Write>(ir_instruction)) {
+        //     this->EmitWrite(ir_write_accessor);
+        //     return;
+        // }
 
-        if (auto ir_squeeze_view = Cast<ir::SqueezeView>(ir_tensor)) {
-            this->EmitSqueezeView(ir_squeeze_view);
-            return;
-        }
+        // if (auto ir_prefetch = Cast<ir::Prefetch>(ir_instruction)) {
+        //     this->EmitPrefetch(ir_prefetch);
+        //     return;
+        // }
 
-        if (auto ir_squeeze_dim_view = Cast<ir::SqueezeDimView>(ir_tensor)) {
-            this->EmitSqueezeDimView(ir_squeeze_dim_view);
-            return;
-        }
+        // if (auto ir_broadcast = Cast<ir::Broadcast>(ir_instruction)) {
+        //     this->EmitBroadcast(ir_broadcast);
+        //     return;
+        // }
 
-        if (auto ir_instruction = Cast<ir::Instruction>(ir_tensor)) {
-            this->EmitInstruction(ir_instruction);
-            return;
-        }
+        // if (auto ir_vector_broadcast = Cast<ir::VectorBroadcast>(ir_instruction)) {
+        //     this->EmitVectorBroadcast(ir_vector_broadcast);
+        //     return;
+        // }
 
-        if (auto ir_operator = Cast<ir::Operator>(ir_tensor)) {
-            this->EmitOperator(ir_operator);
-            return;
-        }
+        // if (auto ir_bit_cast = Cast<ir::BitCast>(ir_instruction)) {
+        //     this->EmitBitCast(ir_bit_cast);
+        //     return;
+        // }
 
-        if (auto ir_constant = Cast<ir::Constant>(ir_tensor)) {
-            this->EmitConstant(ir_constant);
-            return;
-        }
+        // if (auto ir_call = Cast<ir::Call>(ir_instruction)) {
+        //     this->EmitCall(ir_call);
+        //     return;
+        // }
 
-        if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
-            this->EmitGrid(ir_grid);
-            return;
-        }
+        // if (auto ir_free = Cast<ir::Free>(ir_instruction)) {
+        //     this->EmitFree(ir_free);
+        //     return;
+        // }
 
-        if (Is<ir::GridIndex>(ir_tensor)) {
-            // 在EmitGrid中处理
-            return;
-        }
+        // if (auto ir_alloca = Cast<ir::Alloca>(ir_instruction)) {
+        //     this->EmitAlloca(ir_alloca);
+        //     return;
+        // }
 
-        GALOIS_UNREACHABLE;
-    }
+        // if (auto ir_return = Cast<ir::Return>(ir_instruction)) {
+        //     this->EmitReturn(ir_return);
+        //     return;
+        // }
 
-    void EmitInstruction(std::shared_ptr<ir::Instruction> ir_instruction) {
-        for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
-            this->EmitTensor(ir_instruction->GetOperand(i));
-        }
+        // if (auto ir_unary_intrinsic = Cast<ir::UnaryIntrinsic>(ir_instruction)) {
+        //     this->EmitUnaryIntrinsic(ir_unary_intrinsic);
+        //     return;
+        // }
 
-        if (auto ir_arithmetic_instruction = Cast<ir::ArithmeticInstruction>(ir_instruction)) {
-            this->EmitArithmeticInstruction(ir_arithmetic_instruction);
-            return;
-        }
+    //     GALOIS_UNREACHABLE;
+    // }
 
-        if (auto ir_accessor = Cast<ir::Accessor>(ir_instruction)) {
-            this->EmitAccessor(ir_accessor);
-            return;
-        }
+    
+    // do test 
+    // void Visit(std::shared_ptr<ir::Constant> ir_constant) override {
+    //     if (auto ir_constant_float = Cast<ir::ConstantFloat>(ir_constant)) {
+    //         ir_constant->pir_value = pir_builder->Create<pir::ConstantFloat>(
+    //             ir_constant->type->pir_type, ir_constant_float->value);
+    //         return;
+    //     }
 
-        if (auto ir_write_accessor = Cast<ir::Write>(ir_instruction)) {
-            this->EmitWrite(ir_write_accessor);
-            return;
-        }
+    //     if (auto ir_constant_int = Cast<ir::ConstantInt>(ir_constant)) {
+    //         ir_constant->pir_value = pir_builder->Create<pir::ConstantInt>(
+    //             ir_constant->type->pir_type, ir_constant_int->value);
+    //         return;
+    //     }
 
-        if (auto ir_prefetch = Cast<ir::Prefetch>(ir_instruction)) {
-            this->EmitPrefetch(ir_prefetch);
-            return;
-        }
+    //     GALOIS_UNREACHABLE;
+    // }
 
-        if (auto ir_broadcast = Cast<ir::Broadcast>(ir_instruction)) {
-            this->EmitBroadcast(ir_broadcast);
-            return;
-        }
-
-        if (auto ir_vector_broadcast = Cast<ir::VectorBroadcast>(ir_instruction)) {
-            this->EmitVectorBroadcast(ir_vector_broadcast);
-            return;
-        }
-
-        if (auto ir_bit_cast = Cast<ir::BitCast>(ir_instruction)) {
-            this->EmitBitCast(ir_bit_cast);
-            return;
-        }
-
-        if (auto ir_call = Cast<ir::Call>(ir_instruction)) {
-            this->EmitCall(ir_call);
-            return;
-        }
-
-        if (auto ir_free = Cast<ir::Free>(ir_instruction)) {
-            this->EmitFree(ir_free);
-            return;
-        }
-
-        if (auto ir_alloca = Cast<ir::Alloca>(ir_instruction)) {
-            this->EmitAlloca(ir_alloca);
-            return;
-        }
-
-        if (auto ir_return = Cast<ir::Return>(ir_instruction)) {
-            this->EmitReturn(ir_return);
-            return;
-        }
-
-        if (auto ir_unary_intrinsic = Cast<ir::UnaryIntrinsic>(ir_instruction)) {
-            this->EmitUnaryIntrinsic(ir_unary_intrinsic);
-            return;
-        }
+    void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) override {
+        ir_constant_int->pir_value = pir_builder->Create<pir::ConstantInt>(
+            ir_constant_int->type->pir_type, ir_constant_int->value);
+        return;
 
         GALOIS_UNREACHABLE;
     }
 
-    void EmitConstant(std::shared_ptr<ir::Constant> ir_constant) {
-        if (auto ir_constant_float = Cast<ir::ConstantFloat>(ir_constant)) {
-            ir_constant->pir_value = pir_builder->Create<pir::ConstantFloat>(
-                ir_constant->type->pir_type, ir_constant_float->value);
-            return;
-        }
-
-        if (auto ir_constant_int = Cast<ir::ConstantInt>(ir_constant)) {
-            ir_constant->pir_value = pir_builder->Create<pir::ConstantInt>(
-                ir_constant->type->pir_type, ir_constant_int->value);
-            return;
-        }
+    void Visit(std::shared_ptr<ir::ConstantFloat> ir_constant_float) override {
+        ir_constant_float->pir_value = pir_builder->Create<pir::ConstantFloat>(
+            ir_constant_float->type->pir_type, ir_constant_float->value);
+        return;
 
         GALOIS_UNREACHABLE;
     }
+
 
     std::shared_ptr<pir::Value> GetPrajnaPointerFromTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
         if (auto pir_deference = prajna::Cast<pir::DeferencePointer>(ir_tensor->pir_value)) {
@@ -408,8 +434,8 @@ class PrajnaCodegen {
         }
     }
 
-    void EmitAccessor(std::shared_ptr<ir::Accessor> ir_accessor) {
-        this->EmitTensor(ir_accessor->Tensor());
+    void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {
+        ir_accessor->Tensor()->ApplyVisitor(this->shared_from_this());
 
         auto pir_linear_index =
             pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
@@ -466,8 +492,8 @@ class PrajnaCodegen {
         ir_accessor->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
     }
 
-    void EmitPrefetch(std::shared_ptr<ir::Prefetch> ir_prefetch) {
-        this->EmitAccessor(ir_prefetch->Address());
+    void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override {
+        ir_prefetch->Address()->ApplyVisitor(this->shared_from_this());
         auto pir_address = pir_builder->GetAddressOf(ir_prefetch->Address()->pir_value);
 
         static std::shared_ptr<pir::Function> pir_prefetch_function = nullptr;
@@ -498,8 +524,8 @@ class PrajnaCodegen {
         pir_arguments.push_back(pir_builder->GetInt32Constant(1));
         pir_builder->Create<pir::Call>(pir_prefetch_function, pir_arguments);
     }
-    void EmitBroadcast(std::shared_ptr<ir::Broadcast> ir_broadcast) {
-        this->EmitTensor(ir_broadcast->Tensor());
+    void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) override {
+        ir_broadcast->Tensor()->ApplyVisitor(this->shared_from_this());
         this->EmitType(ir_broadcast->type);
 
         std::list<std::shared_ptr<pir::Constant>> prajna_constant_zero_list;
@@ -518,8 +544,8 @@ class PrajnaCodegen {
             pir_builder->Create<pir::ShuffleVector>(pir_vector_tmp, pir_constant_vector_zero_mask);
     }
 
-    void EmitVectorBroadcast(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) {
-        this->EmitTensor(ir_vector_broadcast->Vector());
+    void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) override {
+        ir_vector_broadcast->Vector()->ApplyVisitor(this->shared_from_this());
         this->EmitType(ir_vector_broadcast->type);
 
         std::list<std::shared_ptr<pir::Constant>> prajna_constant_lane_id_list;
@@ -536,8 +562,8 @@ class PrajnaCodegen {
             ir_vector_broadcast->Vector()->pir_value, pir_constant_vector_lane_id_mask);
     }
 
-    void EmitBitCast(std::shared_ptr<ir::BitCast> ir_bit_cast) {
-        this->EmitTensor(ir_bit_cast->Tensor());
+    void Visit(std::shared_ptr<ir::BitCast> ir_bit_cast) override {
+        ir_bit_cast->Tensor()->ApplyVisitor(this->shared_from_this());
         this->EmitType(ir_bit_cast->type);
         ir_bit_cast->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
@@ -546,7 +572,7 @@ class PrajnaCodegen {
                 pir::PointerType::Create(ir_bit_cast->type->pir_type)));
     }
 
-    void EmitAlloca(std::shared_ptr<ir::Alloca> ir_alloca) {
+    void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override {
         auto ir_tensor_type = ir_alloca->type;
 
         std::list<std::shared_ptr<pir::Value>> pir_arguments = {
@@ -571,13 +597,13 @@ class PrajnaCodegen {
         }
     }
 
-    void EmitReturn(std::shared_ptr<ir::Return> ir_return) {
+    void Visit(std::shared_ptr<ir::Return> ir_return) override {
         auto pir_pointer_value = GetPirValueOfTensor(ir_return->Tensor());
         pir_builder->Create<pir::Return>(pir_pointer_value);
     }
 
-    void EmitFree(std::shared_ptr<ir::Free> ir_free) {
-        this->EmitTensor(ir_free->Tensor());
+    void Visit(std::shared_ptr<ir::Free> ir_free) override {
+        ir_free->Tensor()->ApplyVisitor(this->shared_from_this());
         ir_free->pir_value = pir_builder->Create<pir::Call>(
             pir_builder->GetIntrinsic(
                 "free", pir::FunctionType::Create(
@@ -588,9 +614,9 @@ class PrajnaCodegen {
                 pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
 
-    void EmitSliceView(std::shared_ptr<ir::SliceView> ir_slice) {
+    void Visit(std::shared_ptr<ir::SliceView> ir_slice) override {
         this->EmitType(ir_slice->type);
-        this->EmitAccessor(ir_slice->Origin());
+        ir_slice->Origin()->ApplyVisitor(this->shared_from_this());
 
         auto pir_pointer_type = pir::PointerType::Create(ir_slice->type->pir_type);
         // 偏移地址
@@ -600,7 +626,7 @@ class PrajnaCodegen {
                 pir_pointer_type));
     }
 
-    void EmitSqueezeView(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) {
+    void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {
         this->EmitType(ir_squeeze_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_squeeze_view->type->pir_type);
 
@@ -611,7 +637,7 @@ class PrajnaCodegen {
                 pir_pointer_type));
     }
 
-    void EmitSqueezeDimView(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) {
+    void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {
         this->EmitType(ir_squeeze_dim_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_squeeze_dim_view->type->pir_type);
 
@@ -622,7 +648,7 @@ class PrajnaCodegen {
                 pir_pointer_type));
     }
 
-    void EmitCall(std::shared_ptr<ir::Call> ir_call) {
+    void Visit(std::shared_ptr<ir::Call> ir_call) override {
         if (!ir_call->annotation_dict.count("enable_multi_thread")) {
             std::list<std::shared_ptr<pir::Value>> pir_arguments;
             for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
@@ -726,7 +752,7 @@ class PrajnaCodegen {
         }
     }
 
-    void EmitUnaryIntrinsic(std::shared_ptr<ir::UnaryIntrinsic> ir_intrinsic) {
+    void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_intrinsic) override {
         auto ir_operand = ir_intrinsic->GetOperand(0);
         auto pir_operand_type = ir_operand->type->pir_type;
         auto pir_intrinsic_type = pir::FunctionType::Create({pir_operand_type}, pir_operand_type);
@@ -737,7 +763,7 @@ class PrajnaCodegen {
             pir_builder->Create<pir::Call>(pir_intrinsic, ir_operand->pir_value);
     }
 
-    void EmitPthreadBlock(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) {
+    void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) override {
         auto ir_captured_tensors = transform::CaptureExternalTensors(ir_pthread_block);
     }
 
