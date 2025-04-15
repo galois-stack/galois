@@ -3,6 +3,7 @@
 #include "galois/codegen/cpu/prajna_codegen.hpp"
 #include "galois/helper.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/transform/reference_count_visitor.hpp"
 #include "prajna/bindings/core.hpp"
 #include "prajna/jit/execution_engine.h"
 #include "thpool.h"
@@ -42,6 +43,9 @@ class Engine {
     template <typename Func>
     Func EmitOperatorSymbol(std::shared_ptr<ir::Operator> ir_operator) {
         if (!ir_operator->pir_value) {
+            auto reference_count_visitor = transform::ReferenceCountVisitor::Create();
+            ir_operator->ApplyVisitor(reference_count_visitor);
+
             auto prajna_codegen =
                 codegen::cpu::PrajnaCodegen::Create(prajna_compiler->_symbol_table);
             prajna_codegen->EmitOperator(ir_operator);

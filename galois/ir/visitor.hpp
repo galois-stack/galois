@@ -51,7 +51,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) {}
     virtual void Visit(std::shared_ptr<ir::Call> ir_call) {}
     virtual void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) {}
-    virtual void Visit(std::shared_ptr<ir::Viewer> ir_viewer) { GALOIS_UNIMPLEMENT; }
+    virtual void Visit(std::shared_ptr<ir::Viewer> ir_viewer) {}
     virtual void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) {}
     virtual void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) {}
     virtual void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) {}
