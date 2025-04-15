@@ -315,12 +315,8 @@ class GemmOptimizer {
         // 计算最终裁剪尺寸
         auto padding_shape = (plane_shape.array() * basic_padding_shape.array()).matrix();
         std::shared_ptr<ir::Tensor> ir_padded_mat = ir_mat;
-        // TODO: 后期使用编译技术， 优化此操作， 无需手动写
-        boost::scope::scope_exit free_mem([&] { ir_builder->Create<ir::Free>(ir_padded_mat); },
-                                          false);
         if (ir_mat->type->shape != padding_shape) {
             ir_padded_mat = ir_builder->Express<op::PaddingCreator>({ir_mat}, padding_shape);
-            free_mem.set_active(true);
         }
         // 将裁剪后的矩阵分块打包
         auto ir_packed_type = ir::TensorType::Create(ir_tile_type, plane_shape);
@@ -362,17 +358,11 @@ class GemmOptimizer {
         auto ir_register_tile_grid = GetInnerGrid3(ir_first_grid);
         ExpandGrid(ir_register_tile_grid);
 
-        ir_builder->Create<ir::Free>(ir_packed_mat_a);
-        ir_builder->Create<ir::Free>(ir_packed_mat_b);
-
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸
         auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->output_type;
         auto ir_mat_c =
             ir_builder->Express<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
-
-        ir_builder->Create<ir::Free>(ir_packed_mat_c);
-        ir_builder->Create<ir::Free>(ir_unpacked_mat_c);
 
         ir_builder->Create<ir::Return>(ir_mat_c);
 

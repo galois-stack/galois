@@ -130,8 +130,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
         std::shared_ptr<Operator> ir_operator;
         {
             // TODO: give a valid name
-            auto [ir_tmp_operator, op_scope] =
-                this->CreateOperator(ir_operator_type, "unname" + std::to_string(this->id++));
+            auto [ir_tmp_operator, op_scope] = this->CreateOperator(
+                ir_operator_type, sp_creator->name + std::to_string(this->id++));
             ir_operator = ir_tmp_operator;
             std::vector<std::shared_ptr<Tensor>> ir_inputs;
             std::transform(RANGE(ir_tmp_operator->inputs), std::back_inserter(ir_inputs),
