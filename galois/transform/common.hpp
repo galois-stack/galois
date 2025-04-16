@@ -10,33 +10,40 @@
 namespace galois::transform {
 
 inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
-                       std::function<void(std::shared_ptr<ir::Tensor>)> callback);
+                       std::shared_ptr<galois::ir::Visitor> visitor);
 
-inline void EachTensor(std::shared_ptr<ir::Tensor> ir_tensor,
-                       std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    if (auto ir_block = Cast<ir::Block>(ir_tensor)) {
-        EachTensor(ir_block, callback);
+inline void EachTensor(std::shared_ptr<ir::Tensor> ir_value,
+                       std::shared_ptr<galois::ir::Visitor> visitor) {
+    if (auto ir_block = Cast<ir::Block>(ir_value)) {
+        EachTensor(ir_block, visitor);
     } else {
-        callback(ir_tensor);
+        ir_value->ApplyVisitor(visitor);
     }
 }
 
 inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
-                       std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    callback(ir_block);
+                       std::shared_ptr<galois::ir::Visitor> visitor) {
+    ir_block->ApplyVisitor(visitor);
     for (auto ir_tensor : ir_block->tensors) {
-        EachTensor(ir_tensor, callback);
+        EachTensor(ir_tensor, visitor);
     }
 }
 
 template <typename Value_>
+class EachVisitor : public galois::ir::Visitor {
+   private:
+    std::function<void(std::shared_ptr<Value_>)> callback_;
+
+   public:
+    EachVisitor(std::function<void(std::shared_ptr<Value_>)> callback) : callback_(callback) {}
+
+    void Visit(std::shared_ptr<Value_> value) override { callback_(value); }
+};
+template <typename Value_>
 inline void Each(std::shared_ptr<ir::Block> ir_block,
                  std::function<void(std::shared_ptr<Value_>)> callback) {
-    EachTensor(ir_block, [=](auto ir_e) {
-        if (auto ir_value_ = Cast<Value_>(ir_e)) {
-            callback(ir_value_);
-        }
-    });
+    auto visitor = std::make_shared<EachVisitor<Value_>>(callback);
+    EachTensor(ir_block, visitor);
 }
 
 inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
