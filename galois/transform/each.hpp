@@ -6,6 +6,7 @@
 
 namespace galois::transform {
 
+
 template <typename Value_>
 class EachTensorVisitor : public ir::Visitor {
    protected:
@@ -18,6 +19,7 @@ class EachTensorVisitor : public ir::Visitor {
         self->callback_ = callback;
         return self;
     }
+
 
     void Visit(std::shared_ptr<ir::Block> ir_block) override {
         for (auto tensor : ir_block->tensors) {
@@ -112,5 +114,15 @@ class EachTensorVisitor : public ir::Visitor {
    private:
     std::function<void(std::shared_ptr<Value_>)> callback_;
 };
+
+template <typename Value_>
+inline void Each(std::shared_ptr<ir::Tensor> ir_tensor,
+                 std::function<void(std::shared_ptr<Value_>)> callback) {
+    auto visitor = EachTensorVisitor<Value_>::Create(callback);
+    ir_tensor->ApplyVisitor(visitor);
+}
+
+
+
 
 }  // namespace galois::transform

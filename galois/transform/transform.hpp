@@ -7,6 +7,7 @@
 #include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
 #include "galois/transform/common.hpp"
+#include "galois/transform/each.hpp"
 
 namespace galois::transform {
 
