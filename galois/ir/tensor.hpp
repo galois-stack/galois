@@ -102,10 +102,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::unordered_map<std::string, std::list<std::string>> annotation_dict;
     std::list<InstructionAndOperandIndex> instruction_with_index_list;
     std::shared_ptr<Block> parent_block = nullptr;
-
-    std::shared_ptr<Operator> outputted_operator = nullptr;
-    std::shared_ptr<Operator> inputted_operator = nullptr;
-
     std::shared_ptr<pir::Value> pir_value = nullptr;
     std::string tag = "Tensor";
 };
