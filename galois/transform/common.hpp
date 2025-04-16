@@ -11,12 +11,11 @@
 
 namespace galois::transform {
 
-
 template <typename Value_>
-inline void Each(std::shared_ptr<ir::Block> ir_block,
+inline void Each(std::shared_ptr<ir::Tensor> ir_tensor,
                  std::function<void(std::shared_ptr<Value_>)> callback) {
     auto visitor = EachTensorVisitor<Value_>::Create(callback);
-    ir_block->ApplyVisitor(visitor);
+    ir_tensor->ApplyVisitor(visitor);
 }
 
 inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
