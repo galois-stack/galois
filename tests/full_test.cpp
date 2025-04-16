@@ -7,10 +7,8 @@ void BM_Full(benchmark::State &state) {
     auto ir_value_type = ir::f32;
 
     auto ir_builder = ir::Builder::Create();
-
-    auto ir_full_creator = op::FullCreator::Create(ir_input_type);
-
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_full_creator, {ir_value_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::FullCreator>({ir_value_type}, ir_input_type);
 
     auto jit_engine = jit::Engine::Create();
     auto full_fun = jit_engine->EmitOperatorSymbol<float (*)(float *)>(ir_operator);
@@ -34,10 +32,8 @@ TEST(GaloisTests, TestFull) {
     auto ir_value_type = ir::f32;
 
     auto ir_builder = ir::Builder::Create();
-
-    auto ir_full_creator = op::FullCreator::Create(ir_input_type);
-
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_full_creator, {ir_value_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::FullCreator>({ir_value_type}, ir_input_type);
 
     auto jit_engine = jit::Engine::Create();
     auto full_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
