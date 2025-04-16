@@ -170,10 +170,10 @@ class Builder : public std::enable_shared_from_this<Builder> {
 
     template <typename Creator, typename... CreatorArgs>
     std::shared_ptr<Operator> CreateOperatorByCreator(
-        std::vector<std::shared_ptr<TensorType>> input_types, CreatorArgs... creator_args) {
+        std::vector<std::shared_ptr<TensorType>> ir_input_types, CreatorArgs... creator_args) {
         auto sp_creator = Creator::Create(creator_args...);
-        auto ir_output_type = sp_creator->InferType(input_types);
-        auto ir_operator_type = OperatorType::Create(input_types, ir_output_type);
+        auto ir_output_type = sp_creator->InferType(ir_input_types);
+        auto ir_operator_type = OperatorType::Create(ir_input_types, ir_output_type);
         auto [ir_operator, op_scope] =
             this->CreateOperator(ir_operator_type, sp_creator->name + std::to_string(this->id++));
         std::vector<std::shared_ptr<Tensor>> ir_inputs;
@@ -186,10 +186,10 @@ class Builder : public std::enable_shared_from_this<Builder> {
     template <typename Creator, typename... CreatorArgs>
     std::shared_ptr<Tensor> Express(std::vector<std::shared_ptr<Tensor>> inputs,
                                     CreatorArgs... creator_args) {
-        std::vector<std::shared_ptr<TensorType>> input_types;
-        std::transform(RANGE(inputs), std::back_inserter(input_types),
+        std::vector<std::shared_ptr<TensorType>> ir_input_types;
+        std::transform(RANGE(inputs), std::back_inserter(ir_input_types),
                        [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });
-        auto ir_operator = this->CreateOperatorByCreator<Creator>(input_types, creator_args...);
+        auto ir_operator = this->CreateOperatorByCreator<Creator>(ir_input_types, creator_args...);
         return this->Call(ir_operator, inputs);
     };
 
