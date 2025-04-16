@@ -129,7 +129,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                       ir_grid->index->pir_value, pir_builder->GetInt64Constant(i)));
         }
 
-        for (auto ir_tensor : ir_grid->block->tensors) {
+        for (auto ir_tensor : *ir_grid->block) {
             ir_tensor->ApplyVisitor(this->shared_from_this());
         }
 
@@ -142,7 +142,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
-        for (auto ir_input_type : ir_operator->GetOperatorType()->input_types) {
+        for (auto ir_input_type : ir_operator->GetOperatorType()->ir_input_types) {
             pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_input_type)));
         }
 
@@ -193,7 +193,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         //     (*pir_function_parameters_iter)->no_undef = true;
         // }
 
-        for (auto ir_tensor : ir_operator->block->tensors) {
+        for (auto ir_tensor : *ir_operator->block) {
             ir_tensor->ApplyVisitor(this->shared_from_this());
         }
 

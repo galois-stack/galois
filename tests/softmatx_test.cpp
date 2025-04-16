@@ -5,8 +5,7 @@ void BM_Softmax(benchmark::State &state) {
     auto length = int64_t(state.range(0));
     auto ir_vec_type = ir::f32->Tile(length);
     auto ir_builder = ir::Builder::Create();
-    auto ir_softmax_creator = op::SoftmaxCreator::Create();
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_softmax_creator, {ir_vec_type});
+    auto ir_operator = ir_builder->CreateOperatorByCreator<op::SoftmaxCreator>({ir_vec_type});
 
     auto jit_engine = jit::Engine::Create();
     auto softmax_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
@@ -24,8 +23,7 @@ BENCHMARK(BM_Softmax)->Arg(1 << 10)->Arg(1 << 20)->Arg(1 << 30);
 TEST(GaloisTests, TestSoftmax) {
     auto ir_vec_type = ir::f32->Tile(4);
     auto ir_builder = ir::Builder::Create();
-    auto ir_softmax_creator = op::SoftmaxCreator::Create();
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_softmax_creator, {ir_vec_type});
+    auto ir_operator = ir_builder->CreateOperatorByCreator<op::SoftmaxCreator>({ir_vec_type});
 
     auto jit_engine = jit::Engine::Create();
     auto softmax_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);

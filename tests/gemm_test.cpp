@@ -46,9 +46,8 @@ class GemmVsEigenTest : public testing::Test {
         auto ir_mat_type_b = ir_data_type->Tile(1024, 1024);
 
         auto ir_builder = ir::Builder::Create();
-        auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-        auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
-                                                               {ir_mat_type_a, ir_mat_type_b});
+        auto ir_operator = ir_builder->template CreateOperatorByCreator<op::MatrixMultiplyCreator>(
+            {ir_mat_type_a, ir_mat_type_b});
         auto gemm_optimizer = optimization::GemmOptimizer::Create();
         auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
 
@@ -139,12 +138,8 @@ class GemmPerformanceTest
         auto ir_mat_type_b = ir_data_type->Tile(k, n);
 
         auto ir_builder = ir::Builder::Create();
-        auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
-        auto ir_mat_type_c =
-            ir_packed_matrix_multiply_op_creator->InferType({ir_mat_type_a, ir_mat_type_b});
-
-        auto ir_operator = ir_builder->CreateOperatorByCreator(ir_packed_matrix_multiply_op_creator,
-                                                               {ir_mat_type_a, ir_mat_type_b});
+        auto ir_operator = ir_builder->CreateOperatorByCreator<op::MatrixMultiplyCreator>(
+            {ir_mat_type_a, ir_mat_type_b});
 
         auto gemm_optimizer = optimization::GemmOptimizer::Create();
         auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);

@@ -8,8 +8,8 @@ void BM_UnaryIntrinsic(benchmark::State &state) {
     auto length = int64_t(state.range(0));
     auto ir_input_type = ir::f32->Tile(length);
     auto ir_builder = ir::Builder::Create();
-    auto ir_intrin_creator = op::UnaryInstrinsicCreator::Create("sin");
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_intrin_creator, {ir_input_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::UnaryInstrinsicCreator>({ir_input_type}, "sin");
 
     auto jit_engine = jit::Engine::Create();
     auto sin_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
@@ -29,8 +29,8 @@ BENCHMARK(BM_UnaryIntrinsic)->Arg(1 << 10)->Arg(1 << 20)->Arg(1 << 30);
 TEST(GaloisTests, TestUnaryIntrinsic) {
     auto ir_input_type = ir::f32;
     auto ir_builder = ir::Builder::Create();
-    auto ir_intrin_creator = op::UnaryInstrinsicCreator::Create("sin");
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_intrin_creator, {ir_input_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::UnaryInstrinsicCreator>({ir_input_type}, "sin");
 
     auto jit_engine = jit::Engine::Create();
     auto sin_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);

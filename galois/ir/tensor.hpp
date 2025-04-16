@@ -102,10 +102,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::unordered_map<std::string, std::list<std::string>> annotation_dict;
     std::list<InstructionAndOperandIndex> instruction_with_index_list;
     std::shared_ptr<Block> parent_block = nullptr;
-
-    std::shared_ptr<Operator> outputted_operator = nullptr;
-    std::shared_ptr<Operator> inputted_operator = nullptr;
-
     std::shared_ptr<pir::Value> pir_value = nullptr;
     std::string tag = "Tensor";
 };
@@ -553,7 +549,7 @@ class Write : public Instruction {
     }
 };
 
-class Block : public Tensor {
+class Block : public Tensor, public std::list<std::shared_ptr<Tensor>> {
    public:
     static std::shared_ptr<Block> Create() {
         std::shared_ptr<Block> self(new Block);
@@ -564,8 +560,8 @@ class Block : public Tensor {
         interpreter->Visit(Cast<Block>(this->shared_from_this()));
     }
 
-   public:
-    std::list<std::shared_ptr<Tensor>> tensors;
+    //    public:
+    // std::list<std::shared_ptr<Tensor>> tensors;
 };
 
 class VoidType : public TensorType {
@@ -594,7 +590,7 @@ class OperatorType : public TensorType {
         std::vector<std::shared_ptr<TensorType>> ir_in_types,
         std::shared_ptr<TensorType> ir_out_types) {
         std::shared_ptr<OperatorType> self(new OperatorType);
-        self->input_types = ir_in_types;
+        self->ir_input_types = ir_in_types;
         self->output_type = ir_out_types;
         self->name = "(";
         for (auto ir_in_type : ir_in_types) {
@@ -607,7 +603,7 @@ class OperatorType : public TensorType {
     }
 
    public:
-    std::vector<std::shared_ptr<TensorType>> input_types;
+    std::vector<std::shared_ptr<TensorType>> ir_input_types;
     std::shared_ptr<TensorType> output_type;
 };
 
@@ -632,7 +628,7 @@ class Operator : public Tensor {
         std::shared_ptr<Operator> self(new Operator);
         self->type = ir_operator_type;
         self->block = Block::Create();
-        std::transform(RANGE(ir_operator_type->input_types), std::back_inserter(self->inputs),
+        std::transform(RANGE(ir_operator_type->ir_input_types), std::back_inserter(self->inputs),
                        [](std::shared_ptr<TensorType> ir_type) { return Input::Create(ir_type); });
 
         self->tag = "Operator";
@@ -732,7 +728,7 @@ class Call : public Instruction {
         self->Operator(ir_operator);
         auto iter_inputs = ir_inputs.begin();
         for (int64_t i = 0; i < self->InputSize(); ++i, ++iter_inputs) {
-            GALOIS_ASSERT(ir_operator->GetOperatorType()->input_types[i] == ir_inputs[i]->type);
+            GALOIS_ASSERT(ir_operator->GetOperatorType()->ir_input_types[i] == ir_inputs[i]->type);
             self->Input(i, *iter_inputs);
         }
         self->type = ir_operator->GetOperatorType()->output_type;

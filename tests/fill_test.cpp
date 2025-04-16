@@ -9,9 +9,8 @@ void BM_Fill(benchmark::State &state) {
     auto ir_value_type = ir::f32;
 
     auto ir_builder = ir::Builder::Create();
-    auto ir_fill_creator = op::FillCreator::Create();
     auto ir_operator =
-        ir_builder->CreateOperatorByCreator(ir_fill_creator, {ir_input_type, ir_value_type});
+        ir_builder->CreateOperatorByCreator<op::FillCreator>({ir_input_type, ir_value_type});
     auto jit_engine = jit::Engine::Create();
     auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)(float *, float *)>(ir_operator);
 
@@ -36,9 +35,8 @@ TEST(GaloisTests, TestFill) {
     auto ir_value_type = ir::f32;
 
     auto ir_builder = ir::Builder::Create();
-    auto ir_fill_creator = op::FillCreator::Create();
     auto ir_operator =
-        ir_builder->CreateOperatorByCreator(ir_fill_creator, {ir_input_type, ir_value_type});
+        ir_builder->CreateOperatorByCreator<op::FillCreator>({ir_input_type, ir_value_type});
     auto jit_engine = jit::Engine::Create();
     auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)(float *, float *)>(ir_operator);
 
