@@ -15,7 +15,7 @@ class FillCreator : public op::Creator {
 
     std::shared_ptr<ir::TensorType> InferType(
         std::vector<std::shared_ptr<ir::TensorType>>) override {
-        return ir::VoidType::Create();
+        return ir::void_;
     }
 
     void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
