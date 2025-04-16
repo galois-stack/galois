@@ -1,49 +1,22 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <set>
 
 #include "galois/helper.hpp"
 #include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
+#include "each_tensor_visitor.hpp"
 
 namespace galois::transform {
 
-inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
-                       std::shared_ptr<galois::ir::Visitor> visitor);
 
-inline void EachTensor(std::shared_ptr<ir::Tensor> ir_value,
-                       std::shared_ptr<galois::ir::Visitor> visitor) {
-    if (auto ir_block = Cast<ir::Block>(ir_value)) {
-        EachTensor(ir_block, visitor);
-    } else {
-        ir_value->ApplyVisitor(visitor);
-    }
-}
-
-inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
-                       std::shared_ptr<galois::ir::Visitor> visitor) {
-    ir_block->ApplyVisitor(visitor);
-    for (auto ir_tensor : ir_block->tensors) {
-        EachTensor(ir_tensor, visitor);
-    }
-}
-
-template <typename Value_>
-class EachVisitor : public galois::ir::Visitor {
-   private:
-    std::function<void(std::shared_ptr<Value_>)> callback_;
-
-   public:
-    EachVisitor(std::function<void(std::shared_ptr<Value_>)> callback) : callback_(callback) {}
-
-    void Visit(std::shared_ptr<Value_> value) override { callback_(value); }
-};
 template <typename Value_>
 inline void Each(std::shared_ptr<ir::Block> ir_block,
                  std::function<void(std::shared_ptr<Value_>)> callback) {
-    auto visitor = std::make_shared<EachVisitor<Value_>>(callback);
-    EachTensor(ir_block, visitor);
+    auto visitor = EachTensorVisitor<Value_>::Create(callback);
+    ir_block->ApplyVisitor(visitor);
 }
 
 inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
