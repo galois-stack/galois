@@ -20,9 +20,9 @@ class CloneVisitor : public Visitor {
         }
 
         auto ir_new = Block::Create();
-        for (auto ir_tensor : ir_block->tensors) {
+        for (auto ir_tensor : *ir_block) {
             ir_tensor->ApplyVisitor(this->shared_from_this());
-            ir_new->tensors.push_back(tensor_dict[ir_tensor]);
+            ir_new->push_back(tensor_dict[ir_tensor]);
         }
         tensor_dict[ir_block] = ir_new;
     }

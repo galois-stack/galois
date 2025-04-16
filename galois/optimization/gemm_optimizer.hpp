@@ -57,7 +57,7 @@ class NativeCpuInfo {
 
 inline std::shared_ptr<ir::Grid> GetInnerGrid3(std::shared_ptr<ir::Grid> ir_grid) {
     auto ir_block_iter =
-        std::find_if(RANGE(ir_grid->block->tensors), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
+        std::find_if(RANGE((*ir_grid->block)), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
             if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
                 if (ir_grid->shape.size() == 3) {
                     return true;
@@ -66,7 +66,7 @@ inline std::shared_ptr<ir::Grid> GetInnerGrid3(std::shared_ptr<ir::Grid> ir_grid
             return false;
         });
 
-    if (ir_block_iter != ir_grid->block->tensors.end()) {
+    if (ir_block_iter != ir_grid->block->end()) {
         return GetInnerGrid3(Cast<ir::Grid>(*ir_block_iter));
     } else {
         return Cast<ir::Grid>(ir_grid);
@@ -95,7 +95,7 @@ inline std::vector<Eigen::VectorXi64> GenerateIndexGrid(Eigen::VectorXi64 shape)
 inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
     auto index_grid = GenerateIndexGrid(ir_grid->shape);
     GALOIS_ASSERT(ir_grid->parent_block);
-    auto ir_grid_iter = std::find(RANGE(ir_grid->parent_block->tensors), ir_grid);
+    auto ir_grid_iter = std::find(RANGE((*ir_grid->parent_block)), ir_grid);
 
     auto ir_external_tensor_set = transform::CaptureExternalTensors(ir_grid->block);
     std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>> tensor_dict;
@@ -106,7 +106,7 @@ inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
     for (auto index : index_grid) {
         auto ir_clone_visitor = ir::CloneVisitor::Create();
         ir_clone_visitor->tensor_dict = tensor_dict;
-        for (auto ir_value : Clone(ir_grid->block->tensors)) {
+        for (auto ir_value : Clone(*ir_grid->block)) {
             auto ir_value_clone = ir_clone_visitor->Clone(ir_value);
             GALOIS_ASSERT(ir_value_clone->tag == ir_value->tag);
             if (auto ir_accessor = Cast<ir::Accessor>(ir_value_clone)) {
@@ -116,11 +116,11 @@ inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
                 }
             }
 
-            ir_grid->parent_block->tensors.insert(ir_grid_iter, ir_value_clone);
+            ir_grid->parent_block->insert(ir_grid_iter, ir_value_clone);
         }
     }
 
-    ir_grid->parent_block->tensors.remove(ir_grid);
+    ir_grid->parent_block->remove(ir_grid);
     ir_grid->Finalize();
 }
 
@@ -326,7 +326,7 @@ class GemmOptimizer {
     }
 
     std::shared_ptr<ir::Operator> Optimize(std::shared_ptr<ir::Operator> ir_matrix_multiply) {
-        ir_matrix_multiply->block->tensors.clear();
+        ir_matrix_multiply->block->clear();
         auto ir_builder = ir::Builder::Create();
         auto [ir_gemm_operator, scope] = ir_builder->CreateOperator(
             ir_matrix_multiply->GetOperatorType(), ir_matrix_multiply->name + "_gemm");
@@ -347,7 +347,7 @@ class GemmOptimizer {
         auto ir_packed_mat_mul = Cast<ir::Call>(ir_packed_mat_c)->Operator();
         // TODO: 需要更通用的方式来定位grid
         auto ir_first_grid = Cast<ir::Grid>(*std::find_if(
-            RANGE(ir_packed_mat_mul->block->tensors), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
+            RANGE((*ir_packed_mat_mul->block)), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
                 if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
                     if (ir_grid->shape.size() == 3) {
                         return true;

@@ -129,7 +129,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                       ir_grid->index->pir_value, pir_builder->GetInt64Constant(i)));
         }
 
-        for (auto ir_tensor : ir_grid->block->tensors) {
+        for (auto ir_tensor : *ir_grid->block) {
             ir_tensor->ApplyVisitor(this->shared_from_this());
         }
 
@@ -193,7 +193,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         //     (*pir_function_parameters_iter)->no_undef = true;
         // }
 
-        for (auto ir_tensor : ir_operator->block->tensors) {
+        for (auto ir_tensor : *ir_operator->block) {
             ir_tensor->ApplyVisitor(this->shared_from_this());
         }
 
