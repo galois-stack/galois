@@ -142,7 +142,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         this->operator_stack.push(ir_operator);
         auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
-        for (auto ir_input_type : ir_operator->GetOperatorType()->input_types) {
+        for (auto ir_input_type : ir_operator->GetOperatorType()->ir_input_types) {
             pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_input_type)));
         }
 

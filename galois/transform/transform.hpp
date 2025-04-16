@@ -441,14 +441,14 @@ inline void Repeat(std::shared_ptr<ir::Operator> ir_operator, int64_t times) {
 
 inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
     //     auto ir_captured_tensor_set = CaptureExternalTensors(ir_block);
-    //     std::vector<std::shared_ptr<ir::TensorType>> input_types;
-    //     std::transform(RANGE(ir_captured_tensor_set), std::back_inserter(input_types),
+    //     std::vector<std::shared_ptr<ir::TensorType>> ir_input_types;
+    //     std::transform(RANGE(ir_captured_tensor_set), std::back_inserter(ir_input_types),
     //                    [](std::shared_ptr<ir::Tensor> ir_tensor) {
     //                        GALOIS_ASSERT(ir_tensor->type);
     //                        return ir_tensor->type;
     //                    });
     //     std::vector<std::shared_ptr<ir::TensorType>> output_types;
-    //     auto ir_operator_function = ir::Operator::Create(input_types, output_types);
+    //     auto ir_operator_function = ir::Operator::Create(ir_input_types, output_types);
     //     ir_operator_function->name = "__tmp_todo";
     //     ir_operator_function->fullname = ir_operator_function->name;
     //     std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>>

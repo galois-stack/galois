@@ -15,9 +15,9 @@ class SumCreator : public op::Creator {
     }
 
     std::shared_ptr<ir::TensorType> InferType(
-        std::vector<std::shared_ptr<ir::TensorType>> input_types) override {
-        GALOIS_ASSERT(input_types.size() == 1);
-        auto input_type = input_types.front();
+        std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) override {
+        GALOIS_ASSERT(ir_input_types.size() == 1);
+        auto input_type = ir_input_types.front();
         return input_type->DataType();
     }
 
