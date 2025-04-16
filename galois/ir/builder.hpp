@@ -94,13 +94,11 @@ class Builder : public std::enable_shared_from_this<Builder> {
         this->operator_stack.push(ir_operator);
         this->block_stack.push(ir_operator->block);
         this->iterator_stack.push(ir_operator->block->end());
-        this->temp_tensors_stack.push(std::vector<std::shared_ptr<Tensor>>());
 
         auto scope_guard = ScopeGuard::Create([&]() {
             this->operator_stack.pop();
             this->block_stack.pop();
             this->iterator_stack.pop();
-            this->temp_tensors_stack.pop();
         });
         return {ir_operator, std::move(scope_guard)};
     }
@@ -206,7 +204,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
     std::stack<std::shared_ptr<Operator>> operator_stack;
     std::stack<std::shared_ptr<Block>> block_stack;
     std::stack<std::list<std::shared_ptr<Tensor>>::iterator> iterator_stack;
-    std::stack<std::vector<std::shared_ptr<Tensor>>> temp_tensors_stack;
 
     size_t id = 0;
 
