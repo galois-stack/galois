@@ -94,9 +94,9 @@ class DecreaseVisitor : public ir::Visitor {
         auto ir_parent_block = ir_tensor->parent_block;
         auto ir_free = ir::Free::Create(ir_tensor);
         ir_free->parent_block = ir_parent_block;
-        auto iter = std::find_if(RANGE(ir_parent_block->tensors),
-                                 [](auto ir_x) { return Is<ir::Return>(ir_x); });
-        ir_tensor->parent_block->tensors.insert(iter, ir_free);
+        auto iter =
+            std::find_if(RANGE((*ir_parent_block)), [](auto ir_x) { return Is<ir::Return>(ir_x); });
+        ir_tensor->parent_block->insert(iter, ir_free);
     }
 
    public:
@@ -194,13 +194,12 @@ class ReferenceCountVisitor : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Block> ir_block) override {
         // 进入Block时, 需要增加Tensor的引用计数
-        for (auto ir_tensor : ir_block->tensors) {
+        for (auto ir_tensor : *ir_block) {
             ir_tensor->ApplyVisitor(this->increase_visitor);
         }
 
         // 推出Block时, 需要减少Tensor的引用计数
-        for (auto ir_tensor :
-             Clone(ir_block->tensors)) {  // 拷贝tensors， 因为free tensor的时候会改变结构
+        for (auto ir_tensor : Clone(*ir_block)) {  // 拷贝tensors， 因为free tensor的时候会改变结构
             ir_tensor->ApplyVisitor(this->decrease_visitor);
         }
     }

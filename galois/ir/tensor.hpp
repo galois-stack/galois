@@ -549,7 +549,7 @@ class Write : public Instruction {
     }
 };
 
-class Block : public Tensor {
+class Block : public Tensor, public std::list<std::shared_ptr<Tensor>> {
    public:
     static std::shared_ptr<Block> Create() {
         std::shared_ptr<Block> self(new Block);
@@ -560,8 +560,8 @@ class Block : public Tensor {
         interpreter->Visit(Cast<Block>(this->shared_from_this()));
     }
 
-   public:
-    std::list<std::shared_ptr<Tensor>> tensors;
+    //    public:
+    // std::list<std::shared_ptr<Tensor>> tensors;
 };
 
 class VoidType : public TensorType {

@@ -51,7 +51,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
 
     void Insert(std::shared_ptr<Tensor> ir_tensor) {
         GALOIS_ASSERT(this->iterator_stack.size());
-        this->CurrentBlock()->tensors.insert(this->iterator_stack.top(), ir_tensor);
+        this->CurrentBlock()->insert(this->iterator_stack.top(), ir_tensor);
         ir_tensor->parent_block = this->CurrentBlock();
     }
 
@@ -60,7 +60,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
         auto ir_grid = Cast<Grid>(this->Create<Grid>(shape));
         this->grid_stack.push(ir_grid);
         this->block_stack.push(ir_grid->block);
-        this->iterator_stack.push(ir_grid->block->tensors.end());
+        this->iterator_stack.push(ir_grid->block->end());
         auto scope_guard = ScopeGuard::Create([&]() {
             this->grid_stack.pop();
             this->block_stack.pop();
@@ -72,7 +72,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
     std::tuple<std::shared_ptr<PthreadBlock>, std::unique_ptr<ScopeGuard>> CreatePthreadBlock() {
         auto ir_pthread_block = Cast<PthreadBlock>(this->Create<PthreadBlock>());
         this->block_stack.push(ir_pthread_block);
-        this->iterator_stack.push(ir_pthread_block->tensors.end());
+        this->iterator_stack.push(ir_pthread_block->end());
         auto scope_guard = ScopeGuard::Create([&]() {
             this->block_stack.pop();
             this->iterator_stack.pop();
@@ -93,7 +93,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
 
         this->operator_stack.push(ir_operator);
         this->block_stack.push(ir_operator->block);
-        this->iterator_stack.push(ir_operator->block->tensors.end());
+        this->iterator_stack.push(ir_operator->block->end());
         this->temp_tensors_stack.push(std::vector<std::shared_ptr<Tensor>>());
 
         auto scope_guard = ScopeGuard::Create([&]() {
