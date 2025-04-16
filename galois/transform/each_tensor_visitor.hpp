@@ -20,9 +20,9 @@ class EachTensorVisitor : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Tensor> ir_tensor) override {
-        if (auto value = Cast<Value_>(ir_tensor)) {
-            callback_(value);
-        }
+        auto value = Cast<Value_>(ir_tensor);
+        GALOIS_ASSERT(value);
+        callback_(value);
     }
 
     void Visit(std::shared_ptr<ir::Block> ir_block) override {
