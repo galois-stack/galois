@@ -10,8 +10,8 @@ TEST(GaloisTests, TestPadding) {
     shape[1] = 32;
 
     auto ir_builder = ir::Builder::Create();
-    auto ir_padding_creator = op::PaddingCreator::Create(shape);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_padding_creator, {ir_input_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::PaddingCreator>({ir_input_type}, shape);
     auto jit_engine = jit::Engine::Create();
     auto padding_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
 
@@ -37,7 +37,8 @@ TEST(GaloisTests, TestPaddingIdentity) {
 
     auto ir_builder = ir::Builder::Create();
     auto ir_padding_creator = op::PaddingCreator::Create(shape);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_padding_creator, {ir_input_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::PaddingCreator>({ir_input_type}, shape);
     auto jit_engine = jit::Engine::Create();
     auto padding_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
 

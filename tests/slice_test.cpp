@@ -12,8 +12,8 @@ void BM_Slice(benchmark::State &state) {
     auto ir_input_type = ir::f32->Tile(length);
     auto ir_builder = ir::Builder::Create();
     auto shape = ir_input_type->shape / 2;  // 裁剪尺寸的一半
-    auto ir_slice_creator = op::SliceCreator::Create(shape);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_slice_creator, {ir_input_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::SliceCreator>({ir_input_type}, shape);
 
     auto jit_engine = jit::Engine::Create();
     auto slice_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
@@ -38,8 +38,8 @@ TEST(GaloisTests, TestSlice) {
 
     auto ir_input_type = ir::f32->Tile(16);
     auto ir_builder = ir::Builder::Create();
-    auto ir_slice_creator = op::SliceCreator::Create(shape);
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_slice_creator, {ir_input_type});
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::SliceCreator>({ir_input_type}, shape);
 
     auto jit_engine = jit::Engine::Create();
     auto slice_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);

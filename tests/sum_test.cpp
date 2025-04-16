@@ -5,11 +5,9 @@
 // 定义基准测试函数 BM_Sum::State &state 用于控制基准测试的运行
 void BM_Sum(benchmark::State &state) {
     auto length = int64_t(state.range(0));
-    auto ir_vec_type = ir::f32->Tile(length);
+    auto ir_input_type = ir::f32->Tile(length);
     auto ir_builder = ir::Builder::Create();
-
-    auto ir_sum_creator = op::SumCreator::Create();
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_sum_creator, {ir_vec_type});
+    auto ir_operator = ir_builder->CreateOperatorByCreator<op::SumCreator>({ir_input_type});
 
     auto jit_engine = jit::Engine::Create();
     auto sum_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
@@ -31,8 +29,7 @@ BENCHMARK(BM_Sum)->Arg(1 << 10)->Arg(1 << 20)->Arg(1 << 30);
 TEST(GaloisTests, TestSum) {
     auto ir_input_type = ir::f32->Tile(4);
     auto ir_builder = ir::Builder::Create();
-    auto ir_sum_creator = op::SumCreator::Create();
-    auto ir_operator = ir_builder->CreateOperatorByCreator(ir_sum_creator, {ir_input_type});
+    auto ir_operator = ir_builder->CreateOperatorByCreator<op::SumCreator>({ir_input_type});
 
     auto jit_engine = jit::Engine::Create();
     auto sum_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
