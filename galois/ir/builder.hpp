@@ -116,29 +116,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return ir_operator;
     }
 
-    template <typename Creator, typename... CreatorArgs>
-    std::shared_ptr<Tensor> Express(std::vector<std::shared_ptr<Tensor>> inputs,
-                                    CreatorArgs... creator_args) {
-        auto sp_creator = Creator::Create(creator_args...);
-        std::vector<std::shared_ptr<TensorType>> input_types;
-        std::transform(RANGE(inputs), std::back_inserter(input_types),
-                       [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });
-        auto ir_output_type = sp_creator->InferType(input_types);
-        auto ir_operator_type = OperatorType::Create(input_types, ir_output_type);
-        std::shared_ptr<Operator> ir_operator;
-        {
-            // TODO: give a valid name
-            auto [ir_tmp_operator, op_scope] = this->CreateOperator(
-                ir_operator_type, sp_creator->name + std::to_string(this->id++));
-            ir_operator = ir_tmp_operator;
-            std::vector<std::shared_ptr<Tensor>> ir_inputs;
-            std::transform(RANGE(ir_tmp_operator->inputs), std::back_inserter(ir_inputs),
-                           [](std::shared_ptr<Tensor> ir_input) { return ir_input; });
-            sp_creator->AffineExpress(ir_inputs, this->shared_from_this());
-        }
-        return this->Create<Call>(ir_operator, inputs);
-    };
-
     std::shared_ptr<Accessor> CreateAccessor(std::shared_ptr<Tensor> ir_tensor) {
         auto ir_tensor_type = ir_tensor->type;
 
@@ -198,6 +175,34 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Div, ir_tensor1,
                                                        ir_tensor2);
     }
+
+    std::shared_ptr<ir::Call> Call(std::shared_ptr<ir::Operator> ir_operator,
+                                   std::vector<std::shared_ptr<Tensor>> ir_inputs) {
+        return this->Create<ir::Call>(ir_operator, ir_inputs);
+    }
+
+    template <typename Creator, typename... CreatorArgs>
+    std::shared_ptr<Tensor> Express(std::vector<std::shared_ptr<Tensor>> inputs,
+                                    CreatorArgs... creator_args) {
+        auto sp_creator = Creator::Create(creator_args...);
+        std::vector<std::shared_ptr<TensorType>> input_types;
+        std::transform(RANGE(inputs), std::back_inserter(input_types),
+                       [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });
+        auto ir_output_type = sp_creator->InferType(input_types);
+        auto ir_operator_type = OperatorType::Create(input_types, ir_output_type);
+        std::shared_ptr<Operator> ir_operator;
+        {
+            // TODO: give a valid name
+            auto [ir_tmp_operator, op_scope] = this->CreateOperator(
+                ir_operator_type, sp_creator->name + std::to_string(this->id++));
+            ir_operator = ir_tmp_operator;
+            std::vector<std::shared_ptr<Tensor>> ir_inputs;
+            std::transform(RANGE(ir_tmp_operator->inputs), std::back_inserter(ir_inputs),
+                           [](std::shared_ptr<Tensor> ir_input) { return ir_input; });
+            sp_creator->AffineExpress(ir_inputs, this->shared_from_this());
+        }
+        return this->Call(ir_operator, inputs);
+    };
 
    public:
     std::stack<std::shared_ptr<Grid>> grid_stack;

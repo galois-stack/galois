@@ -49,7 +49,7 @@ TEST(GaloisTests, TestReferenceCountCall) {
         ir_callee = ir_operator_local;
     }
     std::vector<std::shared_ptr<ir::Tensor>> ir_arguments;
-    ir_builder->Create<ir::Call>(ir_callee, ir_arguments);
+    ir_builder->Call(ir_callee, {});
     auto ir_reference_visitor = transform::ReferenceCountVisitor::Create();
     ir_operator->ApplyVisitor(ir_reference_visitor);
     scope = nullptr;
