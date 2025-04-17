@@ -22,7 +22,7 @@ class EachTensorVisitor : public ir::Visitor {
 
 
     void Visit(std::shared_ptr<ir::Block> ir_block) override {
-        for (auto tensor : ir_block->tensors) {
+        for (auto tensor : *ir_block) {
             tensor->ApplyVisitor(this->shared_from_this());
         }
     }
