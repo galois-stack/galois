@@ -153,9 +153,10 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     Eigen::VectorXi64 shape;
     std::shared_ptr<TensorType> value_type;
     int64_t bytes = 0;
-    bool enable_multi_thread = false;
     Eigen::RowVectorXi64 stride;
     std::shared_ptr<pir::Type> pir_type = nullptr;
+    bool enable_multi_thread = false;
+    bool unroll_grid = false;
 };
 
 class RealNumberType : public TensorType {

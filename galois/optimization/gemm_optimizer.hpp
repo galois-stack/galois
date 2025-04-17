@@ -55,24 +55,6 @@ class NativeCpuInfo {
     std::vector<int64_t> cache_sizes;
 };
 
-inline std::shared_ptr<ir::Grid> GetInnerGrid3(std::shared_ptr<ir::Grid> ir_grid) {
-    auto ir_block_iter =
-        std::find_if(RANGE((*ir_grid->block)), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
-            if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
-                if (ir_grid->shape.size() == 3) {
-                    return true;
-                }
-            }
-            return false;
-        });
-
-    if (ir_block_iter != ir_grid->block->end()) {
-        return GetInnerGrid3(Cast<ir::Grid>(*ir_block_iter));
-    } else {
-        return Cast<ir::Grid>(ir_grid);
-    }
-}
-
 inline std::vector<Eigen::VectorXi64> GenerateIndexGrid(Eigen::VectorXi64 shape) {
     std::vector<Eigen::VectorXi64> index_grid;
     Eigen::VectorXi64 root;
@@ -92,7 +74,7 @@ inline std::vector<Eigen::VectorXi64> GenerateIndexGrid(Eigen::VectorXi64 shape)
     return index_grid;
 }
 
-inline void ExpandGrid(std::shared_ptr<ir::Grid> ir_grid) {
+inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
     auto index_grid = GenerateIndexGrid(ir_grid->shape);
     GALOIS_ASSERT(ir_grid->parent_block);
     auto ir_grid_iter = std::find(RANGE((*ir_grid->parent_block)), ir_grid);
@@ -197,8 +179,9 @@ class NeonGemmTilePolicy {
         auto [register_rows, register_cols] =
             this->GetRegisterTileShape(ir_data_type, simd_lanes_a, cpu_info);
 
-        auto ir_tile_mat_type_a =
-            ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_a = ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1);
+        ir_tile_mat_type_a->unroll_grid = true;
+        ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(1, 32)->Tile(4, 1);
         auto ir_tile_mat_type_b =
             ir_data_type->Tile(1, simd_lanes_b)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
@@ -255,8 +238,9 @@ class AvxGemmTilePolicy {
         auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
         auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
 
-        auto ir_tile_mat_type_a =
-            ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_a = ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1);
+        ir_tile_mat_type_a->unroll_grid = true;
+        ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(1, 32)->Tile(4, 1);
         auto ir_tile_mat_type_b =
             ir_data_type->Tile(1, simd_lanes_b)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
@@ -344,19 +328,14 @@ class GemmOptimizer {
         // 将分块矩阵转为常规矩阵
         auto ir_packed_mat_c =
             ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
-        auto ir_packed_mat_mul = Cast<ir::Call>(ir_packed_mat_c)->Operator();
-        // TODO: 需要更通用的方式来定位grid
-        auto ir_first_grid = Cast<ir::Grid>(*std::find_if(
-            RANGE((*ir_packed_mat_mul->block)), [&](std::shared_ptr<ir::Tensor> ir_tensor) {
-                if (auto ir_grid = Cast<ir::Grid>(ir_tensor)) {
-                    if (ir_grid->shape.size() == 3) {
-                        return true;
-                    }
-                }
-                return false;
-            }));
-        auto ir_register_tile_grid = GetInnerGrid3(ir_first_grid);
-        ExpandGrid(ir_register_tile_grid);
+        auto ir_packed_mat_mul_operator = Cast<ir::Call>(ir_packed_mat_c)->Operator();
+
+        transform::Each<ir::Grid>(ir_packed_mat_mul_operator,
+                                  [](std::shared_ptr<ir::Grid> ir_grid) {
+                                      if (ir_grid->unroll_grid) {
+                                          UnrollGrid(ir_grid);
+                                      };
+                                  });
 
         auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸

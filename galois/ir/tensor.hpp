@@ -676,6 +676,7 @@ class Grid : public Tensor {
     std::shared_ptr<Operator> parent_operator = nullptr;
     std::shared_ptr<Grid> parent_grid = nullptr;
     bool enable_multi_thread = false;
+    bool unroll_grid = false;
 
     bool is_local = true;
 };
