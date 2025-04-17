@@ -12,6 +12,7 @@ add_executable(galois_test
     padding_test.cpp
     tile_matrix_multiply_test.cpp
     reference_count_test.cpp
+    arithmetic_test.cpp
     blas_test.cpp)
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
