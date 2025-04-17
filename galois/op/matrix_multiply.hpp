@@ -135,6 +135,7 @@ class MatrixMultiplyCreator : public BinaryCreator {
             ir_mat_a->type->shape[0], ir_mat_a->type->shape[1], ir_mat_b->type->shape[1]));
         // std::unique_ptr<ScopeGuard> pthread_block_scope;
         // ir_grid->enable_multi_thread = ir_mat_a->type->enable_multi_thread;
+        ir_grid->unroll_grid = ir_mat_a->type->unroll_grid;
 
         auto ir_accessor_a = ir_builder->CreateAccessor(ir_mat_a);
         ir_accessor_a->transform_matrix(0, 0) = 1;
