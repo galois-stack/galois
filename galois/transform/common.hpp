@@ -1,48 +1,22 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <set>
 
 #include "galois/helper.hpp"
 #include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/transform/each.hpp"
 
 namespace galois::transform {
 
-inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
-                       std::function<void(std::shared_ptr<ir::Tensor>)> callback);
 
-inline void EachTensor(std::shared_ptr<ir::Tensor> ir_tensor,
-                       std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    if (auto ir_block = Cast<ir::Block>(ir_tensor)) {
-        EachTensor(ir_block, callback);
-    } else {
-        callback(ir_tensor);
-    }
-}
-
-inline void EachTensor(std::shared_ptr<ir::Block> ir_block,
-                       std::function<void(std::shared_ptr<ir::Tensor>)> callback) {
-    callback(ir_block);
-    for (auto ir_tensor : *ir_block) {
-        EachTensor(ir_tensor, callback);
-    }
-}
-
-template <typename Value_>
-inline void Each(std::shared_ptr<ir::Block> ir_block,
-                 std::function<void(std::shared_ptr<Value_>)> callback) {
-    EachTensor(ir_block, [=](auto ir_e) {
-        if (auto ir_value_ = Cast<Value_>(ir_e)) {
-            callback(ir_value_);
-        }
-    });
-}
 
 inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
     std::shared_ptr<ir::Block> ir_block) {
     std::set<std::shared_ptr<ir::Tensor>> ir_captured_tensor_set;
-
+    
     Each<ir::Instruction>(ir_block, [&](std::shared_ptr<ir::Instruction> ir_instruction) {
         for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
             auto ir_operand = ir_instruction->GetOperand(i);
