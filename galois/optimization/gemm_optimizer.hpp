@@ -173,19 +173,19 @@ class NeonGemmTilePolicy {
     }
 
     std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
-               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+               std::shared_ptr<op::MatrixMultiplyMicroKernel>>
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         auto [simd_lanes_a, simd_lanes_b] = this->GetSimdTileShape(ir_data_type, cpu_info);
         auto [register_rows, register_cols] =
             this->GetRegisterTileShape(ir_data_type, simd_lanes_a, cpu_info);
 
-        auto ir_tile_mat_type_a = ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1);
-        ir_tile_mat_type_a->unroll_grid = true;
-        ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b =
-            ir_data_type->Tile(1, simd_lanes_b)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
+        auto micro_kernel_rows = simd_lanes_a * register_rows;
+        auto micro_kernel_cols = simd_lanes_b * register_cols;
+        auto ir_tile_mat_type_a = ir_data_type->Tile(micro_kernel_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b = ir_data_type->Tile(1, micro_kernel_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
-                               op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
+                               op::SimdMatrixMultiplyMicroKernel::Create(
+                                   cpu_info->SimdBits(), micro_kernel_rows, micro_kernel_cols));
     }
 };
 
@@ -197,12 +197,12 @@ class AvxGemmTilePolicy {
     };
 
     std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
-               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+               std::shared_ptr<op::MatrixMultiplyMicroKernel>>
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         int32_t simd_register_count = cpu_info->SimdRegisterCount();
 
         auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
-        int64_t simd_lanes_a = 1;  // 因为avx不支持vector * vector[lane]这种形式， 故赋值1
+        int64_t simd_lanes_a = 1;        // 因为avx不支持vector * vector[lane]这种形式， 故赋值1
         auto simd_lanes_b = simd_lanes;  // b的simd lanes是固定的
 
         z3::context z3_context;
@@ -238,13 +238,13 @@ class AvxGemmTilePolicy {
         auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
         auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
 
-        auto ir_tile_mat_type_a = ir_data_type->Tile(simd_lanes_a, 1)->Tile(register_rows, 1);
-        ir_tile_mat_type_a->unroll_grid = true;
-        ir_tile_mat_type_a = ir_tile_mat_type_a->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b =
-            ir_data_type->Tile(1, simd_lanes_b)->Tile(1, register_cols)->Tile(32, 1)->Tile(1, 4);
+        auto micro_kernel_rows = simd_lanes_a * register_rows;
+        auto micro_kernel_cols = simd_lanes_b * register_cols;
+        auto ir_tile_mat_type_a = ir_data_type->Tile(micro_kernel_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b = ir_data_type->Tile(1, micro_kernel_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
-                               op::SimdMatrixMultiplyKernel::Create(cpu_info->SimdBits()));
+                               op::SimdMatrixMultiplyMicroKernel2::Create(
+                                   cpu_info->SimdBits(), micro_kernel_rows, micro_kernel_cols));
     }
 };
 
@@ -258,7 +258,7 @@ class GemmTilePolicy {
     };
 
     std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
-               std::shared_ptr<op::SimdMatrixMultiplyKernel>>
+               std::shared_ptr<op::MatrixMultiplyMicroKernel>>
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         // 当i8时， Neon不支持"mla.16b v1 v2 v3[0]"形式， 必须“mla.16b v1 v2
         // v3”的形式，这应该和avx采用一样的策略

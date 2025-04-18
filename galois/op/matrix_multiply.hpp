@@ -4,7 +4,7 @@
 
 namespace galois::op {
 
-class MatrixMultiplyKernel {
+class MatrixMultiplyMicroKernel {
    public:
     virtual bool Match(std::shared_ptr<ir::TensorType> ir_mat_type_a,
                        std::shared_ptr<ir::TensorType> ir_mat_type_b) = 0;
@@ -14,7 +14,7 @@ class MatrixMultiplyKernel {
                          std::shared_ptr<ir::Builder> ir_builder) = 0;
 };
 
-class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
+class SimdMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
    public:
     static std::shared_ptr<SimdMatrixMultiplyKernel> Create(int64_t bits) {
         std::shared_ptr<SimdMatrixMultiplyKernel> self(new SimdMatrixMultiplyKernel);
@@ -22,18 +22,6 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
         // self->sim_cols = simd_cols;
         self->bytes = self->bits / 8;
         return self;
-    }
-
-    bool IsVectorized(std::shared_ptr<ir::TensorType> ir_type) {
-        if (ir_type->shape.size() == 2) {
-            if (ir_type->shape[0] == 1 || ir_type->shape[1] == 1) {
-                if (ir_type->bytes == this->bytes) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     bool Match(std::shared_ptr<ir::TensorType> ir_mat_type_a,
@@ -85,6 +73,161 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyKernel {
     int64_t bits = 128;
     int64_t bytes = 16;
     int64_t simd_cols;
+};
+
+class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
+   public:
+    static std::shared_ptr<SimdMatrixMultiplyMicroKernel> Create(int64_t bits, int64_t rows,
+                                                                 int64_t cols) {
+        std::shared_ptr<SimdMatrixMultiplyMicroKernel> self(new SimdMatrixMultiplyMicroKernel);
+        self->bits = bits;
+        self->bytes = self->bits / 8;
+        self->rows = rows;
+        self->cols = cols;
+        return self;
+    }
+
+    bool Match(std::shared_ptr<ir::TensorType> ir_mat_type_a,
+               std::shared_ptr<ir::TensorType> ir_mat_type_b) override {
+        GALOIS_ASSERT(ir_mat_type_a->shape.size() == 2);
+        GALOIS_ASSERT(ir_mat_type_b->shape.size() == 2);
+        auto simd_lanes = this->bytes / ir_mat_type_a->value_type->bytes;
+        if (ir_mat_type_a->value_type == ir_mat_type_b->value_type) {
+            if (ir_mat_type_a->shape[1] == 1 && ir_mat_type_a->shape[0] == this->rows) {
+                if (ir_mat_type_b->shape[0] == 1 && ir_mat_type_b->shape[1] == this->cols) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    void Express(std::shared_ptr<ir::Tensor> ir_mat_a, std::shared_ptr<ir::Tensor> ir_mat_b,
+                 std::shared_ptr<ir::Tensor> ir_mat_c,
+                 std::shared_ptr<ir::Builder> ir_builder) override {
+        int64_t lanes_a = ir_mat_a->type->shape[0];
+        int64_t lanes_b = ir_mat_b->type->shape[1];
+        auto ir_data_type = ir_mat_a->type->DataType();
+        auto simd_lanes = this->bytes / ir_data_type->bytes;
+        GALOIS_ASSERT(lanes_a % simd_lanes == 0);
+        GALOIS_ASSERT(lanes_b % simd_lanes == 0);
+        auto ir_simd_type_a = ir_data_type->Tile(simd_lanes)->Tile(lanes_a / simd_lanes);
+        auto ir_simd_type_b = ir_data_type->Tile(simd_lanes)->Tile(lanes_b / simd_lanes);
+
+        auto ir_vec_bit_cast_a = ir_builder->Create<ir::BitCast>(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->Create<ir::BitCast>(ir_mat_b, ir_simd_type_b);
+        auto ir_mat_bit_cast_c =
+            ir_builder->Create<ir::BitCast>(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
+
+        for (int64_t r = 0; r < ir_simd_type_a->shape[0]; ++r) {
+            auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
+            ir_accessor_a->transform_matrix.resize(0, 0);
+            ir_accessor_a->shift_vector[0] = r;
+            for (int64_t c = 0; c < ir_simd_type_b->shape[0]; ++c) {
+                auto ir_accessor_b = ir_builder->CreateAccessor(ir_vec_bit_cast_b);
+                ir_accessor_b->transform_matrix.resize(0, 0);
+                ir_accessor_b->shift_vector[0] = c;
+
+                for (int64_t i = 0; i < simd_lanes; ++i) {
+                    auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(
+                        ir_accessor_a, ir_accessor_b->type, i);
+                    auto ir_mul = ir_builder->Mul(ir_vector_broadcast_a, ir_accessor_b);
+                    auto ir_accessor_c_row = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
+                    ir_accessor_c_row->transform_matrix.resize(0, 0);
+                    ir_accessor_c_row->shift_vector[0] = r * simd_lanes + i;
+                    auto ir_accessor_c = ir_builder->CreateAccessor(ir_accessor_c_row);
+                    ir_accessor_c->transform_matrix.resize(0, 0);
+                    ir_accessor_c->shift_vector[0] = c;
+                    auto ir_sum = ir_builder->Add(ir_mul, ir_accessor_c);
+                    auto ir_write = ir_builder->Create<ir::Write>(ir_sum, ir_accessor_c);
+                }
+            }
+        }
+    }
+
+   private:
+    int64_t bits = 128;
+    int64_t bytes = 16;
+    int64_t rows;
+    int64_t cols;
+};
+
+class SimdMatrixMultiplyMicroKernel2 : public MatrixMultiplyMicroKernel {
+   public:
+    static std::shared_ptr<SimdMatrixMultiplyMicroKernel2> Create(int64_t bits, int64_t rows,
+                                                                  int64_t cols) {
+        std::shared_ptr<SimdMatrixMultiplyMicroKernel2> self(new SimdMatrixMultiplyMicroKernel2);
+        self->bits = bits;
+        self->bytes = self->bits / 8;
+        self->rows = rows;
+        self->cols = cols;
+        return self;
+    }
+
+    bool Match(std::shared_ptr<ir::TensorType> ir_mat_type_a,
+               std::shared_ptr<ir::TensorType> ir_mat_type_b) override {
+        GALOIS_ASSERT(ir_mat_type_a->shape.size() == 2);
+        GALOIS_ASSERT(ir_mat_type_b->shape.size() == 2);
+        auto simd_lanes = this->bytes / ir_mat_type_a->value_type->bytes;
+        if (ir_mat_type_a->value_type == ir_mat_type_b->value_type) {
+            if (ir_mat_type_a->shape[1] == 1 && ir_mat_type_a->shape[0] == this->rows) {
+                if (ir_mat_type_b->shape[0] == 1 && ir_mat_type_b->shape[1] == this->cols) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    void Express(std::shared_ptr<ir::Tensor> ir_mat_a, std::shared_ptr<ir::Tensor> ir_mat_b,
+                 std::shared_ptr<ir::Tensor> ir_mat_c,
+                 std::shared_ptr<ir::Builder> ir_builder) override {
+        int64_t lanes_a = ir_mat_a->type->shape[0];
+        int64_t lanes_b = ir_mat_b->type->shape[1];
+        auto ir_data_type = ir_mat_a->type->DataType();
+        auto simd_lanes = this->bytes / ir_data_type->bytes;
+        // GALOIS_ASSERT(lanes_a % simd_lanes == 0);
+        GALOIS_ASSERT(lanes_b % simd_lanes == 0);
+        auto ir_simd_type_a = ir_data_type->Tile(lanes_a);
+        auto ir_simd_type_b = ir_data_type->Tile(simd_lanes)->Tile(lanes_b / simd_lanes);
+
+        auto ir_vec_bit_cast_a = ir_builder->Create<ir::BitCast>(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->Create<ir::BitCast>(ir_mat_b, ir_simd_type_b);
+        auto ir_mat_bit_cast_c =
+            ir_builder->Create<ir::BitCast>(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
+
+        for (int64_t i = 0; i < lanes_a; ++i) {
+            auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
+            ir_accessor_a->transform_matrix.resize(0, 0);
+            ir_accessor_a->shift_vector[0] = i;
+            auto ir_accessor_a_vector =
+                ir_builder->Create<ir::BitCast>(ir_accessor_a, ir_accessor_a->type->Tile(1));
+            auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(
+                ir_accessor_a_vector, ir_vec_bit_cast_b->type->value_type, 0);
+            for (int64_t c = 0; c < ir_simd_type_b->shape[0]; ++c) {
+                auto ir_accessor_b = ir_builder->CreateAccessor(ir_vec_bit_cast_b);
+                ir_accessor_b->transform_matrix.resize(0, 0);
+                ir_accessor_b->shift_vector[0] = c;
+                auto ir_mul = ir_builder->Mul(ir_vector_broadcast_a, ir_accessor_b);
+                auto ir_accessor_c_row = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
+                ir_accessor_c_row->transform_matrix.resize(0, 0);
+                ir_accessor_c_row->shift_vector[0] = i;
+                auto ir_accessor_c = ir_builder->CreateAccessor(ir_accessor_c_row);
+                ir_accessor_c->transform_matrix.resize(0, 0);
+                ir_accessor_c->shift_vector[0] = c;
+                auto ir_sum = ir_builder->Add(ir_mul, ir_accessor_c);
+                auto ir_write = ir_builder->Create<ir::Write>(ir_sum, ir_accessor_c);
+            }
+        }
+    }
+
+   private:
+    int64_t bits = 128;
+    int64_t bytes = 16;
+    int64_t rows;
+    int64_t cols;
 };
 
 class MatrixMultiplyCreator : public BinaryCreator {
