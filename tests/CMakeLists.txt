@@ -1,7 +1,6 @@
 # add_executable(galois_test main.cpp matrix_multiply.cpp)
 add_executable(galois_test
     main.cpp
-    full_test.cpp
     gemm_test.cpp
     unary_instrinsic_test.cpp
     sum_test.cpp
@@ -13,7 +12,9 @@ add_executable(galois_test
     tile_matrix_multiply_test.cpp
     reference_count_test.cpp
     arithmetic_test.cpp
-    blas_test.cpp)
+    blas_test.cpp
+    operation_count_test.cpp
+    )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
 target_compile_definitions(galois_ir PRIVATE  EIGEN_MAX_ALIGN_BYTES=32)

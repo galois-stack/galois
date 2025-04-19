@@ -56,7 +56,7 @@ class OperationCountVisitor : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Call> ir_call) override {
-        ir_call->Operator()->ApplyVisit(this->shared_from_this());
+        ir_call->Operator()->ApplyVisitor(this->shared_from_this());
     }
     void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
         if (!operation_count_stack.empty()) {
