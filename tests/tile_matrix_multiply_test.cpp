@@ -59,10 +59,10 @@ class TileMatrixMultiplyPerformanceTest
 };
 
 TEST_P(TileMatrixMultiplyPerformanceTest, TestTilePolicy) {
-    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t0 = std::chrono::steady_clock::now();
     auto p_mat_c = mat_mul_fun(this->sp_aligned256_mem_a.get(), this->sp_aligned256_mem_b.get());
     boost::scope::scope_exit free_mem([p_mat_c] { free(p_mat_c); });
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
     this->cost_time = static_cast<double>((t1 - t0).count());
 }
 
