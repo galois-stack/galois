@@ -14,9 +14,9 @@ TEST(GaloisTest, TestGemmF32) {
     blas_factory->GemmF32(mat_a.data(), mat_b.data(), &p_mat_c, m, k, n);
     free(p_mat_c);
 
-    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t0 = std::chrono::steady_clock::now();
     blas_factory->GemmF32(mat_a.data(), mat_b.data(), &p_mat_c, m, k, n);
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
     free(p_mat_c);
     auto cost_time = (t1 - t0).count();
 

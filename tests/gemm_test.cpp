@@ -85,18 +85,18 @@ class GemmVsEigenTest : public testing::Test {
 TYPED_TEST_SUITE_P(GemmVsEigenTest);
 
 TYPED_TEST_P(GemmVsEigenTest, TestGemm) {
-    auto t0_eigen = std::chrono::high_resolution_clock::now();
+    auto t0_eigen = std::chrono::steady_clock::now();
     auto eigen_matrix_f32_expect = (this->eigen_matrix_a * this->eigen_matrix_b).eval();
-    auto t1_eigen = std::chrono::high_resolution_clock::now();
+    auto t1_eigen = std::chrono::steady_clock::now();
     this->eigen_cost_time = static_cast<double>((t1_eigen - t0_eigen).count());
 
     auto mat_c_rows = eigen_matrix_f32_expect.rows();
     auto mat_c_cols = eigen_matrix_f32_expect.cols();
 
-    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t0 = std::chrono::steady_clock::now();
     auto p_mat_c = this->mat_mul_fun(this->eigen_matrix_a.data(), this->eigen_matrix_b.data());
     boost::scope::scope_exit free_mem([p_mat_c] { free(p_mat_c); });
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
     this->galois_cost_time = static_cast<double>((t1 - t0).count());
 
     auto get_galois_re = [=](int64_t i, int64_t j) -> TypeParam {
@@ -176,10 +176,10 @@ class GemmPerformanceTest
 
 TEST_P(GemmPerformanceTest, TestMatrixMultiplyGemm) {
     // 执行 Galois 矩阵乘法
-    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t0 = std::chrono::steady_clock::now();
     auto p_mat_c = mat_mul_fun(this->sp_aligned256_mem_a.get(), this->sp_aligned256_mem_b.get());
     boost::scope::scope_exit free_mem([p_mat_c] { free(p_mat_c); });
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
     this->galois_cost_time = static_cast<double>((t1 - t0).count());
 }
 

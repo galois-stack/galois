@@ -16,9 +16,9 @@ TEST(GaloisTests, TestAdd) {
     std::vector<float> input_vec0(length);
     std::vector<float> input_vec1(length);
 
-    auto t0 = std::chrono::high_resolution_clock::now();
+    auto t0 = std::chrono::steady_clock::now();
     auto p_re = add_fun(input_vec0.data(), input_vec1.data());
-    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t1 = std::chrono::steady_clock::now();
 
     auto bandwidth = double(length * 2 * sizeof(float)) / (t1 - t0).count();
     fmt::print("{} GB/sec \n", bandwidth);
