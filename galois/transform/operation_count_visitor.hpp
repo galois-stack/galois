@@ -42,10 +42,12 @@ class OperationCountVisitor : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) override {
+
+        int64_t op_count = ir_arithmetic_instruction->Size();
         if (!operation_count_stack.empty()) {
-            operation_count_stack.top() += 1;
+            operation_count_stack.top() += op_count;
         } else {
-            operation_count += 1;
+            operation_count += op_count;
         }
     }
 
@@ -59,15 +61,19 @@ class OperationCountVisitor : public ir::Visitor {
         ir_call->Operator()->ApplyVisitor(this->shared_from_this());
     }
     void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
-        if (!operation_count_stack.empty()) {
-            operation_count_stack.top() += 1;
-        } else {
-            operation_count += 1;
-        }
+    
     }
 
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
         ir_operator->block->ApplyVisitor(this->shared_from_this());
+    }
+
+    void Visit(std::shared_ptr<Broadcast> ir_broadcast) override {
+        
+    }
+
+    void Visit(std::shared_ptr<VectorBroadcast> ir_vbroadcast) override {
+       
     }
 
     void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {}
@@ -81,8 +87,6 @@ class OperationCountVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override {}
 
     void Visit(std::shared_ptr<ir::Write> ir_write) override {}
-    void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) override {}
-    void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) override {}
 
     void Visit(std::shared_ptr<ir::Viewer> ir_viewer) override {}
     void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {}

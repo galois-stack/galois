@@ -11,12 +11,12 @@ TEST(GaloisTests, TestOperationCount) {
         auto ir_builder = ir::Builder::Create();
         auto ir_operator = ir_builder->template CreateOperatorByCreator<op::MatrixMultiplyCreator>(
             {ir_mat_type_a, ir_mat_type_b});
-        auto gemm_optimizer = optimization::GemmOptimizer::Create();
-        auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
+        // auto gemm_optimizer = optimization::GemmOptimizer::Create();
+        // auto ir_gemm_operator = gemm_optimizer->Optimize(ir_operator);
 
         auto jit_engine = jit::Engine::Create();
         auto mat_mul_fun =
-            jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_gemm_operator);
+            jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);
 
         auto normalize_m = ir_mat_type_a->NormalizeShape()[0];
         auto normalize_k = ir_mat_type_a->NormalizeShape()[1];
@@ -24,7 +24,7 @@ TEST(GaloisTests, TestOperationCount) {
         auto items = normalize_m * normalize_k * normalize_n;
 
         auto operationCountVisitor = galois::transform::OperationCountVisitor::Create();
-        ir_gemm_operator->ApplyVisitor(operationCountVisitor);
+        ir_operator->ApplyVisitor(operationCountVisitor);
         auto operationCount = operationCountVisitor->GetOperationCount();
 
         std::cout << "operationCount: " << operationCount << std::endl;
