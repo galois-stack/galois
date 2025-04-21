@@ -14,6 +14,7 @@ add_executable(galois_test
     arithmetic_test.cpp
     blas_test.cpp
     operation_count_test.cpp
+    matrix_multiply_micro_kernel_test.cpp
     )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)

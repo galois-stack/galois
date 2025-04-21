@@ -4,7 +4,7 @@
 
 #include "galois/ir/tensor.hpp"
 
-namespace galois::transform {
+namespace galois::ir {
 
 class OperationCounter : public ir::Visitor {
    protected:
@@ -98,4 +98,4 @@ class OperationCounter : public ir::Visitor {
     std::stack<int64_t> operation_count_stack;
 };
 
-}  // namespace galois::transform
+}  // namespace galois::ir
