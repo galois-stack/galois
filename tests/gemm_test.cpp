@@ -1,7 +1,7 @@
 #include "boost/scope/scope_exit.hpp"
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
-#include "galois/transform/operation_count_visitor.hpp"
+#include "galois/ir/operation_count_visitor.hpp"
 #include "tests/galois_test.hpp"
 
 template <typename DataType>
@@ -142,7 +142,7 @@ class GemmPerformanceTest
         auto ir_operator = ir_builder->CreateOperatorByCreator<op::MatrixMultiplyCreator>(
             {ir_mat_type_a, ir_mat_type_b});
 
-        auto ir_opertor_count_visitor = galois::transform::OperationCountVisitor::Create();
+        auto ir_opertor_count_visitor = galois::transform::OperationCounter::Create();
         this->items = ir_opertor_count_visitor->CountOperation(
             ir_operator);  // 需要在原始的operator上统计， 因为优化后的算子会padding，导致有出入
 

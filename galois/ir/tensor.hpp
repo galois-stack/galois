@@ -439,14 +439,6 @@ class ArithmeticInstruction : public Instruction {
         return self;
     }
 
-    // 计算向量化宽度
-    int64_t Size() {
-        if (type->IsScalar() || type->shape.size() != 1 || !IsPowerOfTwo(type->shape[0]) ||
-            !type->value_type->IsScalar()) {
-            return 1;
-        }
-        return type->shape[0];
-    }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<ArithmeticInstruction>(this->shared_from_this()));

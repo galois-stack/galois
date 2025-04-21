@@ -6,13 +6,13 @@
 
 namespace galois::transform {
 
-class OperationCountVisitor : public ir::Visitor {
+class OperationCounter : public ir::Visitor {
    protected:
-    OperationCountVisitor() = default;
+    OperationCounter() = default;
 
    public:
-    static std::shared_ptr<OperationCountVisitor> Create() {
-        auto self = std::shared_ptr<OperationCountVisitor>(new OperationCountVisitor);
+    static std::shared_ptr<OperationCounter> Create() {
+        auto self = std::shared_ptr<OperationCounter>(new OperationCounter);
         return self;
     }
 

@@ -1,8 +1,7 @@
-#include <iostream>
 
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
-#include "galois/transform/operation_count_visitor.hpp"
+#include "galois/ir/operation_count_visitor.hpp"
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestOperationCount) {
@@ -21,7 +20,7 @@ TEST(GaloisTests, TestOperationCount) {
     auto normalize_n = ir_mat_type_b->NormalizeShape()[1];
     auto items = normalize_m * normalize_k * normalize_n * 2;
 
-    auto operation_count_visitor = galois::transform::OperationCountVisitor::Create();
+    auto operation_count_visitor = galois::transform::OperationCounter::Create();
     auto operation_count = operation_count_visitor->CountOperation(ir_operator);
     ASSERT_EQ(items, operation_count);
 }
