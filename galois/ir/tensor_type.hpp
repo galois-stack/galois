@@ -143,8 +143,11 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
     }
 
     int64_t NormalizeSize() {
-        return std::accumulate(RANGE(this->NormalizeShape()), 1,
-                               [](int64_t x, int64_t y) { return x * y; });
+        if (this->IsScalar()) {
+            return this->Size();
+        } else {
+            return this->Size() * this->value_type->NormalizeSize();
+        }
     }
 
     virtual bool IsScalar() { return this->shape.size() == 0; }
