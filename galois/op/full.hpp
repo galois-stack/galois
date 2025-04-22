@@ -25,7 +25,7 @@ class FullCreator : public op::Creator {
                        std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_value = ir_inputs.front();
         auto ir_output = ir_builder->Create<ir::Alloca>(this->InferType({}));
-        ir_builder->Express<op::FillCreator>({ir_output, ir_value});
+        ir_builder->ExpressCreator<op::FillCreator>({ir_output, ir_value});
         ir_builder->Create<ir::Return>(ir_output);
     }
 
