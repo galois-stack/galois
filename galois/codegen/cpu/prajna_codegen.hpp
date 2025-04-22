@@ -412,18 +412,39 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override {
         auto ir_tensor_type = ir_alloca->type;
+        this->EmitType(ir_alloca->type);
 
-        std::list<std::shared_ptr<pir::Value>> pir_arguments = {
-            pir_builder->GetInt64Constant(ir_tensor_type->bytes)};
-        auto pir_function_type =
-            pir::FunctionType::Create({pir::IntType::Create(64, true)},
-                                      pir::PointerType::Create(pir::IntType::Create(8, false)));
-        auto pir_aligned_alloc = pir_builder->GetIntrinsic("auto_aligned_alloc", pir_function_type);
-        auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            pir_builder->Create<pir::Call>(pir_aligned_alloc, pir_arguments),
-            pir::PointerType::Create(this->EmitType(ir_tensor_type)));
-        ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
-        return;
+        if (ir_alloca->memory_type == ir::MemoryType::Heap) {
+            std::list<std::shared_ptr<pir::Value>> pir_arguments = {
+                pir_builder->GetInt64Constant(ir_tensor_type->bytes)};
+            auto pir_function_type =
+                pir::FunctionType::Create({pir::IntType::Create(64, true)},
+                                          pir::PointerType::Create(pir::IntType::Create(8, false)));
+            auto pir_aligned_alloc =
+                pir_builder->GetIntrinsic("auto_aligned_alloc", pir_function_type);
+            auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
+                pir_builder->Create<pir::Call>(pir_aligned_alloc, pir_arguments),
+                pir::PointerType::Create(this->EmitType(ir_tensor_type)));
+            ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
+            return;
+        } else if (ir_alloca->memory_type == ir::MemoryType::Stack) {
+            int64_t alignment = 4;  // TODO: 需要根据平台来确定
+            if (ir_alloca->type->bytes % 8 == 0) {
+                alignment = 8;
+            } else if (ir_alloca->type->bytes % 16 == 0) {
+                alignment = 16;
+            } else if (ir_alloca->type->bytes % 32 == 0) {
+                alignment = 32;
+            } else if (ir_alloca->type->bytes % 64 == 0) {
+                alignment = 64;
+            }
+            auto pir_tensor_pointer = pir_builder->Create<pir::Alloca>(
+                ir_alloca->type->pir_type, pir_builder->GetInt64Constant(1), alignment);
+            ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
+            return;
+        } else {
+            GALOIS_UNIMPLEMENT;
+        }
     }
 
     std::shared_ptr<pir::Value> GetPirValueOfTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
@@ -441,6 +462,8 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Free> ir_free) override {
+        return;
+
         ir_free->pir_value = pir_builder->Create<pir::Call>(
             pir_builder->GetIntrinsic(
                 "free", pir::FunctionType::Create(
