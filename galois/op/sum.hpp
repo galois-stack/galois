@@ -21,25 +21,25 @@ class SumCreator : public op::Creator {
         return input_type->DataType();
     }
 
-    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
-                       std::shared_ptr<ir::Builder> ir_builder) override {
+    void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
+                 std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_re_type = this->InferType(ir::GetTensorTypes(ir_inputs));
         auto ir_re = ir_builder->Create<ir::Alloca>(ir_re_type);
         ir_builder->ExpressCreator<op::FillCreator>(
             {ir_re, ir_builder->GetZero(ir_re_type->DataType())});
-        this->AffineExpressImpl(ir_inputs.front(), ir_re, ir_builder);
+        this->ExpressInline(ir_inputs.front(), ir_re, ir_builder);
         ir_builder->Create<ir::Return>(ir_re);
     }
 
-    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_re,
-                           std::shared_ptr<ir::Builder> ir_builder) {
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_re,
+                       std::shared_ptr<ir::Builder> ir_builder) {
         if (ir_input->type->IsScalar()) {
             auto ir_add = ir_builder->Add(ir_input, ir_re);
             ir_builder->Create<ir::Write>(ir_add, ir_re);
         } else {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_input->type->shape);
             auto ir_accessor = ir_builder->CreateIdentityAccessor(ir_input);
-            this->AffineExpressImpl(ir_accessor, ir_re, ir_builder);
+            this->ExpressInline(ir_accessor, ir_re, ir_builder);
         }
     }
 };

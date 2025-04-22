@@ -179,7 +179,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
         std::vector<std::shared_ptr<Tensor>> ir_inputs;
         std::transform(RANGE(ir_operator->inputs), std::back_inserter(ir_inputs),
                        [](std::shared_ptr<Tensor> ir_input) { return ir_input; });
-        sp_creator->AffineExpress(ir_inputs, this->shared_from_this());
+        sp_creator->Express(ir_inputs, this->shared_from_this());
         return ir_operator;
     };
 

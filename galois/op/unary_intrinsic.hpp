@@ -19,9 +19,8 @@ class UnaryInstrinsicCreator : public UnaryCreator {
         return ir_input_type;
     }
 
-    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
-                           std::shared_ptr<ir::Tensor> ir_output,
-                           std::shared_ptr<ir::Builder> ir_builder) override {
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_output,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
         if (ir_input->type->IsScalar()) {
             auto ir_value = ir_builder->Create<ir::UnaryIntrinsic>(this->intrinsic_name, ir_input);
             ir_builder->Create<ir::Write>(ir_value, ir_output);
@@ -29,7 +28,7 @@ class UnaryInstrinsicCreator : public UnaryCreator {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_input->type->shape);
             auto ir_input_accessor = ir_builder->CreateIdentityAccessor(ir_input);
             auto ir_output_accessor = ir_builder->CreateIdentityAccessor(ir_output);
-            this->AffineExpressImpl(ir_input_accessor, ir_output_accessor, ir_builder);
+            this->ExpressInline(ir_input_accessor, ir_output_accessor, ir_builder);
         }
     }
 

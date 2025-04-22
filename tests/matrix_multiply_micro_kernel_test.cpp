@@ -19,7 +19,7 @@ TEST(GaloisTests, TestMatrixMultiplyMicroKernel) {
     auto [ir_operator, scope_operator] = ir_builder->CreateOperator(
         ir::OperatorType::Create({ir_mat_type_a, ir_mat_type_b, ir_mat_type_c}, ir::void_),
         "matrix_multiply");
-    ir_packed_matrix_multiply_op_creator->AffineExpressImpl(
+    ir_packed_matrix_multiply_op_creator->ExpressInline(
         ir_operator->inputs[0], ir_operator->inputs[1], ir_operator->inputs[2], ir_builder);
     scope_operator = nullptr;
 

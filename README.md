@@ -216,7 +216,7 @@ class MatrixMultiplyCreator : public Creator {
                                             ir_input_types[1]->shape[1]);
     }
 
-    void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
+    void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                        std::vector<std::shared_ptr<ir::Tensor>> ir_outputs,
                        std::shared_ptr<Builder> ir_builder) override {
         // 某种意义上可以从下往上把这个kernel的实现优化出来的, galois也实验了这样的优化, 但最终并没有这样做,
@@ -260,7 +260,7 @@ class MatrixMultiplyCreator : public Creator {
         ir_accessor_c->transform_matrix(1, 2) = 1;
 
         // 矩阵分块乘法的原理 ir_mat_c[i,j] += ir_mat_a[i,k] * ir_mat_b[k,j]. 而这里的"*"其实就是矩阵乘法本身(而非标量乘法)
-        this->AffineExpress({ir_accessor_a, ir_accessor_b}, {ir_accessor_c}, ir_builder);
+        this->Express({ir_accessor_a, ir_accessor_b}, {ir_accessor_c}, ir_builder);
         // 只有在标量形式下, 矩阵乘法里的"*"所表示的运算才对应数值运算里的乘, 在element type是matrix时, "*"就是矩阵乘法它自己(这种递归也体现在了在AffineExpress的递归调用里)
         // 当我们用简单的方式, 描述一个完备的矩阵运算的时, 获得了最佳的性能, 这很好地体现了galois平台的思想
     }

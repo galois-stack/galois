@@ -21,13 +21,12 @@ class ArithmeticCreator : public BinaryCreator {
         return ir_input_type0;
     }
 
-    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input0,
-                           std::shared_ptr<ir::Tensor> ir_input1,
-                           std::shared_ptr<ir::Tensor> ir_output,
-                           std::shared_ptr<ir::Builder> ir_builder) override {
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_input0, std::shared_ptr<ir::Tensor> ir_input1,
+                       std::shared_ptr<ir::Tensor> ir_output,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
         if (ir_input0->type->IsScalar() && ir_input1->type->IsScalar()) {
-            auto ir_re = ir_builder->Create<ir::ArithmeticInstruction>(Operation, ir_input0,
-                                                                       ir_input1);
+            auto ir_re =
+                ir_builder->Create<ir::ArithmeticInstruction>(Operation, ir_input0, ir_input1);
             ir_builder->Create<ir::Write>(ir_re, ir_output);
             return;
         }
@@ -37,7 +36,7 @@ class ArithmeticCreator : public BinaryCreator {
         auto ir_accessor_in0 = ir_builder->CreateIdentityAccessor(ir_input0);
         auto ir_accessor_in1 = ir_builder->CreateIdentityAccessor(ir_input1);
 
-        this->AffineExpressImpl(ir_accessor_in0, ir_accessor_in1, ir_accessor_out, ir_builder);
+        this->ExpressInline(ir_accessor_in0, ir_accessor_in1, ir_accessor_out, ir_builder);
     }
 };
 

@@ -253,10 +253,9 @@ class MatrixMultiplyCreator : public BinaryCreator {
                                                 ir_mat_b_type->shape[1]);
     }
 
-    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_mat_a,
-                           std::shared_ptr<ir::Tensor> ir_mat_b,
-                           std::shared_ptr<ir::Tensor> ir_mat_c,
-                           std::shared_ptr<ir::Builder> ir_builder) override {
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_mat_a, std::shared_ptr<ir::Tensor> ir_mat_b,
+                       std::shared_ptr<ir::Tensor> ir_mat_c,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
         for (auto ir_kernel : ir_builder->matrix_multiply_kernel_queue) {
             if (ir_kernel->Match(ir_mat_a->type, ir_mat_b->type)) {
                 ir_kernel->Express(ir_mat_a, ir_mat_b, ir_mat_c, ir_builder);
@@ -290,7 +289,7 @@ class MatrixMultiplyCreator : public BinaryCreator {
         ir_accessor_c->transform_matrix(0, 0) = 1;
         ir_accessor_c->transform_matrix(1, 2) = 1;
 
-        this->AffineExpressImpl(ir_accessor_a, ir_accessor_b, ir_accessor_c, ir_builder);
+        this->ExpressInline(ir_accessor_a, ir_accessor_b, ir_accessor_c, ir_builder);
     }
 };
 
