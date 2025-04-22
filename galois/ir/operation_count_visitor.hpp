@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <stack>
 
 #include "galois/ir/tensor.hpp"
 
