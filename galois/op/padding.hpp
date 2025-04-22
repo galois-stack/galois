@@ -71,7 +71,7 @@ class PaddingCreator : public UnaryCreator {
             ir_output_left_origin->shift_vector[0] = input_shape[0];
             auto ir_output_slice =
                 ir_builder->Create<ir::SliceView>(ir_output_left_origin, remainder_shape);
-            ir_builder->Express<op::FillCreator>(
+            ir_builder->ExpressCreator<op::FillCreator>(
                 {ir_output_slice, ir_builder->GetZero(ir_output_slice->type->DataType())});
         }
     }

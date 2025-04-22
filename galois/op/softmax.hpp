@@ -24,11 +24,12 @@ class SoftmaxCreator : public op::Creator {
     void AffineExpress(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                        std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_input = ir_inputs.front();
-        auto ir_exp = ir_builder->Express<op::UnaryInstrinsicCreator>({ir_input}, "exp");
-        auto ir_exp_sum = ir_builder->Express<op::SumCreator>({ir_exp});
+        auto ir_exp = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_input}, "exp");
+        auto ir_exp_sum = ir_builder->ExpressCreator<op::SumCreator>({ir_exp});
         auto ir_exp_sum_broadcast = ir_builder->Create<ir::Alloca>(ir_exp->type);
-        ir_builder->Express<op::FillCreator>({ir_exp_sum_broadcast, ir_exp_sum});
-        auto ir_softmax = ir_builder->Express<op::DivCreator>({ir_exp, ir_exp_sum_broadcast});
+        ir_builder->ExpressCreator<op::FillCreator>({ir_exp_sum_broadcast, ir_exp_sum});
+        auto ir_softmax =
+            ir_builder->ExpressCreator<op::DivCreator>({ir_exp, ir_exp_sum_broadcast});
         ir_builder->Create<ir::Return>(ir_softmax);
     }
 };

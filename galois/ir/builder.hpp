@@ -184,8 +184,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
     };
 
     template <typename Creator, typename... CreatorArgs>
-    std::shared_ptr<Tensor> Express(std::vector<std::shared_ptr<Tensor>> inputs,
-                                    CreatorArgs... creator_args) {
+    std::shared_ptr<Tensor> ExpressCreator(std::vector<std::shared_ptr<Tensor>> inputs,
+                                           CreatorArgs... creator_args) {
         std::vector<std::shared_ptr<TensorType>> ir_input_types;
         std::transform(RANGE(inputs), std::back_inserter(ir_input_types),
                        [](std::shared_ptr<Tensor> ir_tensor) { return ir_tensor->type; });

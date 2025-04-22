@@ -300,11 +300,12 @@ class GemmOptimizer {
         auto padding_shape = (plane_shape.array() * basic_padding_shape.array()).matrix();
         std::shared_ptr<ir::Tensor> ir_padded_mat = ir_mat;
         if (ir_mat->type->shape != padding_shape) {
-            ir_padded_mat = ir_builder->Express<op::PaddingCreator>({ir_mat}, padding_shape);
+            ir_padded_mat = ir_builder->ExpressCreator<op::PaddingCreator>({ir_mat}, padding_shape);
         }
         // 将裁剪后的矩阵分块打包
         auto ir_packed_type = ir::TensorType::Create(ir_tile_type, plane_shape);
-        auto ir_packed_mat = ir_builder->Express<op::PackCreator>({ir_padded_mat}, ir_packed_type);
+        auto ir_packed_mat =
+            ir_builder->ExpressCreator<op::PackCreator>({ir_padded_mat}, ir_packed_type);
 
         return ir_packed_mat;
     }
@@ -326,8 +327,8 @@ class GemmOptimizer {
         auto ir_packed_mat_a = this->PackTensorForTile(ir_mat_a, ir_tile_mat_type_a, ir_builder);
         auto ir_packed_mat_b = this->PackTensorForTile(ir_mat_b, ir_tile_mat_type_b, ir_builder);
         // 将分块矩阵转为常规矩阵
-        auto ir_packed_mat_c =
-            ir_builder->Express<op::MatrixMultiplyCreator>({ir_packed_mat_a, ir_packed_mat_b});
+        auto ir_packed_mat_c = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>(
+            {ir_packed_mat_a, ir_packed_mat_b});
         auto ir_packed_mat_mul_operator = Cast<ir::Call>(ir_packed_mat_c)->Operator();
 
         transform::Each<ir::Grid>(ir_packed_mat_mul_operator,
@@ -337,11 +338,11 @@ class GemmOptimizer {
                                       };
                                   });
 
-        auto ir_unpacked_mat_c = ir_builder->Express<op::UnpackCreator>({ir_packed_mat_c});
+        auto ir_unpacked_mat_c = ir_builder->ExpressCreator<op::UnpackCreator>({ir_packed_mat_c});
         // 裁剪矩阵到原始尺寸
         auto ir_mat_c_type = ir_matrix_multiply->GetOperatorType()->output_type;
         auto ir_mat_c =
-            ir_builder->Express<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
+            ir_builder->ExpressCreator<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
 
         ir_builder->Create<ir::Return>(ir_mat_c);
 
