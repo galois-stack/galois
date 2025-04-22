@@ -20,7 +20,7 @@ TEST(GaloisTests, TestAdd) {
     auto p_re = add_fun(input_vec0.data(), input_vec1.data());
     auto t1 = std::chrono::steady_clock::now();
 
-         auto bandwidth = double(length * 2 * sizeof(float)) / (t1 - t0).count();
+            auto bandwidth = double(length * 2 * sizeof(float)) / (t1 - t0).count();
     fmt::print("{} GB/sec \n", bandwidth);
 
     free(p_re);

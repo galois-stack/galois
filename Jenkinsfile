@@ -45,38 +45,7 @@ pipeline{
                         }
                         stage('format') {
                             steps {
-                                script {
-                                    // 运行clang-format检查并将输出保存到临时文件
-                                    def status = sh(script: '''
-                                        find . -regex ".*\\(\\.cpp\\|\\.h\\|\\.hpp\\|\\.cxx\\)" -exec clang-format --dry-run --verbose {} \\; > clang_format_output.txt 2>&1
-                                        exit 0
-                                    ''', returnStatus: true)
-
-                                    // 读取输出文件，提取不符合规范的文件
-                                    def output = readFile('clang_format_output.txt').trim()
-                                    def nonCompliantFiles = []
-                                    output.eachLine { line ->
-                                        if (line.contains('non-compliant')) {
-                                            def fileMatch = (line =~ /Formatting\s(.+)/)
-                                            if (fileMatch) {
-                                                nonCompliantFiles << fileMatch[0][1]
-                                            }
-                                        }
-                                    }
-
-                                    // 根据结果输出提示信息
-                                    if (nonCompliantFiles) {
-                                        echo "警告：以下文件不符合clang-format规范，请运行 'clang-format -i <file>' 修复："
-                                        nonCompliantFiles.each { file ->
-                                            echo "- ${file}"
-                                        }
-                                    } else {
-                                        echo "所有文件均符合clang-format规范。"
-                                    }
-
-                                    // 清理临时文件
-                                    sh 'rm -f clang_format_output.txt'
-                                }
+                                sh './scripts/check_clang_format.sh'
                             }
                         }
                         stage('build') {
@@ -122,38 +91,7 @@ pipeline{
                         }
                         stage('format') {
                             steps {
-                                script {
-                                    // 运行clang-format检查并将输出保存到临时文件
-                                    def status = sh(script: '''
-                                        find . -regex ".*\\(\\.cpp\\|\\.h\\|\\.hpp\\|\\.cxx\\)" -exec clang-format --dry-run --verbose {} \\; > clang_format_output.txt 2>&1
-                                        exit 0
-                                    ''', returnStatus: true)
-
-                                    // 读取输出文件，提取不符合规范的文件
-                                    def output = readFile('clang_format_output.txt').trim()
-                                    def nonCompliantFiles = []
-                                    output.eachLine { line ->
-                                        if (line.contains('non-compliant')) {
-                                            def fileMatch = (line =~ /Formatting\s(.+)/)
-                                            if (fileMatch) {
-                                                nonCompliantFiles << fileMatch[0][1]
-                                            }
-                                        }
-                                    }
-
-                                    // 根据结果输出提示信息
-                                    if (nonCompliantFiles) {
-                                        echo "警告：以下文件不符合clang-format规范，请运行 'clang-format -i <file>' 修复："
-                                        nonCompliantFiles.each { file ->
-                                            echo "- ${file}"
-                                        }
-                                    } else {
-                                        echo "所有文件均符合clang-format规范。"
-                                    }
-
-                                    // 清理临时文件
-                                    sh 'rm -f clang_format_output.txt'
-                                }
+                                sh './scripts/check_clang_format.sh'
                             }
                         }
                         stage('build') {
