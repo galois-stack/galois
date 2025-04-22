@@ -21,9 +21,8 @@ class UnpackCreator : public UnaryCreator {
         return ir::TensorType::Create(ir_scalar_type, shape);
     }
 
-    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
-                           std::shared_ptr<ir::Tensor> ir_output,
-                           std::shared_ptr<ir::Builder> ir_builder) override {
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_output,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_input_normalize_shape = ir_input->type->NormalizeShape();
         GALOIS_ASSERT(ir_output->type->shape == ir_input_normalize_shape);
 
@@ -36,7 +35,7 @@ class UnpackCreator : public UnaryCreator {
         auto ir_input_block = ir_builder->CreateIdentityAccessor(ir_input);
         if (ir_input_block->type->IsScalar()) {
             auto ir_output_block = ir_builder->CreateIdentityAccessor(ir_output);
-            this->AffineExpressImpl(ir_input_block, ir_output_block, ir_builder);
+            this->ExpressInline(ir_input_block, ir_output_block, ir_builder);
         } else {
             auto input_block_normalize_shape = ir_input_block->type->NormalizeShape();
             auto ir_output_block_origin = ir_builder->CreateIdentityAccessor(ir_output);
@@ -44,7 +43,7 @@ class UnpackCreator : public UnaryCreator {
                 input_block_normalize_shape.array();
             auto ir_output_block = ir_builder->Create<ir::SliceView>(ir_output_block_origin,
                                                                      input_block_normalize_shape);
-            this->AffineExpressImpl(ir_input_block, ir_output_block, ir_builder);
+            this->ExpressInline(ir_input_block, ir_output_block, ir_builder);
         }
     }
 };

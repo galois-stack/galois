@@ -22,9 +22,8 @@ class PaddingCreator : public UnaryCreator {
                                       padding_shape);
     };
 
-    void AffineExpressImpl(std::shared_ptr<ir::Tensor> ir_input,
-                           std::shared_ptr<ir::Tensor> ir_output,
-                           std::shared_ptr<ir::Builder> ir_builder) override {
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_output,
+                       std::shared_ptr<ir::Builder> ir_builder) override {
         auto input_shape = ir_input->type->shape;
         auto output_shape = ir_output->type->shape;
 
@@ -62,7 +61,7 @@ class PaddingCreator : public UnaryCreator {
             auto ir_input_slice_squeeze = ir_builder->Create<ir::SqueezeDimView>(ir_input_slice, 0);
             auto ir_output_slice_squeeze =
                 ir_builder->Create<ir::SqueezeDimView>(ir_output_slice, 0);
-            this->AffineExpressImpl(ir_input_slice_squeeze, ir_output_slice_squeeze, ir_builder);
+            this->ExpressInline(ir_input_slice_squeeze, ir_output_slice_squeeze, ir_builder);
         }
         {
             Eigen::VectorXi64 remainder_shape = output_shape;
