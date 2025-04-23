@@ -63,6 +63,9 @@ class GemmVsEigenTest : public testing::Test {
 
         this->eigen_matrix_a = EigenMatrixType::Random(normalize_m, normalize_k);
         this->eigen_matrix_b = EigenMatrixType::Random(normalize_k, normalize_n);
+        this->t = new float[10000000];
+        t[3421] = 10.0f;
+
     }
     void TearDown() override {
         fmt::print("cost time: {}ns, eigen glops: {:.04f}gops\n", this->eigen_cost_time,
@@ -81,6 +84,8 @@ class GemmVsEigenTest : public testing::Test {
     EigenMatrixType eigen_matrix_a;
     EigenMatrixType eigen_matrix_b;
     double items;
+    float *t = nullptr;
+
 };
 
 TYPED_TEST_SUITE_P(GemmVsEigenTest);
