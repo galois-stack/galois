@@ -43,6 +43,12 @@ pipeline{
                                 sh 'git --version'
                             }
                         }
+                        stage('format') {
+                            steps {
+                                sh 'echo "Running clang-format check..."'
+                                sh './scripts/check_clang_format.sh'
+                            }
+                        }
                         stage('build') {
                             steps {
                                 sh './scripts/clone_submodules.sh -f --jobs=4 --depth=50'
@@ -82,6 +88,12 @@ pipeline{
                                 sh 'pwd'
                                 sh 'git --version'
                                 sh 'git config --global --list'
+                            }
+                        }
+                        stage('format') {
+                            steps {
+                                sh 'echo "Running clang-format check..."'
+                                sh './scripts/check_clang_format.sh'
                             }
                         }
                         stage('build') {
