@@ -61,11 +61,11 @@ pipeline{
                                 sh './scripts/test.sh ${BUILD_TYPE}'
                             }
                         }
-                        // stage("leak-check") {
-                        //     steps {
-                        //         sh 'valgrind --leak-check=full  --num-callers=10 --trace-children=yes ./scripts/test.sh ${BUILD_TYPE}'
-                        //     }
-                        // }
+                        stage("leak-check") {
+                            steps {
+                                sh 'valgrind --leak-check=full  --num-callers=10 --trace-children=yes ./scripts/test.sh ${BUILD_TYPE} --gtest_filter=*TestMatrixMultiplyGemm/f32_500_500_50*'
+                            }
+                        }
                     }
                 }
 
