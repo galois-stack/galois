@@ -439,7 +439,6 @@ class ArithmeticInstruction : public Instruction {
         return self;
     }
 
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<ArithmeticInstruction>(this->shared_from_this()));
     }

@@ -30,7 +30,6 @@ inline std::string ToString(const std::shared_ptr<ir::TensorType>& type) {
         if (int_type->bits == 8 && int_type->is_signed) return "i8";
         if (int_type->bits == 16 && int_type->is_signed) return "i16";
         if (int_type->bits == 32 && int_type->is_signed) return "i32";
-       
     }
 
     return "unknown";
