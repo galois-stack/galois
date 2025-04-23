@@ -151,79 +151,47 @@ class NeonGemmTilePolicy {
         return self;
     };
 
-    std::tuple<int64_t, int64_t> GetSimdTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
-                                                  std::shared_ptr<NativeCpuInfo> cpu_info) {
+    std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
+                                                    std::shared_ptr<NativeCpuInfo> cpu_info) {
+        int32_t simd_register_count = cpu_info->SimdRegisterCount();
         auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
-        auto simd_lanes_b = simd_lanes;  // b的simd lanes是固定的
-        int32_t simd_register_count = cpu_info->SimdRegisterCount();
-
         /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
         z3::context z3_context;
         z3::params z3_params(z3_context);
         z3_params.set("priority", z3_context.str_symbol("register tile"));
         z3::optimize z3_optimize(z3_context);
         z3_optimize.set(z3_params);
-        // a的simd lanes, 通过求解得来， 因为存在寄存器不够用的情况， 所以需要裁剪
-        z3::expr z3_simd_lanes_a = z3_context.bv_const("z3_simd_lanes_a", 32);
-        z3_optimize.add(z3_simd_lanes_a > 0 && z3_simd_lanes_a <= int32_t(simd_lanes));
-        // 需要是2的倍数， 为了方便后续的计算。 若去除此限制， 需要考虑内存对齐等更多问题
-        // 约束：2 的幂，且范围在 1 到 32
-        z3_optimize.add((z3_simd_lanes_a & (z3_simd_lanes_a - 1)) == 0);
-        // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化
-        z3_optimize.add(z3_simd_lanes_a + 2 < simd_register_count);
-        z3::optimize::handle z3_handle_x = z3_optimize.maximize(z3_simd_lanes_a);
-        GALOIS_ASSERT(z3_optimize.check() == z3::sat);
-        z3::model z3_model = z3_optimize.get_model();
-        auto simd_lanes_a = z3_model.eval(z3_simd_lanes_a).get_numeral_int64();
-        return {simd_lanes_a, simd_lanes_b};
-    }
-
-    std::tuple<int64_t, int64_t> GetRegisterTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
-                                                      int64_t simd_lanes_a,
-                                                      std::shared_ptr<NativeCpuInfo> cpu_info) {
-        int32_t simd_register_count = cpu_info->SimdRegisterCount();
-        /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
-        z3::context z3_context;
-        z3::params z3_params(z3_context);
-        z3_params.set("priority", z3_context.str_symbol("register tile"));
-        z3::optimize z3_optimize(z3_context);
-        z3_optimize.set(z3_params);
-        // a的simd lanes, 通过求解得来， 因为存在寄存器不够用的情况， 所以需要裁剪
-        z3::expr z3_register_rows = z3_context.int_const("z3_register_rows");
-        z3::expr z3_register_cols = z3_context.int_const("z3_register_cols");
-        z3_optimize.add(z3_register_rows > 0);
-        z3_optimize.add(z3_register_cols > 0);
-        z3_optimize.add(z3_register_rows >= z3_register_cols);
-        // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化， 因为底层llvm怎么生成不好说
-        // z3_register_rows + z3_register_cols : 行和列的寄存器都需要保留， 这样才能复用数据
-        // z3_register_rows * z3_register_cols * int32_t(simd_lanes_a)： 用于存储外积的结果
-        z3_optimize.add(z3_register_rows + z3_register_cols +
-                            z3_register_rows * z3_register_cols * int32_t(simd_lanes_a) <
+        z3::expr z3_register_tile_rows = z3_context.int_const("z3_register_tile_rows");
+        z3::expr z3_register_tile_cols = z3_context.int_const("z3_register_tile_cols");
+        z3_optimize.add(z3_register_tile_rows > 0);
+        z3_optimize.add(z3_register_tile_cols > 0);
+        z3_optimize.add(z3_register_tile_rows >= z3_register_tile_cols);
+        // z3_register_tile_rows + z3_register_cols : 行和列的寄存器都需要保留， 这样才能复用数据
+        // z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)： 用于存储外积的结果
+        z3_optimize.add(z3_register_tile_rows + z3_register_tile_cols +
+                            z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes) <
                         simd_register_count);
-        // 最大化尺寸
+        // 最大化无依赖的计算指令数目, 同时也最大化了计算强度
         z3::optimize::handle z3_handle_x =
-            z3_optimize.maximize(z3_register_rows * z3_register_cols);
+            z3_optimize.maximize(z3_register_tile_rows * z3_register_tile_cols);
         GALOIS_ASSERT(z3_optimize.check() == z3::sat);
         z3::model z3_model = z3_optimize.get_model();
-        auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
-        auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
-        return {register_rows, register_cols};
+        auto register_tile_rows = z3_model.eval(z3_register_tile_rows).get_numeral_int64();
+        auto register_tile_cols = z3_model.eval(z3_register_tile_cols).get_numeral_int64();
+        return {register_tile_rows * simd_lanes, register_tile_cols * simd_lanes};
     }
 
     std::tuple<std::shared_ptr<ir::TensorType>, std::shared_ptr<ir::TensorType>,
                std::shared_ptr<op::MatrixMultiplyMicroKernel>>
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
-        auto [simd_lanes_a, simd_lanes_b] = this->GetSimdTileShape(ir_data_type, cpu_info);
-        auto [register_rows, register_cols] =
-            this->GetRegisterTileShape(ir_data_type, simd_lanes_a, cpu_info);
+        auto [kernel_tile_rows, kernel_tile_cols] =
+            this->GetKernelTileShape(ir_data_type, cpu_info);
 
-        auto micro_kernel_rows = simd_lanes_a * register_rows;
-        auto micro_kernel_cols = simd_lanes_b * register_cols;
-        auto ir_tile_mat_type_a = ir_data_type->Tile(micro_kernel_rows, 1)->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b = ir_data_type->Tile(1, micro_kernel_cols)->Tile(32, 1)->Tile(1, 4);
+        auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::SimdMatrixMultiplyMicroKernel::Create(
-                                   cpu_info->SimdBits(), micro_kernel_rows, micro_kernel_cols));
+                                   cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
     }
 };
 
