@@ -45,6 +45,7 @@ pipeline{
                         }
                         stage('format') {
                             steps {
+                                sh 'echo "Running clang-format check..."'
                                 sh './scripts/check_clang_format.sh'
                             }
                         }
@@ -91,6 +92,7 @@ pipeline{
                         }
                         stage('format') {
                             steps {
+                                sh 'echo "Running clang-format check..."'
                                 sh './scripts/check_clang_format.sh'
                             }
                         }
