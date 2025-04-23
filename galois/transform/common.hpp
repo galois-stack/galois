@@ -11,12 +11,10 @@
 
 namespace galois::transform {
 
-
-
 inline std::set<std::shared_ptr<ir::Tensor>> CaptureExternalTensors(
     std::shared_ptr<ir::Block> ir_block) {
     std::set<std::shared_ptr<ir::Tensor>> ir_captured_tensor_set;
-    
+
     Each<ir::Instruction>(ir_block, [&](std::shared_ptr<ir::Instruction> ir_instruction) {
         for (int64_t i = 0; i < ir_instruction->OperandSize(); ++i) {
             auto ir_operand = ir_instruction->GetOperand(i);
