@@ -11,6 +11,8 @@ TEST(GaloisTests, TestMatrixMultiplyMicroKernel) {
     ir_mat_type_a = ir_mat_type_a->value_type;
     ir_mat_type_b = ir_mat_type_b->value_type;
 
+    fmt::print("a: {}, b: {}\n", ir_mat_type_a->name, ir_mat_type_b->name);
+
     auto ir_builder = ir::Builder::Create();
     ir_builder->matrix_multiply_kernel_queue.push_back(mat_mul_kernel);
     auto ir_packed_matrix_multiply_op_creator = op::MatrixMultiplyCreator::Create();
