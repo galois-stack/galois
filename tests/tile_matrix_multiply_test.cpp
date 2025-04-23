@@ -19,13 +19,12 @@ class TileMatrixMultiplyPerformanceTest
         ir_mat_type_a = ir_mat_type_a->Tile(m, k);
         ir_mat_type_b = ir_mat_type_b->Tile(k, n);
 
+        fmt::print("a: {}, b: {}\n", ir_mat_type_a->name, ir_mat_type_b->name);
+
         auto ir_builder = ir::Builder::Create();
         ir_builder->matrix_multiply_kernel_queue.push_back(mat_mul_kernel);
         auto ir_operator = ir_builder->CreateOperatorByCreator<op::MatrixMultiplyCreator>(
             {ir_mat_type_a, ir_mat_type_b});
-
-        // auto ir_register_tile_grid = optimization::GetInnerGrid3(ir_operator->block);
-        // optimization::ExpandGrid(ir_register_tile_grid);
 
         this->jit_engine = jit::Engine::Create();
         mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);

@@ -13,6 +13,9 @@ namespace galois::optimization {
 
 class NativeCpuInfo {
    public:
+    enum Simd { None = 0, SSE, SSE2, AVX, AVX2, AVX512, AMX, NEON, SVE, SME };
+
+   public:
     static std::shared_ptr<NativeCpuInfo> Create() {
         std::shared_ptr<NativeCpuInfo> self(new NativeCpuInfo);
         // 初始化 cpuinfo 库
@@ -28,6 +31,8 @@ class NativeCpuInfo {
     int64_t CacheLevel() { return cache_sizes.size(); }
     int64_t GetCacheSize(int64_t level) { return cache_sizes[level]; }
 
+    Simd simd;
+
    private:
     NativeCpuInfo() = default;
 
@@ -36,17 +41,50 @@ class NativeCpuInfo {
         simd_bits = 128;
         simd_register_count = 32;
         if (cpuinfo_has_x86_avx512f()) {
+            this->simd = Simd::AVX512;
             simd_bits = 512;
             simd_register_count = 32;
-        } else if (cpuinfo_has_x86_avx2() || cpuinfo_has_x86_avx()) {
+            return;
+        }
+        if (cpuinfo_has_x86_avx2()) {
+            this->simd = Simd::AVX2;
             simd_bits = 256;
             simd_register_count = 16;
-        } else if (cpuinfo_has_x86_sse2()) {
+            return;
+        }
+        if (cpuinfo_has_x86_avx()) {
+            this->simd = Simd::AVX;
+            simd_bits = 256;
+            simd_register_count = 16;
+            return;
+        }
+        if (cpuinfo_has_x86_sse()) {
+            this->simd = Simd::SSE;
             simd_bits = 128;
             simd_register_count = 8;
-        } else if (cpuinfo_has_arm_neon()) {
+            return;
+        }
+        if (cpuinfo_has_x86_sse2()) {
+            this->simd = Simd::SSE2;
+            simd_bits = 128;
+            simd_register_count = 8;
+            return;
+        }
+        if (cpuinfo_has_arm_neon()) {
+            this->simd = Simd::NEON;
             simd_bits = 128;
             simd_register_count = 32;
+            return;
+        }
+        if (cpuinfo_has_arm_sve()) {
+            this->simd = Simd::SVE;
+            GALOIS_UNIMPLEMENT;
+            return;
+        }
+        if (cpuinfo_has_arm_sme()) {
+            this->simd = Simd::SME;
+            GALOIS_UNIMPLEMENT;
+            return;
         }
     }
 
@@ -262,10 +300,10 @@ class GemmTilePolicy {
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         // 当i8时， Neon不支持"mla.16b v1 v2 v3[0]"形式， 必须“mla.16b v1 v2
         // v3”的形式，这应该和avx采用一样的策略
-        if (cpu_info->SimdBits() == 256 || ir_data_type == ir::i8) {
-            return this->ir_avx_gemm_tile_poly->Tile(ir_data_type, cpu_info);
-        } else {
+        if (cpu_info->simd == NativeCpuInfo::Simd::NEON && ir_data_type != ir::i8) {
             return this->ir_neon_gemm_tile_poly->Tile(ir_data_type, cpu_info);
+        } else {
+            return this->ir_avx_gemm_tile_poly->Tile(ir_data_type, cpu_info);
         }
     }
 
