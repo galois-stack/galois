@@ -154,7 +154,7 @@ class NeonGemmTilePolicy {
     std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
                                                     std::shared_ptr<NativeCpuInfo> cpu_info) {
         int32_t simd_register_count = cpu_info->SimdRegisterCount();
-        auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
+        int32_t simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
         /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
         z3::context z3_context;
         z3::params z3_params(z3_context);
@@ -166,10 +166,11 @@ class NeonGemmTilePolicy {
         z3_optimize.add(z3_register_tile_rows > 0);
         z3_optimize.add(z3_register_tile_cols > 0);
         z3_optimize.add(z3_register_tile_rows >= z3_register_tile_cols);
-        // z3_register_tile_rows + z3_register_cols : 行和列的寄存器都需要保留， 这样才能复用数据
-        // z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)： 用于存储外积的结果
+        // z3_register_tile_rows + z3_register_tile_cols : 行和列的寄存器都需要保留，
+        // 这样才能复用数据 z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)：
+        // 用于存储外积的结果
         z3_optimize.add(z3_register_tile_rows + z3_register_tile_cols +
-                            z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes) <
+                            z3_register_tile_rows * z3_register_tile_cols * simd_lanes <
                         simd_register_count);
         // 最大化无依赖的计算指令数目, 同时也最大化了计算强度
         z3::optimize::handle z3_handle_x =
@@ -206,51 +207,40 @@ class AvxGemmTilePolicy {
                std::shared_ptr<op::MatrixMultiplyMicroKernel>>
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         int32_t simd_register_count = cpu_info->SimdRegisterCount();
-
-        auto simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
-        int64_t simd_lanes_a = 1;        // 因为avx不支持vector * vector[lane]这种形式， 故赋值1
-        auto simd_lanes_b = simd_lanes;  // b的simd lanes是固定的
+        int32_t simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
 
         z3::context z3_context;
         z3::params z3_params(z3_context);
-        z3_params.set("priority", z3_context.str_symbol("register tile"));
+        z3_params.set("priority", z3_context.str_symbol("kernel tile"));
         z3::optimize z3_optimize(z3_context);
         z3_optimize.set(z3_params);
         // a的simd lanes, 通过求解得来， 因为存在寄存器不够用的情况， 所以需要裁剪
-        z3::expr z3_register_rows = z3_context.bv_const("z3_register_rows", 32);
-        z3::expr z3_register_cols = z3_context.bv_const("z3_register_cols", 32);
-        z3_optimize.add((z3_register_rows & (z3_register_rows - 1)) ==
-                        0);  // 为2的power， 该条件可能过强
-        z3_optimize.add((z3_register_cols & (z3_register_cols - 1)) ==
-                        0);  // 为2的power， 该条件可能过强
-        z3_optimize.add(z3_register_rows > 0 && z3_register_rows < simd_register_count);
-        z3_optimize.add(z3_register_cols > 0 && z3_register_cols < simd_register_count);
-        z3_optimize.add(z3_register_rows >= z3_register_cols);
-        // 有瑕疵， AVX的shuffe指令可能还需要寄存器， 这里不进一步细化， 因为底层llvm怎么生成不好说
-        // 1 用于将标量shufflevector到向量参与计算
-        // z3_register_cols 需要保留寄存器， 防止反复加载
-        // z3_register_rows * z3_register_cols 用于存放外积的结果
-        z3_optimize.add(1 + z3_register_cols + z3_register_rows * z3_register_cols <=
+        z3::expr z3_kernel_tile_rows = z3_context.bv_const("z3_kernel_tile_rows", 32);
+        z3::expr z3_kernel_tile_cols = z3_context.bv_const("z3_kernel_tile_cols", 32);
+        z3_optimize.add(z3_kernel_tile_cols % simd_lanes == 0);
+        auto z3_register_tile_cols = z3_kernel_tile_cols / simd_lanes;
+        z3_optimize.add(z3_kernel_tile_rows % 2 == 0);
+        z3_optimize.add(z3_kernel_tile_rows > 0 && z3_kernel_tile_rows < simd_register_count);
+        z3_optimize.add(z3_register_tile_cols > 0 && z3_register_tile_cols < simd_register_count);
+        z3_optimize.add(z3_kernel_tile_rows >= z3_register_tile_cols);
+        // z3_kernel_tile_rows 需要保留broadcast后的向量寄存器， 防止反复加载
+        //  z3_kernel_tile_rows * z3_register_tile_cols  用于存放外积的结果
+        z3_optimize.add(z3_kernel_tile_rows + z3_kernel_tile_rows * z3_register_tile_cols <=
                         simd_register_count);
 
-        // 最大化尺寸
-        // z3_register_rows * z3_register_cols: 为了尽可能多的计算数目
-        // z3_register_cols： 为了尽可能的复用“标量拓展向量后”的数据， 因为该步骤需要消耗一个指令
-        // 多目标优化，后期可能需要调整二者的权重
+        // z3_kernel_tile_rows * z3_register_tile_cols: 为了尽可能多的计算指令数目
         z3::optimize::handle z3_handle_x =
-            z3_optimize.maximize(z3_register_rows * z3_register_cols + z3_register_cols);
+            z3_optimize.maximize(z3_kernel_tile_rows * z3_register_tile_cols);
         GALOIS_ASSERT(z3_optimize.check() == z3::sat);
         z3::model z3_model = z3_optimize.get_model();
-        auto register_rows = z3_model.eval(z3_register_rows).get_numeral_int64();
-        auto register_cols = z3_model.eval(z3_register_cols).get_numeral_int64();
+        auto kernel_tile_rows = z3_model.eval(z3_kernel_tile_rows).get_numeral_int64();
+        auto kernel_tile_cols = z3_model.eval(z3_kernel_tile_cols).get_numeral_int64();
 
-        auto micro_kernel_rows = simd_lanes_a * register_rows;
-        auto micro_kernel_cols = simd_lanes_b * register_cols;
-        auto ir_tile_mat_type_a = ir_data_type->Tile(micro_kernel_rows, 1)->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b = ir_data_type->Tile(1, micro_kernel_cols)->Tile(32, 1)->Tile(1, 4);
+        auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
+        auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::SimdMatrixMultiplyMicroKernel2::Create(
-                                   cpu_info->SimdBits(), micro_kernel_rows, micro_kernel_cols));
+                                   cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
     }
 };
 
