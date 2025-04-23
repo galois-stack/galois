@@ -66,9 +66,8 @@ class GemmVsEigenTest : public testing::Test {
 
         this->t = new float[10000000];
         t[3421] = 10.0f;
-        double items;
-        double galois_cost_time;
-        float *t = nullptr;
+       
+        
 
     }
     void TearDown() override {
@@ -88,6 +87,7 @@ class GemmVsEigenTest : public testing::Test {
     EigenMatrixType eigen_matrix_a;
     EigenMatrixType eigen_matrix_b;
     double items;
+    float *t = nullptr;
 };
 
 TYPED_TEST_SUITE_P(GemmVsEigenTest);
