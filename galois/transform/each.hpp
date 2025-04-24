@@ -70,15 +70,13 @@ class EachTensorVisitor : public ir::Visitor {
     }
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
         this->callback(ir_operator);
-        for (auto ir_input: ir_operator->inputs) {
+        for (auto ir_input : ir_operator->inputs) {
             ir_input->ApplyVisitor(this->shared_from_this());
         }
         ir_operator->block->ApplyVisitor(this->shared_from_this());
     }
 
-    void Visit(std::shared_ptr<ir::Input> ir_input) override {
-        this->callback(ir_input);
-    }
+    void Visit(std::shared_ptr<ir::Input> ir_input) override { this->callback(ir_input); }
 
     void Visit(std::shared_ptr<ir::Constant> ir_constant) override { this->callback(ir_constant); }
     void Visit(std::shared_ptr<ir::ConstantRealNumber> ir_constant_real_number) override {

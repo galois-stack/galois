@@ -35,7 +35,7 @@ class ConstantFloat;
 class Visitor : public std::enable_shared_from_this<Visitor> {
    public:
     virtual void Visit(std::shared_ptr<ir::Tensor> ir_tensor) {}
-    virtual void Visit(std::shared_ptr<ir::Input> ir_input){}
+    virtual void Visit(std::shared_ptr<ir::Input> ir_input) {}
     virtual void Visit(std::shared_ptr<ir::Block> ir_block) {}
     virtual void Visit(std::shared_ptr<ir::Grid> ir_grid) {}
     virtual void Visit(std::shared_ptr<ir::Accessor> ir_accessor) {}
