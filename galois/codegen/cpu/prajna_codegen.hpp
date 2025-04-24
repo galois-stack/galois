@@ -462,8 +462,6 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Free> ir_free) override {
-        return;
-
         ir_free->pir_value = pir_builder->Create<pir::Call>(
             pir_builder->GetIntrinsic(
                 "free", pir::FunctionType::Create(
