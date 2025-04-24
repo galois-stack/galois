@@ -60,6 +60,7 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     virtual void Detach() {
         // 只是解除依赖, 不是销毁数据,
         this->instruction_with_index_list.clear();
+        this->parent_block = nullptr;
     }
 
     /// @brief 实例需要销毁前调用
