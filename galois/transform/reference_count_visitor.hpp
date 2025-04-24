@@ -96,7 +96,7 @@ class DecreaseVisitor : public ir::Visitor {
         ir_free->parent_block = ir_parent_block;
         auto iter =
             std::find_if(RANGE((*ir_parent_block)), [](auto ir_x) { return Is<ir::Return>(ir_x); });
-        ir_tensor->parent_block->insert(iter, ir_free);
+        ir_parent_block->insert(iter, ir_free);
     }
 
    public:
