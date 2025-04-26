@@ -1,71 +1,78 @@
-# 使用Z3求解矩阵乘法核大小
+# 使用Z3求解矩阵乘法核大小-基于NEON
 
 在Gemm优化中, 我们会使用多层分块的策略来减少内存的访问, 不同的层级的Tile, 其内存会放在不同的cache上. 而最小一层的Tile我们这里把它称为“Kernel Tile”. Kernel Tile是和向量化指令集紧密联系的, 本文就关注如何使用Z3求解出Kernel Tile的尺寸
+
+## NEON 指令集概述
+NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，广泛应用于 ARMv7-A、ARMv8-A 等架构，用于加速多媒体、信号处理和机器学习任务。
+- **向量宽度**：支持 128 位向量寄存器（Q 寄存器），可存储多种数据类型，例如 4 个 32 位浮点数（float32x4_t）、8 个 16 位整数（int16x8_t）等。
+- **寄存器**：在 ARMv8-A 架构中，NEON 有 32 个 128 位向量寄存器（Q0-Q31），每个寄存器可以分成两个 64 位部分（D0-D63，共 64 个 D 寄存器）；寄存器可存储浮点数（float32, float64）、整数（int8, int16, int32, int64）、无符号整数以及定点格式数据。
+- **指令类型**：包括加载/存储（如 vld1q_f32, vst1q_f32）；算术运算（如加法 vaddq_f32、乘法 vmulq_f32、融合乘加 vfmaq_f32）；逻辑运算（如与 vandq_s32、或 vorrq_s32）；比较和选择（如比较 vceqq_f32、选择 vbslq_f32）；数据重排（如转置 vtrnq_f32、交错 vzipq_f32）；以及归约操作（如 vaddvq_f32）。
+
+
+#### NEON中的FMA指令
+NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非常重要的一部分，因为它可以将乘法和加法操作融合为一个指令，减少指令依赖、降低延迟，并提升计算吞吐量。
+
+- **功能**：FMA执行`a * b + c`的操作，其中`a`和`b`相乘，结果与`c`相加。
+- **优势**：
+  - 融合操作：相比单独的乘法（`vmul`）和加法（`vadd`），FMA减少了指令数。
+  - 更高的精度：FMA在中间结果上不进行舍入，直接累加，减少了浮点运算的精度损失。
+  - 更好的流水线性能：FMA通常有较低的延迟（例如在Cortex-A57上约为4-5周期），且可以并行执行。
+- **NEON中的FMA指令**：
+  - 主要用于浮点运算（`float32`），也支持定点和整数运算。
+  - 常见形式：`vfmaq_f32`（向量FMA）、`vfmaq_laneq_f32`（带广播的FMA）。
+
 
 ## 向量化指令如何实现矩阵乘法
 
 ### 内积实现(Dot Product)
-![alt text](image-6.png)
-内积实现通过将一个向量与另一个向量对应元素相乘并累计，最终得到一个标量结果。例如，在ARM NEON([ARM Intrinsics Guide](https://developer.arm.com/architectures/instruction-sets/intrinsics/))中，可以通过vmulq_f32 和 vaddvq_f32 高效计算浮点向量的点积: 
+
+内积是通过将一个向量与另一个向量对应元素相乘并累加，最终得到一个标量结果。
+![alt text](image-3.png)
 
 
+例如，在ARM NEON中，可以通过vfmaq_f32计算浮点向量的点积: 
+- **场景**：计算`C[i][j] += A[i][k:k+4] * B[k:k+4][j]`（点积）。
+- **代码片段**：
+  ```c
+  float32x4_t a = vld1q_f32(&A[i * K + k]);  // A 的一行
+  float32x4_t b;  // B 的一列（逐元素加载）
+  b = vsetq_lane_f32(B[k][j], b, 0);
+  b = vsetq_lane_f32(B[k+1][j], b, 1);
+  b = vsetq_lane_f32(B[k+2][j], b, 2);
+  b = vsetq_lane_f32(B[k+3][j], b, 3);
+  float32x4_t c = vld1q_f32(&C[i * N + j]);
+  c = vfmaq_f32(c, a, b);  // c += a * b
+  ```
+- **FMA的作用**：
+  - `vfmaq_f32` 逐元素计算点积并累加，适合内积实现。
 
 
-
-```
-//伪代码
-float32x4_t A[i][:], B[:][j];
-float32x4_t prod = vmulq_f32(A[i][:], B[:][j]);// 对应元素相乘
-float32_t result;
-result = vaddvq_f32(prod);// 累加所有元素到标量
-
-```
-在这种方式下，C[i][j] 的每个值都是通过对A[i][:]行和B[:][j]列的dot product实现。
+在这种方式下，\( C[i][j] \)  的每个值都是通过对\(A[i][:]\)行和\(B[:][j]\)列的dot product实现。
 
  
 
 ### 外积实现(Out Product)
-
-
-![alt text](image-7.png)
 外积实现是从RAM加载A的一列和B的一行到寄存器中，计算两个向量之间的外积，并将外积的结果添加到矩阵C中。
-经过K次迭代后，矩阵C的计算完成，可以存储到RAM中。这里通常把C称为累加器，因为它沿着维度K累加外积。
+
+![alt text](image-8.png)
 
 
-```
-伪代码：
-
-// 矩阵乘法 C = A × B
-// A: M × K, B: K × N, C: M × N
-// 初始化 C 的 4x4 小块
-float32x4x4_t c_tile;
-c_tile.val[0] = vld1q_f32(&C[i * N + j]);
-c_tile.val[1] = vld1q_f32(&C[(i + 1) * N + j]);
-c_tile.val[2] = vld1q_f32(&C[(i + 2) * N + j]);
-c_tile.val[3] = vld1q_f32(&C[(i + 3) * N + j]);
-
-// 沿 K 维度迭代，累加外积
-for (int k = 0; k < K; k++) {
-    // 加载 A 的一列 (A[i:i+4,k])，从 A_transpose 加载
-    float32x4_t a = vld1q_f32(&A_transpose[k * M + i]);
-
-    // 加载 B 的一行 (B[k][j:j+4])
-    float32x4_t b = vld1q_f32(&B[k * N + j]);
-
-    // 计算外积并累加到 c_tile
-    for (int l = 0; l < 4; ++l) {
-        c_tile.val[l] = vfmaq_laneq_f32(c_tile.val[l], b, a, l);
-    }
-}
-
-// 将 c_tile 写回 C
-vst1q_f32(&C[i * N + j], c_tile.val[0]);
-vst1q_f32(&C[(i + 1) * N + j], c_tile.val[1]);
-vst1q_f32(&C[(i + 2) * N + j], c_tile.val[2]);
-vst1q_f32(&C[(i + 3) * N + j], c_tile.val[3]);
-  
-
-```
+例如，在ARM NEON中，可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积: 
+- **场景**：计算`C = A × B`，`A`是一列（`A[i:i+4,k]`），`B`是一行（`B[k][j:j+4]`），生成4×4小块。
+- **代码片段**（参考之前的实现）：
+  ```c
+  float32x4_t a = vld1q_f32(&A[k * M + i]);  // A 的一列
+  float32x4_t b = vld1q_f32(&B[k * N + j]);  // B 的一行
+  float32x4x4_t c_tile;
+  // 加载 c_tile（C 的 4x4 小块）
+  for (int l = 0; l < 4; l++) {
+      c_tile.val[l] = vld1q_f32(&C[(i + l) * N + j]);
+  }
+  // 外积计算
+  for (int l = 0; l < 4; l++) {
+      c_tile.val[l] = vfmaq_laneq_f32(c_tile.val[l], b, a, l);
+  }
+  ```
 
 
 
@@ -79,7 +86,7 @@ vst1q_f32(&C[(i + 3) * N + j], c_tile.val[3]);
 **指令延迟：** 指令固有的执行时间，一条指令的数据可供另一条指令使用所需的处理器时钟数。
 
 
-Intel的AVX-512指令([Intel® Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#ig_expand=4407,3067,3107))，用于执行融合乘加操作（Fused Multiply-Add），如图所示：
+例如在Intel的AVX-512指令([Intel® Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#ig_expand=4407,3067,3107))中，用于执行融合乘加操作（Fused Multiply-Add）的_mm256_fmadd_ps指令，如图所示：
 
 ![alt text](image-4.png)
 
@@ -94,21 +101,54 @@ Intel的AVX-512指令([Intel® Intrinsics Guide](https://www.intel.com/content/w
 
 **流水线:** 一种能使多条指令重叠执行的实现技术。
 
-简化的流水线的指令执行，如图：
-![alt text](image-5.png)
-流水线指令执行通常包含5个步骤：
-1. 指令提取(IF)
-2. 指令译码(ID)
-3. 执行/有效地址(EX)
-4. 存储器访问(MEM)
-5. 写回(WB)
+我们以FMA为例，FMA（Fused Multiply-Add）就是把：
 
-在CPU流水线中，指令依赖会导致数据冒险，即一条指令依赖于前面一条尚在流水线中的指令。
- 例如，假设有一条加法指令，它后面紧跟着一条使用加法的和的减法指令(x10)：
- ```
- ADD X10, X1, X2      // 第1条指令：X10 = X1 + X2
-SUB X12, X10, X3     // 第2条指令：X12 = X10 - X3 （依赖X10）
+\[
+d = a \times b + c
+\]
+这两步运算（乘法 + 加法）融合成一条指令
+简化的FMA流水线的指令执行，如图：
+**指令依赖：**
+![alt text](image.png)
+
+- **FMA的输入值**（a、b、c）**依赖前面的指令结果**，那么就必须等前面的指令执行完。
+- 尤其是累加型的循环，比如：
+  
+  ```c
+  for (int i = 0; i < N; ++i)
+      sum = sum + a[i] * b[i];
+  ```
+
+  这里 sum 是累加的，它每次迭代依赖上一次的 sum。
+
+  用FMA实现：
+
+  ```c
+  sum = fma(a[i], b[i], sum);
+  ```
+
+  **每一次FMA必须等上一次的sum算完**，所以存在指令依赖，不能乱序执行，形成**流水线停顿**。
+  只要是FMA的输入参数来自“前一条FMA输出”，就有指令依赖！
+
+**无指令依赖：**
+![alt text](image-1.png)
+
+- FMA的输入值都是独立的，互不相干，互不等待。
+- 特别是那种一次性计算多个独立结果，比如矩阵乘法的内部小块计算（小tile），每个位置单独累加。
+
+举例：
+
+```c
+// 并行计算不同位置
+for (int i = 0; i < 4; ++i)
+  for (int j = 0; j < 4; ++j)
+    C[i][j] = fma(A[i][k], B[k][j], C[i][j]);
 ```
+
+在这里：
+- 不同的 \( C[i][j] \) 之间是独立的。
+- 每个位置的累加是自己的，不依赖别人的结果。
+
 
 
 
