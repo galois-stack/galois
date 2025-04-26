@@ -19,7 +19,8 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 ### 内积实现(Dot Product)
 
 内积是通过将一个向量与另一个向量对应元素相乘并累加，最终得到一个标量结果。
-![alt text](image-5.png)
+
+图1![alt text](image-5.png)
 
 例如，在ARM NEON中，可以通过vfmaq_f32计算浮点向量的点积:
 
@@ -46,7 +47,7 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 
 外积实现是从RAM加载A的一列和B的一行到向量寄存器中，计算两个向量之间的外积，并将外积的结果添加到矩阵C中。
 
-![alt text](image-6.png)
+图2![alt text](image-6.png)
 
 例如，在ARM NEON中，可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
 
@@ -79,7 +80,8 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 为此很多cpu支持**指令流水线**技术,  一种能使多条无依赖指令重叠执行的实现技术。
 
 我们以FMA为例， 如果多条FMA指令存在依赖，那它们的执行如下图所示：
-![alt text](image.png)
+
+图3![alt text](image.png)
 
 - **FMA的输入值**（a、b、c）**依赖前面的指令结果**，那么就必须等前面的指令执行完。
 - 尤其是累加型的循环，比如：
@@ -95,7 +97,8 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
   所以是存在依赖关系的
 
 **无指令依赖：**
-![alt text](image-1.png)
+
+图4![alt text](image-1.png)
 
 如果我们的fma指令不存在依赖关系, 那它们就可以如上图所示流水线执行, 它们的指令延迟会得到很好的掩盖.
 
@@ -113,14 +116,13 @@ for (int i = 0; i < 4; ++i)
 
 回到开头我们的向量化外积实现, 可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
 如果我们直接把simd kernel应用到分块矩阵乘法中, 就会存在一个问题, 指令数目不足以掩盖指令延迟, 那样性能就无法发挥到极致.
-所以simd kernel是我们的“不可拆分”, 但并不是最佳的kernel tile. 要获得最佳性能, 需要将simd kernel以外积的形式进一步
-展开.
+所以simd kernel是我们的“不可拆分”, 但并不是最佳的kernel tile. 要获得最佳性能, 需要将simd kernel以外积的形式进一步展开.
 
 ## Kernel Tile建模
 
 如下图所示我们可以将simd kernel进一步展开, 很多资料里把它称作register tile.
 
-![alt text](image-2.png)
+图5 ![alt text](image-2.png)
 
 这些参数存在这样的关系:
 
@@ -137,6 +139,7 @@ for (int i = 0; i < 4; ++i)
 - 约束: 所使用的向量寄存器数量不超过cpu支持的
 
 我们的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes"
+
 所需要的寄存器数目
 
 - tile A: register_tile_rows
@@ -190,7 +193,7 @@ std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> 
 ```
 
 上述就是我们通过Z3求解kernel tile的代码, 并不复杂. 在Neon指令集下, 但数据类型为f32时, 我们求得kernel tile的尺寸为
-12x8.
+8x12. 上文的图5显示的就是该结果, 一共用了2 \* 3 \* 4 + 2 + 3共29个寄存器.··
 
 下面是我们基于Galois的IR实现的通用kernel,
 
@@ -276,20 +279,69 @@ class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
 
 将kernel tile的shape代入之后, 我们可以得到下面的汇编代码：
 
-```asm
-
+```assembly
+      58: 3cdf01c8      ldur    q8, [x14, #-0x10]
+      5c: ad7f29a9      ldp     q9, q10, [x13, #-0x20]
+      60: 4f88113d      fmla.4s v29, v9, v8[0]
+      64: 4fa8113c      fmla.4s v28, v9, v8[1]
+      68: 4f88193b      fmla.4s v27, v9, v8[2]
+      6c: 4fa8193a      fmla.4s v26, v9, v8[3]
+      70: 4f881159      fmla.4s v25, v10, v8[0]
+      74: 4fa81158      fmla.4s v24, v10, v8[1]
+      78: 4f881957      fmla.4s v23, v10, v8[2]
+      7c: 4fa81956      fmla.4s v22, v10, v8[3]
+      80: 3cc305ab      ldr     q11, [x13], #0x30
+      84: 4f881175      fmla.4s v21, v11, v8[0]
+      88: 4fa81174      fmla.4s v20, v11, v8[1]
+      8c: 4f881973      fmla.4s v19, v11, v8[2]
+      90: 4fa81972      fmla.4s v18, v11, v8[3]
+      94: 3cc205c8      ldr     q8, [x14], #0x20
+      98: 4f881131      fmla.4s v17, v9, v8[0]
+      9c: 4fa81130      fmla.4s v16, v9, v8[1]
+      a0: 4f881927      fmla.4s v7, v9, v8[2]
+      a4: 4fa81926      fmla.4s v6, v9, v8[3]
+      a8: 4f881145      fmla.4s v5, v10, v8[0]
+      ac: 4fa81144      fmla.4s v4, v10, v8[1]
+      b0: 4f881943      fmla.4s v3, v10, v8[2]
+      b4: 4fa8195f      fmla.4s v31, v10, v8[3]
+      b8: 4f881162      fmla.4s v2, v11, v8[0]
+      bc: 9100058c      add     x12, x12, #0x1
+      c0: 4fa81161      fmla.4s v1, v11, v8[1]
+      c4: 4f881960      fmla.4s v0, v11, v8[2]
+      c8: 4fa8197e      fmla.4s v30, v11, v8[3]
+      cc: f1007d9f      cmp     x12, #0x1f
+      d0: 54fffc43      b.lo    0x58 <ltmp0+0x58>
 ```
 
-这段代码是符合我们的期望的, 也获得了预期的性能
+这段代码是符合我们的期望的, 一共24条fma向量指令被展开, 也获得了预期的性能, 达到了130gflops, 在M4 pro平台, f32的单核峰值是130gflops多一点, 基本是接近的.
 
-## 总结
+## Galois项目
 
-总结一下我们方案的优点, 介绍一下其在我们galois项目中的应用. 附上我们galois项目的地址
+Galois项目通过上述方案, 在Gemm最为关键的Kernel实现上获得了非常理想性能, 该方案具备一下有点
+
+- 核心代码少, 且具备良好可读性
+- 具备良好的兼容能力和拓展能力
+- 可维护性高
+
+这是<https://github.com/galois-stack/galois/>的项目地址, 欢迎大家star和参与.
+Galois项目的最终目标是构建一个基于编译器的AI基础设施, 以"端侧(本地)部署LLM"为主要目标.
+
+后续我们还会更新更多的技术文档, 大家感兴趣可以关注公主号.
 
 ## 参考资料
+
+- [Blic](https://github.com/flame/blis)
+- [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page)
+- [Anatomy of High-Performance Matrix Multiplication](https://www.cs.utexas.edu/~flame/pubs/GotoTOMS_revision.pdf)
+- [cpufp](https://github.com/pigirons/cpufp.git)
 
 ## 作者介绍
 
 ### 孙腾
 
 介绍一下你自己
+
+### 张志敏
+
+天大大学本科, 先后任职于联影医疗, 商汤科技, 九号机器人和小米AI实验室. 在软件开发, 算法研究,推理框架和编译器等领域有丰富的落地经验.
+现专注于通过“编译器技术”来实现大模型的本地化和轻量化部署.
