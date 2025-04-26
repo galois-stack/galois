@@ -1,10 +1,10 @@
-# 使用Z3求解矩阵乘法核大小-基于NEON
+# 使用Z3求解矩阵乘法Kernel Tile·-基于NEON
 
 在Gemm优化中, 我们会使用多层分块的策略来减少内存的访问, 不同的层级的Tile, 其内存会放在不同的cache上. 而最小一层的Tile我们这里把它称为“Kernel Tile”. Kernel Tile是和向量化指令集紧密联系的, 本文就关注如何使用Z3求解出Kernel Tile的尺寸
 
 ## NEON 指令集概述
 
-NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，广泛应用于 ARMv7-A、ARMv8-A 等架构，用于加速多媒体、信号处理和机器学习任务。
+NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，一次可进行多个元素(向量)的运算，常用于科学计算, 图像处理和人工智能等计算密集领域.
 
 - **向量宽度**：支持 128 位向量寄存器（Q 寄存器），可存储多种数据类型，例如 4 个 32 位浮点数（float32x4_t）、8 个 16 位整数（int16x8_t）等。
 - **寄存器**：在 ARMv8-A 架构中，NEON 有 32 个 128 位向量寄存器（Q0-Q31）
@@ -12,7 +12,7 @@ NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩�
 
 ### NEON中的FMA指令
 
-NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非常重要的一部分，因为它可以将乘法和加法操作融合为一个指令，减少指令依赖、降低延迟，并提升计算吞吐量。 FMA执行`c = a * b + c`的操作，其中`a`和`b`相乘，结果与`c`相加并存回c。
+NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中非常重要的一部分，因为它可以将乘法和加法操作融合为一个指令，减少指令依赖、降低延迟，并提升计算吞吐量。 FMA执行`c = a * b + c`的操作，其中`a`和`b`相乘，结果与`c`相加并存回c。
 
 ## 向量化指令如何实现矩阵乘法
 
@@ -116,7 +116,7 @@ for (int i = 0; i < 4; ++i)
 
 回到开头我们的向量化外积实现, 可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
 如果我们直接把simd kernel应用到分块矩阵乘法中, 就会存在一个问题, 指令数目不足以掩盖指令延迟, 那样性能就无法发挥到极致.
-所以simd kernel是我们的“不可拆分”, 但并不是最佳的kernel tile. 要获得最佳性能, 需要将simd kernel以外积的形式进一步展开.
+所以simd kernel是不可拆分的”, 但并不是最佳的kernel tile. 要获得最佳性能, 需要将simd kernel以外积的形式进一步展开.
 
 ## Kernel Tile建模
 
@@ -138,7 +138,7 @@ for (int i = 0; i < 4; ++i)
 - 目标: 最大化无依赖的fma向量指令数目
 - 约束: 所使用的向量寄存器数量不超过cpu支持的
 
-我们的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes"
+上图所示的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes"
 
 所需要的寄存器数目
 
@@ -146,7 +146,7 @@ for (int i = 0; i < 4; ++i)
 - tile B: register_tile_cols
 - tile C: register_tile_rows * register_tile_cols \* simd_lanes
 
-合计就是“ z3_register_tile_rows + z3_register_tile_cols + z3_register_tile_rows \* z3_register_tile_cols \* simd_lanes”
+合计就是z3_register_tile_rows + z3_register_tile_cols + z3_register_tile_rows \* z3_register_tile_cols \* simd_lanes个
 
  这应该是一个非线形优化问题, 下面我们就可以通过常用的最优化工具Z3来求解该问题了.
 
@@ -159,50 +159,49 @@ Z3 是由微软开发的一个高性能 SMT（Satisfiability Modulo Theories）�
 ### 通过z3求解
 
 ``` c++
-
 std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> ir_data_type,
-                                                    std::shared_ptr<NativeCpuInfo> cpu_info) {
-        int32_t simd_register_count = cpu_info->SimdRegisterCount();
-        int32_t simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
-        /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
-        z3::context z3_context;
-        z3::params z3_params(z3_context);
-        z3_params.set("priority", z3_context.str_symbol("register tile"));
-        z3::optimize z3_optimize(z3_context);
-        z3_optimize.set(z3_params);
-        z3::expr z3_register_tile_rows = z3_context.int_const("z3_register_tile_rows");
-        z3::expr z3_register_tile_cols = z3_context.int_const("z3_register_tile_cols");
-        z3_optimize.add(z3_register_tile_rows > 0);··
-        z3_optimize.add(z3_register_tile_cols > 0);
-        z3_optimize.add(z3_register_tile_rows >= z3_register_tile_cols);
-        // z3_register_tile_rows + z3_register_tile_cols : 行和列的寄存器都需要保留，
-        // 这样才能复用数据 z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)：
-        // 用于存储外积的结果
-        z3_optimize.add(z3_register_tile_rows + z3_register_tile_cols +
-                            z3_register_tile_rows * z3_register_tile_cols * simd_lanes <
-                        simd_register_count);
-        // 最大化无依赖的计算指令数目, 同时也最大化了计算强度
-        z3::optimize::handle z3_handle_x =
-            z3_optimize.maximize(z3_register_tile_rows * z3_register_tile_cols);
-        GALOIS_ASSERT(z3_optimize.check() == z3::sat);
-        z3::model z3_model = z3_optimize.get_model();
-        auto register_tile_rows = z3_model.eval(z3_register_tile_rows).get_numeral_int64();
-        auto register_tile_cols = z3_model.eval(z3_register_tile_cols).get_numeral_int64();
-        return {register_tile_rows * simd_lanes, register_tile_cols * simd_lanes};
-    }
+                                                std::shared_ptr<NativeCpuInfo> cpu_info) {
+    int32_t simd_register_count = cpu_info->SimdRegisterCount();
+    int32_t simd_lanes = (cpu_info->SimdBits() / 8) / ir_data_type->bytes;
+    /// 通过Z3来求解寄存器分块， 该问题不是一个线性规划问题， 所以采用Z3来处理
+    z3::context z3_context;
+    z3::params z3_params(z3_context);
+    z3_params.set("priority", z3_context.str_symbol("register tile"));
+    z3::optimize z3_optimize(z3_context);
+    z3_optimize.set(z3_params);
+    z3::expr z3_register_tile_rows = z3_context.int_const("z3_register_tile_rows");
+    z3::expr z3_register_tile_cols = z3_context.int_const("z3_register_tile_cols");
+    z3_optimize.add(z3_register_tile_rows > 0);
+    z3_optimize.add(z3_register_tile_cols > 0);
+    z3_optimize.add(z3_register_tile_rows <= z3_register_tile_cols);  // 我们不需要镜像的解
+    // z3_register_tile_rows + z3_register_tile_cols : 行和列的寄存器都需要保留，
+    // 这样才能复用数据 z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)：
+    // 用于存储外积的结果
+    z3_optimize.add(z3_register_tile_rows + z3_register_tile_cols +
+                        z3_register_tile_rows * z3_register_tile_cols * simd_lanes <
+                    simd_register_count);
+    // 最大化无依赖的计算指令数目, 同时也最大化了计算强度
+    z3::optimize::handle z3_handle_x =
+        z3_optimize.maximize(z3_register_tile_rows * z3_register_tile_cols);
+    GALOIS_ASSERT(z3_optimize.check() == z3::sat);
+    z3::model z3_model = z3_optimize.get_model();
+    auto register_tile_rows = z3_model.eval(z3_register_tile_rows).get_numeral_int64();
+    auto register_tile_cols = z3_model.eval(z3_register_tile_cols).get_numeral_int64();
+    return {register_tile_rows * simd_lanes, register_tile_cols * simd_lanes};
+}
 ```
 
-上述就是我们通过Z3求解kernel tile的代码, 并不复杂. 在Neon指令集下, 但数据类型为f32时, 我们求得kernel tile的尺寸为
-8x12. 上文的图5显示的就是该结果, 一共用了2 \* 3 \* 4 + 2 + 3共29个寄存器.··
+上述就是我们通过Z3求解kernel tile的代码, 并不复杂. 在Neon指令集下, 当数据类型为f32时, 我们求得kernel tile的尺寸为
+8x12. 上文的图5显示的就是该结果, 一共用了2 \* 3 \* 4 + 2 + 3共29个寄存器.
 
-下面是我们基于Galois的IR实现的通用kernel,
+下面是我们基于Galois的IR实现的NeonMatrixMultiplyKernel,
 
 ```c++
-class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
+class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
    public:
-    static std::shared_ptr<SimdMatrixMultiplyMicroKernel> Create(int64_t bits, int64_t rows,
-                                                                 int64_t cols) {
-        std::shared_ptr<SimdMatrixMultiplyMicroKernel> self(new SimdMatrixMultiplyMicroKernel);
+    static std::shared_ptr<NeonMatrixMultiplyKernel> Create(int64_t bits, int64_t rows,
+                                                            int64_t cols) {
+        std::shared_ptr<NeonMatrixMultiplyKernel> self(new NeonMatrixMultiplyKernel);
         self->bits = bits;
         self->bytes = self->bits / 8;
         self->rows = rows;
