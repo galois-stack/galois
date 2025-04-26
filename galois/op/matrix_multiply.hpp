@@ -19,7 +19,6 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
     static std::shared_ptr<SimdMatrixMultiplyKernel> Create(int64_t bits) {
         std::shared_ptr<SimdMatrixMultiplyKernel> self(new SimdMatrixMultiplyKernel);
         self->bits = bits;
-        // self->sim_cols = simd_cols;
         self->bytes = self->bits / 8;
         return self;
     }
@@ -56,7 +55,6 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
         auto ir_mat_bit_cast_c = ir_builder->Create<ir::BitCast>(
             ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
 
-        // auto cloner = ir::Cloner::Create();
         for (int64_t i = 0; i < lanes_a[0]; ++i) {
             auto ir_vector_broadcast_a =
                 ir_builder->Create<ir::VectorBroadcast>(ir_vec_bit_cast_a, ir_simd_type_b, i);

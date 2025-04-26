@@ -70,32 +70,15 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 
 ## 存在什么问题
 
-### 指令延迟
-
-**指令延迟：** 指令固有的执行时间，一条指令的数据可供另一条指令使用所需的处理器时钟数。
-
-例如在Intel的AVX-512指令([Intel® Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#ig_expand=4407,3067,3107))中，用于执行融合乘加操作（Fused Multiply-Add）的_mm256_fmadd_ps指令，如图所示：
-
-![alt text](image-4.png)
-
-该指令的延迟是 4 个时钟周期。也就是说，从指令开始执行到其结果准备好供后续指令使用，需要经过 4 个时钟周期。如果后续指令依赖于 _mm256_fmadd_ps 的结果，那么至少需要等待 4 个时钟周期才能继续执行。因此，延迟决定了流水线中的指令之间的时间间隔。
-
-流水线技术可以提高整体的指令吞吐率（单位时间内完成更多指令），但并不能缩短单条指令自身的执行延迟。即使流水线再深，每条指令完成所需的时间（延迟）仍然由指令的复杂性和硬件实现决定。
-
 ### 指令流水线
 
-**指令依赖:** 某些指令需等待前序指令完成才能执行。
+**指令延迟:** FMA等向量化指令是存在较大延迟的, 需要多个时钟周期才能执行完毕.
 
-**流水线:** 一种能使多条指令重叠执行的实现技术。
+**指令依赖:** 如果我们的指令存在依赖关系, 则需要所依赖的指令执行完毕才能执行。
 
-我们以FMA为例，FMA（Fused Multiply-Add）就是把：
+为此很多cpu支持**指令流水线**技术,  一种能使多条无依赖指令重叠执行的实现技术。
 
-\[
-d = a \times b + c
-\]
-这两步运算（乘法 + 加法）融合成一条指令
-简化的FMA流水线的指令执行，如图：
-**指令依赖：**
+我们以FMA为例， 如果多条FMA指令存在依赖，那它们的执行如下图所示：
 ![alt text](image.png)
 
 - **FMA的输入值**（a、b、c）**依赖前面的指令结果**，那么就必须等前面的指令执行完。
@@ -103,25 +86,18 @@ d = a \times b + c
 
   ```c
   for (int i = 0; i < N; ++i)
-      sum = sum + a[i] * b[i];
+      sum = sum + a[i] * b[i]; // fma(a[i], b[i], sum)
   ```
 
-  这里 sum 是累加的，它每次迭代依赖上一次的 sum。
+  **每一次FMA必须等上一次的sum算完**，所以存在指令依赖，不能流水线执行，必须等待上一条执行完毕。
 
-  用FMA实现：
-
-  ```c
-  sum = fma(a[i], b[i], sum);
-  ```
-
-  **每一次FMA必须等上一次的sum算完**，所以存在指令依赖，不能乱序执行，形成**流水线停顿**。
-  只要是FMA的输入参数来自“前一条FMA输出”，就有指令依赖！
+  只要是FMA的输入参数来自“前一条FMA输出”，就有指令依赖. 这里的sum即是上一条fma指令的输出, 也是下一条指令的输入.
+  所以是存在依赖关系的
 
 **无指令依赖：**
 ![alt text](image-1.png)
 
-- FMA的输入值都是独立的，互不相干，互不等待。
-- 特别是那种一次性计算多个独立结果，比如矩阵乘法的内部小块计算（小tile），每个位置单独累加。
+如果我们的fma指令不存在依赖关系, 那它们就可以入上图所示流水线执行, 它们的指令延迟会得到很好的掩盖.
 
 举例：
 
@@ -129,25 +105,47 @@ d = a \times b + c
 // 并行计算不同位置
 for (int i = 0; i < 4; ++i)
   for (int j = 0; j < 4; ++j)
-    C[i][j] = fma(A[i][k], B[k][j], C[i][j]);
+    C[i][j] = A[i][k] * B[k][j] + C[i][j];  // fma(A[i][j], B[k][j], C[i][j])
 ```
 
-在这里：
+这个外积实现中, 不同的 \( C[i][j] \) 之间是独立的, 每个位置累加的是自己的，不依赖别人的结果。 所以fma指令是不存在
+依赖关系的.
 
-- 不同的 \( C[i][j] \) 之间是独立的。
-- 每个位置的累加是自己的，不依赖别人的结果。
-
-不存依赖的指令, 可以通过指令流水线来掩盖延迟
-
-我们可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
-如果我们直接把simd kernel应用到分块矩阵乘法中, 就会存在一个问题, 指令数目不足以掩盖指令延迟, 那样性能就无法发挥到极致
+回到开头我们的向量化外积实, 可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
+如果我们直接把simd kernel应用到分块矩阵乘法中, 就会存在一个问题, 指令数目不足以掩盖指令延迟, 那样性能就无法发挥到极致.
+所以simd kernel是我们的“不可拆分”, 但并不是最佳的kernel tile. 要获得最佳性能, 需要将simd kernel以外积的形式进一步
+展开.
 
 ## Kernel Tile建模
 
-现在我们把Kernel Tile的问题转化成了一个最优化问题
+如下图所示我们可以将simd kernel进一步展开, 很多资料里把它称作register tile.
 
-- 目标: 最大化无依赖的乘加指令
+“加入插图register tile”
+
+这些参数存在这样的关系
+
+- simd_lanes = simd_bits / data_type->bits
+- simd_kernel_tile_rows/cols = simd_lanes
+- kernel_tile_rows/cols = register_tile_rows/cols * simd_lanes
+
+我们看到, 上述形式的所有fma向量指令都是无依赖的. 我们现在所要获取的就是求得最佳kernel rows和kernel cols, 这样我们
+就可以合理的生成MatrixMultiplyKernel了.
+
+通过建模, 我们把Kernel Tile的问题转化成了一个最优化问题,
+
+- 目标: 最大化无依赖的fma向量指令数目
 - 约束: 所使用的向量寄存器数量不超过cpu支持的
+
+我们的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes"
+所需要的寄存器数目
+
+- tile A: register_tile_rows
+- tile B: register_tile_cols
+- tile C: register_tile_rows * \register_tile_cols \* simd_lanes
+
+合计就是“ z3_register_tile_rows + z3_register_tile_cols + z3_register_tile_rows \* z3_register_tile_cols \* simd_lanes”
+
+ 这应该是一个非线形优化问题, 下面我们就可以通过常用的最优化工具Z3来求解该问题了.
 
 ## 通过Z3求解
 
@@ -171,7 +169,7 @@ std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> 
         z3_optimize.set(z3_params);
         z3::expr z3_register_tile_rows = z3_context.int_const("z3_register_tile_rows");
         z3::expr z3_register_tile_cols = z3_context.int_const("z3_register_tile_cols");
-        z3_optimize.add(z3_register_tile_rows > 0);
+        z3_optimize.add(z3_register_tile_rows > 0);··
         z3_optimize.add(z3_register_tile_cols > 0);
         z3_optimize.add(z3_register_tile_rows >= z3_register_tile_cols);
         // z3_register_tile_rows + z3_register_tile_cols : 行和列的寄存器都需要保留，
@@ -191,9 +189,104 @@ std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> 
     }
 ```
 
+上述就是我们通过Z3求解kernel tile的代码, 并不复杂. 在Neon指令集下, 但数据类型为f32时, 我们求得kernel tile的尺寸为
+12x8.
+
+下面是我们基于Galois的IR实现的通用kernel,
+
+```c++
+class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
+   public:
+    static std::shared_ptr<SimdMatrixMultiplyMicroKernel> Create(int64_t bits, int64_t rows,
+                                                                 int64_t cols) {
+        std::shared_ptr<SimdMatrixMultiplyMicroKernel> self(new SimdMatrixMultiplyMicroKernel);
+        self->bits = bits;
+        self->bytes = self->bits / 8;
+        self->rows = rows;
+        self->cols = cols;
+        return self;
+    }
+
+    bool Match(std::shared_ptr<ir::TensorType> ir_mat_type_a,
+               std::shared_ptr<ir::TensorType> ir_mat_type_b) override {
+        GALOIS_ASSERT(ir_mat_type_a->shape.size() == 2);
+        GALOIS_ASSERT(ir_mat_type_b->shape.size() == 2);
+        auto simd_lanes = this->bytes / ir_mat_type_a->value_type->bytes;
+        if (ir_mat_type_a->value_type == ir_mat_type_b->value_type) {
+            if (ir_mat_type_a->shape[1] == 1 && ir_mat_type_a->shape[0] == this->rows) {
+                if (ir_mat_type_b->shape[0] == 1 && ir_mat_type_b->shape[1] == this->cols) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    void Express(std::shared_ptr<ir::Tensor> ir_mat_a, std::shared_ptr<ir::Tensor> ir_mat_b,
+                 std::shared_ptr<ir::Tensor> ir_mat_c,
+                 std::shared_ptr<ir::Builder> ir_builder) override {
+        int64_t lanes_a = ir_mat_a->type->shape[0];
+        int64_t lanes_b = ir_mat_b->type->shape[1];
+        auto ir_data_type = ir_mat_a->type->DataType();
+        auto simd_lanes = this->bytes / ir_data_type->bytes;
+        GALOIS_ASSERT(lanes_a % simd_lanes == 0);
+        GALOIS_ASSERT(lanes_b % simd_lanes == 0);
+        auto ir_simd_type_a = ir_data_type->Tile(simd_lanes)->Tile(lanes_a / simd_lanes);
+        auto ir_simd_type_b = ir_data_type->Tile(simd_lanes)->Tile(lanes_b / simd_lanes);
+
+        auto ir_vec_bit_cast_a = ir_builder->Create<ir::BitCast>(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->Create<ir::BitCast>(ir_mat_b, ir_simd_type_b);
+        auto ir_mat_bit_cast_c =
+            ir_builder->Create<ir::BitCast>(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
+
+        for (int64_t r = 0; r < ir_simd_type_a->shape[0]; ++r) {
+            auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
+            ir_accessor_a->transform_matrix.resize(0, 0);
+            ir_accessor_a->shift_vector[0] = r;
+            for (int64_t c = 0; c < ir_simd_type_b->shape[0]; ++c) {
+                auto ir_accessor_b = ir_builder->CreateAccessor(ir_vec_bit_cast_b);
+                ir_accessor_b->transform_matrix.resize(0, 0);
+                ir_accessor_b->shift_vector[0] = c;
+
+                for (int64_t i = 0; i < simd_lanes; ++i) {
+                    auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(
+                        ir_accessor_a, ir_accessor_b->type, i);
+                    auto ir_mul = ir_builder->Mul(ir_vector_broadcast_a, ir_accessor_b);
+                    auto ir_accessor_c_row = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
+                    ir_accessor_c_row->transform_matrix.resize(0, 0);
+                    ir_accessor_c_row->shift_vector[0] = r * simd_lanes + i;
+                    auto ir_accessor_c = ir_builder->CreateAccessor(ir_accessor_c_row);
+                    ir_accessor_c->transform_matrix.resize(0, 0);
+                    ir_accessor_c->shift_vector[0] = c;
+                    auto ir_sum = ir_builder->Add(ir_mul, ir_accessor_c);
+                    auto ir_write = ir_builder->Create<ir::Write>(ir_sum, ir_accessor_c);
+                }
+            }
+        }
+    }
+
+   private:
+    int64_t bits = 128;
+    int64_t bytes = 16;
+    int64_t rows;
+    int64_t cols;
+};
+```
+
+将kernel tile的shape代入之后, 我们可以下面的汇编代码,
+
+```asm
+
+```
+
+这段代码是符合我们的期望的, 也获得了预期的性能
+
 ## 总结
 
 总结一下我们方案的优点, 介绍一下其在我们galois项目中的应用. 附上我们galois项目的地址
+
+## 参考资料
 
 ## 作者介绍
 
