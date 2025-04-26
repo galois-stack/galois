@@ -3,7 +3,7 @@
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
 
-TEST(GaloisTests, TestMatrixMultiplyMicroKernel) {
+TEST(GaloisTests, TestMatrixMultiplyKernel) {
     auto native_cpu_info = optimization::NativeCpuInfo::Create();
     auto mat_mul_tile_policy = optimization::GemmTilePolicy::Create();
     auto [ir_mat_type_a, ir_mat_type_b, mat_mul_kernel] =
