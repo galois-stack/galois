@@ -165,7 +165,7 @@ class NeonGemmTilePolicy {
         z3::expr z3_register_tile_cols = z3_context.int_const("z3_register_tile_cols");
         z3_optimize.add(z3_register_tile_rows > 0);
         z3_optimize.add(z3_register_tile_cols > 0);
-        z3_optimize.add(z3_register_tile_rows >= z3_register_tile_cols);
+        z3_optimize.add(z3_register_tile_rows <= z3_register_tile_cols);  // 我们不需要镜像的解
         // z3_register_tile_rows + z3_register_tile_cols : 行和列的寄存器都需要保留，
         // 这样才能复用数据 z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)：
         // 用于存储外积的结果
@@ -191,7 +191,7 @@ class NeonGemmTilePolicy {
         auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
         auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
-                               op::SimdMatrixMultiplyMicroKernel::Create(
+                               op::NeonMatrixMultiplyKernel::Create(
                                    cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
     }
 };
@@ -239,7 +239,7 @@ class AvxGemmTilePolicy {
         auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
         auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
-                               op::SimdMatrixMultiplyMicroKernel2::Create(
+                               op::AvxMatrixMultiplyKernel::Create(
                                    cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
     }
 };
@@ -257,7 +257,7 @@ class GemmTilePolicy {
                std::shared_ptr<op::MatrixMultiplyMicroKernel>>
     Tile(std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info) {
         // 当i8时， Neon不支持"mla.16b v1 v2 v3[0]"形式， 必须“mla.16b v1 v2
-        // v3”的形式，这应该和avx采用一样的策略
+        // v3”的形式，所以会去采用和avx一样的策略
         if (cpu_info->simd == NativeCpuInfo::Simd::NEON && ir_data_type != ir::i8) {
             return this->ir_neon_gemm_tile_poly->Tile(ir_data_type, cpu_info);
         } else {

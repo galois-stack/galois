@@ -75,11 +75,11 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
     int64_t simd_cols;
 };
 
-class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
+class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
    public:
-    static std::shared_ptr<SimdMatrixMultiplyMicroKernel> Create(int64_t bits, int64_t rows,
-                                                                 int64_t cols) {
-        std::shared_ptr<SimdMatrixMultiplyMicroKernel> self(new SimdMatrixMultiplyMicroKernel);
+    static std::shared_ptr<NeonMatrixMultiplyKernel> Create(int64_t bits, int64_t rows,
+                                                            int64_t cols) {
+        std::shared_ptr<NeonMatrixMultiplyKernel> self(new NeonMatrixMultiplyKernel);
         self->bits = bits;
         self->bytes = self->bits / 8;
         self->rows = rows;
@@ -153,11 +153,11 @@ class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
     int64_t cols;
 };
 
-class SimdMatrixMultiplyMicroKernel2 : public MatrixMultiplyMicroKernel {
+class AvxMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
    public:
-    static std::shared_ptr<SimdMatrixMultiplyMicroKernel2> Create(int64_t bits, int64_t rows,
-                                                                  int64_t cols) {
-        std::shared_ptr<SimdMatrixMultiplyMicroKernel2> self(new SimdMatrixMultiplyMicroKernel2);
+    static std::shared_ptr<AvxMatrixMultiplyKernel> Create(int64_t bits, int64_t rows,
+                                                           int64_t cols) {
+        std::shared_ptr<AvxMatrixMultiplyKernel> self(new AvxMatrixMultiplyKernel);
         self->bits = bits;
         self->bytes = self->bits / 8;
         self->rows = rows;
