@@ -19,7 +19,7 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 ### 内积实现(Dot Product)
 
 内积是通过将一个向量与另一个向量对应元素相乘并累加，最终得到一个标量结果。
-![alt text](image-3.png)
+![alt text](image-5.png)
 
 例如，在ARM NEON中，可以通过vfmaq_f32计算浮点向量的点积:
 
@@ -46,12 +46,12 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 
 外积实现是从RAM加载A的一列和B的一行到向量寄存器中，计算两个向量之间的外积，并将外积的结果添加到矩阵C中。
 
-![alt text](image-8.png)
+![alt text](image-6.png)
 
 例如，在ARM NEON中，可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
 
 - **场景**：计算`C = A × B`，`A`是一列（`A[i:i+4,k]`），`B`是一行（`B[k][j:j+4]`），生成4×4小块。
-- **代码片段**（参考之前的实现）：
+- **代码片段**：
 
   ```c··
   float32x4_t a = vld1q_f32(&A[k * M + i]);  // A 的一列
@@ -65,7 +65,7 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
   ```
 
 目前主流平台采用的还是外积实现, 其更为简单直接, 并不需要增加特殊的指令
-为了便于和下文区分, 我们把基于的外积的上术矩阵乘法实现成为simd kernel. “simd kernel”是我们实际意义上的不可拆分单元,
+为了便于和下文区分, 我们把基于的外积的上述矩阵乘法实现成为simd kernel. “simd kernel”是我们实际意义上的不可拆分单元,
 再拆就无法有效使用向量化指令了. 实际中neon和avx的“simd kernel”是有区别的, 本文会以Neon的实现为例.
 
 ## 存在什么问题
@@ -97,7 +97,7 @@ NEON中的融合乘加（FMA, Fused Multiply-Add）指令是NEON指令集中非�
 **无指令依赖：**
 ![alt text](image-1.png)
 
-如果我们的fma指令不存在依赖关系, 那它们就可以入上图所示流水线执行, 它们的指令延迟会得到很好的掩盖.
+如果我们的fma指令不存在依赖关系, 那它们就可以如上图所示流水线执行, 它们的指令延迟会得到很好的掩盖.
 
 举例：
 
@@ -111,7 +111,7 @@ for (int i = 0; i < 4; ++i)
 这个外积实现中, 不同的 \( C[i][j] \) 之间是独立的, 每个位置累加的是自己的，不依赖别人的结果。 所以fma指令是不存在
 依赖关系的.
 
-回到开头我们的向量化外积实, 可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
+回到开头我们的向量化外积实现, 可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
 如果我们直接把simd kernel应用到分块矩阵乘法中, 就会存在一个问题, 指令数目不足以掩盖指令延迟, 那样性能就无法发挥到极致.
 所以simd kernel是我们的“不可拆分”, 但并不是最佳的kernel tile. 要获得最佳性能, 需要将simd kernel以外积的形式进一步
 展开.
@@ -120,9 +120,9 @@ for (int i = 0; i < 4; ++i)
 
 如下图所示我们可以将simd kernel进一步展开, 很多资料里把它称作register tile.
 
-“加入插图register tile”
+![alt text](image-2.png)
 
-这些参数存在这样的关系
+这些参数存在这样的关系:
 
 - simd_lanes = simd_bits / data_type->bits
 - simd_kernel_tile_rows/cols = simd_lanes
@@ -141,7 +141,7 @@ for (int i = 0; i < 4; ++i)
 
 - tile A: register_tile_rows
 - tile B: register_tile_cols
-- tile C: register_tile_rows * \register_tile_cols \* simd_lanes
+- tile C: register_tile_rows * register_tile_cols \* simd_lanes
 
 合计就是“ z3_register_tile_rows + z3_register_tile_cols + z3_register_tile_rows \* z3_register_tile_cols \* simd_lanes”
 
@@ -274,7 +274,7 @@ class SimdMatrixMultiplyMicroKernel : public MatrixMultiplyMicroKernel {
 };
 ```
 
-将kernel tile的shape代入之后, 我们可以下面的汇编代码,
+将kernel tile的shape代入之后, 我们可以得到下面的汇编代码：
 
 ```asm
 
