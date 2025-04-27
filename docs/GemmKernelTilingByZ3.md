@@ -27,7 +27,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
   ```c++
   float32x4_t a;
   float32x4_t b;
-  float32x4_t prod = vmulq_f32(a, b); // prod[i] = a[i] * b[i] 
+  float32x4_t prod = vmulq_f32(a, b); // prod[i] = a[i] * b[i]
   float c = vaddvq_f32(prod);  // c = prod[0] + prod[1] + prod[2] + prod[3]
   ```
 
@@ -68,15 +68,14 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 图3![alt text](image.png)
 
-- **FMA的输入值**（a、b、c）**依赖前面的指令结果**, 那么就必须等前面的指令执行完.
-- 尤其是累加型的循环, 比如：
+FMA的输入值（a、b、c）**依赖前面的指令结果, 那么就必须等前面的指令执行完. 尤其是累加型的循环, 比如：
 
   ```c
   for (int i = 0; i < N; ++i)
       sum = sum + a[i] * b[i]; // fma(a[i], b[i], sum)
   ```
 
-  **每一次FMA必须等上一次的sum算完**, 所以存在指令依赖, 不能流水线执行, 必须等待上一条执行完毕.
+  每一次FMA必须等上一次的sum算完, 所以存在指令依赖, 不能流水线执行, 必须等待上一条执行完毕.
 
   只要是FMA的输入参数来自“前一条FMA输出”, 就有指令依赖. 这里的sum即是上一条fma指令的输出, 也是下一条指令的输入.
   所以是存在依赖关系的
@@ -263,7 +262,7 @@ class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
 
 将kernel tile的shape代入之后, 我们可以得到下面的汇编代码：
 
-```assembly
+```asm
       58: 3cdf01c8      ldur    q8, [x14, #-0x10]
       5c: ad7f29a9      ldp     q9, q10, [x13, #-0x20]
       60: 4f88113d      fmla.4s v29, v9, v8[0]
