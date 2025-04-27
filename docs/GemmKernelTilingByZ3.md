@@ -1,10 +1,10 @@
 # 使用Z3求解矩阵乘法Kernel Tile·-基于NEON
 
-在Gemm优化中, 我们会使用多层分块的策略来减少内存的访问, 不同的层级的Tile, 其内存会放在不同的cache上. 而最小一层的Tile我们这里把它称为“Kernel Tile”. Kernel Tile是和向量化指令集紧密联系的, 本文就关注如何使用Z3求解出Kernel Tile的尺寸
+在Gemm优化中, 我们会使用多层分块的策略来减少内存的访问, 不同的层级的Tile, 其内存会放在不同的cache上. 而最小一层的Tile我们这里把它称为“Kernel Tile”. Kernel Tile是和向量化指令集紧密联系的, 本文就关注如何使用Z3求解出Kernel Tile的尺寸。
 
 ## NEON 指令集概述
 
-NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，一次可进行多个元素(向量)的运算，常用于科学计算, 图像处理和人工智能等计算密集领域.
+NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，一次可进行多个元素(向量)的运算，常用于科学计算, 图像处理和人工智能等计算密集领域。
 
 - **向量宽度**：支持 128 位向量寄存器（Q 寄存器），可存储多种数据类型，例如 4 个 32 位浮点数（float32x4_t）、8 个 16 位整数（int16x8_t）等。
 - **寄存器**：在 ARMv8-A 架构中，NEON 有 32 个 128 位向量寄存器（Q0-Q31）
@@ -41,7 +41,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 - **FMA的作用**：
   - `vfmaq_f32` 逐元素计算点积并累加，适合内积实现。
 
-在这种方式下，\( C[i][j] \)  的每个值都是通过对\(A[i][:]\)行和\(B[:][j]\)列的dot product实现。
+在这种方式下，\( C[i][j] \)  的值都是通过对\(A[i]\)行和\(B[j]\)列的dot product实现。
 
 ### 外积实现(Out Product)
 
@@ -316,7 +316,7 @@ class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
 
 ## Galois项目
 
-Galois项目通过上述方案, 在Gemm最为关键的Kernel实现上获得了非常理想性能, 该方案具备一下有点
+Galois项目通过上述方案, 在Gemm最为关键的Kernel实现上获得了非常理想性能, 该方案具备一下优点：
 
 - 核心代码少, 且具备良好可读性
 - 具备良好的兼容能力和拓展能力
@@ -336,9 +336,7 @@ Galois项目的最终目标是构建一个基于编译器的AI基础设施, 以"
 
 ## 作者介绍
 
-### 孙腾
 
-介绍一下你自己
 
 ### 张志敏
 
