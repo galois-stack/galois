@@ -25,16 +25,11 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 例如，在ARM NEON中，可以通过vfmaq_f32计算浮点向量的点积:
 
   ```c++
-  float32x4_t a
+  float32x4_t a;
   float32x4_t b;
   float32x4_t c = vld1q_f32(&C[i * N + j]);
   c = vfmaq_f32(c, a, b);  // c += a * b
   ```
-
-- **FMA的作用**：
-  - `vfmaq_f32` 逐元素计算点积并累加，适合内积实现。
-
-在这种方式下，\( C[i][j] \)  的值都是通过对\(A[i]\)行和\(B[j]\)列的dot product实现。
 
 ### 外积实现(Out Product)
 
