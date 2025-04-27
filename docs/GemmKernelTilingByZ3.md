@@ -24,16 +24,9 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 例如，在ARM NEON中，可以通过vfmaq_f32计算浮点向量的点积:
 
-- **场景**：计算`C[i][j] += A[i][k:k+4] * B[k:k+4][j]`（点积）。
-- **代码片段**：
-
-  ```c
-  float32x4_t a = vld1q_f32(&A[i * K + k]);  // A 的一行
-  float32x4_t b;  // B 的一列（逐元素加载）
-  b = vsetq_lane_f32(B[k][j], b, 0);
-  b = vsetq_lane_f32(B[k+1][j], b, 1);
-  b = vsetq_lane_f32(B[k+2][j], b, 2);
-  b = vsetq_lane_f32(B[k+3][j], b, 3);
+  ```c++
+  float32x4_t a
+  float32x4_t b;
   float32x4_t c = vld1q_f32(&C[i * N + j]);
   c = vfmaq_f32(c, a, b);  // c += a * b
   ```
@@ -51,18 +44,15 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 例如，在ARM NEON中，可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
 
-- **场景**：计算`C = A × B`，`A`是一列（`A[i:i+4,k]`），`B`是一行（`B[k][j:j+4]`），生成4×4小块。
-- **代码片段**：
+  ```c++
+  float32x4_t A;
+  float32x4_t B;
+  float32x4x4_t C;
 
-  ```c··
-  float32x4_t a = vld1q_f32(&A[k * M + i]);  // A 的一列
-  float32x4_t b = vld1q_f32(&B[k * N + j]);  // B 的一行
-  float32x4x4_t c_tile;
-
-  c_tile.val[0] = vfmaq_laneq_f32(c_tile.val[0], b, a, 0);
-  c_tile.val[1] = vfmaq_laneq_f32(c_tile.val[1], b, a, 1);
-  c_tile.val[2] = vfmaq_laneq_f32(c_tile.val[2], b, a, 2);
-  c_tile.val[3] = vfmaq_laneq_f32(c_tile.val[3], b, a, 3);
+  C.val[0] = vfmaq_laneq_f32(C.val[0], B, A, 0);
+  C.val[1] = vfmaq_laneq_f32(C.val[1], B, A, 1);
+  C.val[2] = vfmaq_laneq_f32(C.val[2], B, A, 2);
+  C.val[3] = vfmaq_laneq_f32(C.val[3], B, A, 3);
   ```
 
 目前主流平台采用的还是外积实现, 其更为简单直接, 并不需要增加特殊的指令
@@ -329,16 +319,7 @@ Galois项目的最终目标是构建一个基于编译器的AI基础设施, 以"
 
 ## 参考资料
 
-- [Blic](https://github.com/flame/blis)
+- [Blis](https://github.com/flame/blis)
 - [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page)
 - [Anatomy of High-Performance Matrix Multiplication](https://www.cs.utexas.edu/~flame/pubs/GotoTOMS_revision.pdf)
 - [cpufp](https://github.com/pigirons/cpufp.git)
-
-## 作者介绍
-
-
-
-### 张志敏
-
-天大大学本科, 先后任职于联影医疗, 商汤科技, 九号机器人和小米AI实验室. 在软件开发, 算法研究,推理框架和编译器等领域有丰富的落地经验.
-现专注于通过“编译器技术”来实现大模型的本地化和轻量化部署.
