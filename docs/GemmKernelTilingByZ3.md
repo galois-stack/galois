@@ -111,9 +111,9 @@ for (int i = 0; i < 4; ++i)
 
 这些参数存在这样的关系:
 
-- simd_lanes = simd_bits / data_type->bits
-- simd_kernel_tile_rows/cols = simd_lanes
-- kernel_tile_rows/cols = register_tile_rows/cols * simd_lanes
+- `simd_lanes = simd_bits / data_type->bits`
+- `simd_kernel_tile_rows / cols = simd_lanes`
+- `kernel_tile_rows / cols = register_tile_rows / cols * simd_lanes`
 
 我们看到, 上述形式的所有fma向量指令都是无依赖的. 我们现在所要获取的就是求得最佳kernel rows和kernel cols, 这样我们
 就可以合理的生成MatrixMultiplyKernel了.
@@ -123,15 +123,15 @@ for (int i = 0; i < 4; ++i)
 - 目标: 最大化无依赖的fma向量指令数目
 - 约束: 所使用的向量寄存器数量不超过cpu支持的
 
-上图所示的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes".
+上图所示的fma向量指令数目可以表示为`register_tile_rows * register_tile_cols * simd_lanes`.
 
 所需要的寄存器数目:
 
-- tile A: register_tile_rows
-- tile B: register_tile_cols
-- tile C: register_tile_rows * register_tile_cols \* simd_lanes
+- `tile A: register_tile_rows`
+- `tile B: register_tile_cols`
+- `tile C: register_tile_rows * register_tile_cols * simd_lanes`
 
-合计就是z3_register_tile_rows + z3_register_tile_cols + z3_register_tile_rows \* z3_register_tile_cols \* simd_lanes个
+合计就是`z3_register_tile_rows + z3_register_tile_cols + z3_register_tile_rows * z3_register_tile_cols * simd_lanes`个
 
  这应该是一个非线形优化问题, 下面我们就可以通过常用的最优化工具Z3来求解该问题了.
 
@@ -177,7 +177,7 @@ std::tuple<int64_t, int64_t> GetKernelTileShape(std::shared_ptr<ir::TensorType> 
 ```
 
 上述就是我们通过Z3求解kernel tile的代码, 并不复杂. 在Neon指令集下, 当数据类型为f32时, 我们求得kernel tile的尺寸为
-8x12. 上文的图5显示的就是该结果, 一共用了2 \* 3 \* 4 + 2 + 3共29个寄存器.
+`8x12`. 上文的图5显示的就是该结果, 一共用了`2 * 3 * 4 + 2 + 3`共29个寄存器.
 
 下面是我们基于Galois的IR实现的NeonMatrixMultiplyKernel,
 
