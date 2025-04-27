@@ -35,7 +35,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 外积实现是从RAM加载A的一列和B的一行到向量寄存器中，计算两个向量之间的外积，并将外积的结果添加到矩阵C中。
 
-图2! ![alt text](image-4.png)
+图2 ![alt text](image-4.png)
 
 例如，在ARM NEON中，可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
 
