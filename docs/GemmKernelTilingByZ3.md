@@ -1,28 +1,28 @@
-# 使用Z3求解矩阵乘法Kernel Tile·-基于NEON
+# 使用Z3求解矩阵乘法Kernel Tile--基于NEON
 
-在Gemm优化中, 我们会使用多层分块的策略来减少内存的访问, 不同的层级的Tile, 其内存会放在不同的cache上. 而最小一层的Tile我们这里把它称为“Kernel Tile”. Kernel Tile是和向量化指令集紧密联系的, 本文就关注如何使用Z3求解出Kernel Tile的尺寸。
+在Gemm优化中, 我们会使用多层分块的策略来减少内存的访问, 不同的层级的Tile, 其内存会放在不同的cache上. 而最小一层的Tile我们这里把它称为“Kernel Tile”. Kernel Tile是和向量化指令集紧密联系的, 本文就关注如何使用Z3求解出Kernel Tile的尺寸.
 
 ## NEON 指令集概述
 
-NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，一次可进行多个元素(向量)的运算，常用于科学计算, 图像处理和人工智能等计算密集领域。
+NEON 是 ARM 架构中的高级 SIMD（Single Instruction, Multiple Data）扩展指令集，一次可进行多个元素(向量)的运算，常用于科学计算, 图像处理和人工智能等计算密集领域.
 
-- **向量宽度**：支持 128 位向量寄存器（Q 寄存器），可存储多种数据类型，例如 4 个 32 位浮点数（float32x4_t）、8 个 16 位整数（int16x8_t）等。
-- **寄存器**：在 ARMv8-A 架构中，NEON 有 32 个 128 位向量寄存器（Q0-Q31）
-- **指令类型**：包括加载/存储（如 vld1q_f32, vst1q_f32）；算术运算（如加法 vaddq_f32、乘法 vmulq_f32、融合乘加 vfmaq_f32）；逻辑运算（如与 vandq_s32、或 vorrq_s32）；比较和选择（如比较 vceqq_f32、选择 vbslq_f32）；数据重排（如转置 vtrnq_f32、交错 vzipq_f32）；以及归约操作（如 vaddvq_f32）。
+- **向量宽度**：支持 128 位向量寄存器（Q 寄存器）, 可存储多种数据类型，例如 4 个 32 位浮点数（float32x4_t）、8 个 16 位整数（int16x8_t）等.
+- **寄存器**：在 ARMv8-A 架构中, NEON 有 32 个 128 位向量寄存器（Q0-Q31）.
+- **指令类型**：包括加载/存储（如 vld1q_f32, vst1q_f32）; 算术运算（如加法 vaddq_f32、乘法 vmulq_f32、融合乘加 vfmaq_f32）; 逻辑运算（如与 vandq_s32、或 vorrq_s32）; 比较和选择（如比较 vceqq_f32、选择 vbslq_f32）; 数据重排（如转置 vtrnq_f32、交错 vzipq_f32）; 以及归约操作（如 vaddvq_f32）.
 
 ### NEON中的FMA指令
 
-NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中非常重要的一部分，因为它可以将乘法和加法操作融合为一个指令，减少指令依赖、降低延迟，并提升计算吞吐量。 FMA执行`c = a * b + c`的操作，其中`a`和`b`相乘，结果与`c`相加并存回c。
+NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中非常重要的一部分, 因为它可以将乘法和加法操作融合为一个指令, 减少指令依赖、降低延迟, 并提升计算吞吐量. FMA执行`c = a * b + c`的操作, 其中`a`和`b`相乘，结果与`c`相加并存回c.
 
 ## 向量化指令如何实现矩阵乘法
 
 ### 内积实现(Dot Product)
 
-内积是通过将一个向量与另一个向量对应元素相乘并累加，最终得到一个标量结果。
+内积是通过将一个向量与另一个向量对应元素相乘并累加, 最终得到一个标量结果.
 
 图1![alt text](image-5.png)
 
-例如，在ARM NEON中，可以通过vmulq_f32和vaddvq_f32计算浮点向量的点积:
+例如, 在ARM NEON中, 可以通过vmulq_f32和vaddvq_f32计算浮点向量的点积:
 
   ```c++
   float32x4_t a;
@@ -33,11 +33,11 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 ### 外积实现(Out Product)
 
-外积实现是从RAM加载A的一列和B的一行到向量寄存器中，计算两个向量之间的外积，并将外积的结果添加到矩阵C中。
+外积实现是从RAM加载A的一列和B的一行到向量寄存器中, 计算两个向量之间的外积, 并将外积的结果添加到矩阵C中.
 
 图2 ![alt text](image-4.png)
 
-例如，在ARM NEON中，可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
+例如，在ARM NEON中, 可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
 
   ```c++
   float32x4_t A;
@@ -51,7 +51,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
   ```
 
 目前主流平台采用的还是外积实现, 其更为简单直接, 并不需要增加特殊的指令
-为了便于和下文区分, 我们把基于的外积的上述矩阵乘法实现成为simd kernel. “simd kernel”是我们实际意义上的不可拆分单元,
+为了便于和下文区分, 我们把基于外积的上述矩阵乘法实现称为simd kernel. “simd kernel”是我们实际意义上的不可拆分单元,
 再拆就无法有效使用向量化指令了. 实际中neon和avx的“simd kernel”是有区别的, 本文会以Neon的实现为例.
 
 ## 存在什么问题
@@ -60,25 +60,25 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 **指令延迟:** FMA等向量化指令是存在较大延迟的, 需要多个时钟周期才能执行完毕.
 
-**指令依赖:** 如果我们的指令存在依赖关系, 则需要所依赖的指令执行完毕才能执行。
+**指令依赖:** 如果我们的指令存在依赖关系, 则需要所依赖的指令执行完毕才能执行.
 
-为此很多cpu支持**指令流水线**技术,  一种能使多条无依赖指令重叠执行的实现技术。
+为此很多cpu支持**指令流水线**技术, 一种能使多条无依赖指令重叠执行的实现技术.
 
-我们以FMA为例， 如果多条FMA指令存在依赖，那它们的执行如下图所示：
+我们以FMA为例, 如果多条FMA指令存在依赖，那它们的执行如下图所示:
 
 图3![alt text](image.png)
 
-- **FMA的输入值**（a、b、c）**依赖前面的指令结果**，那么就必须等前面的指令执行完。
-- 尤其是累加型的循环，比如：
+- **FMA的输入值**（a、b、c）**依赖前面的指令结果**, 那么就必须等前面的指令执行完.
+- 尤其是累加型的循环, 比如：
 
   ```c
   for (int i = 0; i < N; ++i)
       sum = sum + a[i] * b[i]; // fma(a[i], b[i], sum)
   ```
 
-  **每一次FMA必须等上一次的sum算完**，所以存在指令依赖，不能流水线执行，必须等待上一条执行完毕。
+  **每一次FMA必须等上一次的sum算完**, 所以存在指令依赖, 不能流水线执行, 必须等待上一条执行完毕.
 
-  只要是FMA的输入参数来自“前一条FMA输出”，就有指令依赖. 这里的sum即是上一条fma指令的输出, 也是下一条指令的输入.
+  只要是FMA的输入参数来自“前一条FMA输出”, 就有指令依赖. 这里的sum即是上一条fma指令的输出, 也是下一条指令的输入.
   所以是存在依赖关系的
 
 **无指令依赖：**
@@ -96,7 +96,7 @@ for (int i = 0; i < 4; ++i)
     C[i][j] = A[i][k] * B[k][j] + C[i][j];  // fma(A[i][j], B[k][j], C[i][j])
 ```
 
-这个外积实现中, 不同的 \( C[i][j] \) 之间是独立的, 每个位置累加的是自己的，不依赖别人的结果。 所以fma指令是不存在
+这个外积实现中, 不同的 \( C[i][j] \) 之间是独立的, 每个位置累加的是自己的, 不依赖别人的结果. 所以fma指令是不存在
 依赖关系的.
 
 回到开头我们的向量化外积实现, 可以看到simd kernel里的计算指令是没有依赖的. 但simd的指令延迟比较大,
@@ -118,14 +118,14 @@ for (int i = 0; i < 4; ++i)
 我们看到, 上述形式的所有fma向量指令都是无依赖的. 我们现在所要获取的就是求得最佳kernel rows和kernel cols, 这样我们
 就可以合理的生成MatrixMultiplyKernel了.
 
-通过建模, 我们把Kernel Tile的问题转化成了一个最优化问题,
+通过建模, 我们把Kernel Tile的问题转化成了一个最优化问题:
 
 - 目标: 最大化无依赖的fma向量指令数目
 - 约束: 所使用的向量寄存器数量不超过cpu支持的
 
-上图所示的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes"
+上图所示的fma向量指令数目可以表示为"register_tile_rows \* register_tile_cols \* simd_lanes".
 
-所需要的寄存器数目
+所需要的寄存器数目:
 
 - tile A: register_tile_rows
 - tile B: register_tile_cols
@@ -139,7 +139,7 @@ for (int i = 0; i < 4; ++i)
 
 ### Z3介绍
 
-Z3 是由微软开发的一个高性能 SMT（Satisfiability Modulo Theories）求解器，广泛用于程序验证、自动化推理和约束求解等场景。Z3 支持整数、布尔、实数等类型约束建模。Z3地址：<https://github.com/Z3Prover/z3>
+Z3 是由微软开发的一个高性能 SMT（Satisfiability Modulo Theories）求解器, 广泛用于程序验证、自动化推理和约束求解等场景. Z3 支持整数、布尔、实数等类型约束建模. Z3地址：<https://github.com/Z3Prover/z3>
 
 ### 通过z3求解
 
@@ -301,7 +301,7 @@ class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
 
 ## Galois项目
 
-Galois项目通过上述方案, 在Gemm最为关键的Kernel实现上获得了非常理想性能, 该方案具备一下优点：
+Galois项目通过上述方案, 在Gemm最为关键的Kernel实现上获得了非常理想性能, 该方案具备一下优点:
 
 - 核心代码少, 且具备良好可读性
 - 具备良好的兼容能力和拓展能力
@@ -310,7 +310,7 @@ Galois项目通过上述方案, 在Gemm最为关键的Kernel实现上获得了�
 这是<https://github.com/galois-stack/galois/>的项目地址, 欢迎大家star和参与.
 Galois项目的最终目标是构建一个基于编译器的AI基础设施, 以"端侧(本地)部署LLM"为主要目标.
 
-后续我们还会更新更多的技术文档, 大家感兴趣可以关注公主号.
+后续我们还会更新更多的技术文档, 大家感兴趣可以关注公众号.
 
 ## 参考资料
 
