@@ -9,7 +9,7 @@ class ArithmeticCreator : public BinaryCreator {
    public:
     static std::shared_ptr<ArithmeticCreator> Create() {
         auto self = std::make_shared<ArithmeticCreator>();
-        self->name = "ToName ";
+        self->name = GetOperationName();
         self->fullname = self->name;
         return self;
     }
@@ -37,6 +37,21 @@ class ArithmeticCreator : public BinaryCreator {
         auto ir_accessor_in1 = ir_builder->CreateIdentityAccessor(ir_input1);
 
         this->ExpressInline(ir_accessor_in0, ir_accessor_in1, ir_accessor_out, ir_builder);
+    }
+
+   private:
+    static std::string GetOperationName() {
+        if (Operation == ir::ArithmeticInstruction::Add) {
+            return "Add";
+        } else if (Operation == ir::ArithmeticInstruction::Sub) {
+            return "Sub";
+        } else if (Operation == ir::ArithmeticInstruction::Mul) {
+            return "Mul";
+        } else if (Operation == ir::ArithmeticInstruction::Div) {
+            return "Div";
+        } else {
+            return "UnknownOp";
+        }
     }
 };
 
