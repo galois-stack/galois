@@ -25,6 +25,7 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<Operator> ir_operator) override {
+        Indent();
         output << "operator " << ir_operator->name << "(";
         for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
             if (i > 0) {
@@ -54,7 +55,7 @@ class IRPrinter : public ir::Visitor {
 
     void Visit(std::shared_ptr<Alloca> ir_alloca) override {
         Indent();
-        output << GetVariableName(ir_alloca) << "  = Alloca " << ir_alloca->type->name << ";\n";
+        output << GetVariableName(ir_alloca) << " = Alloca " << ir_alloca->type->name << ";\n";
     }
 
     void Visit(std::shared_ptr<Grid> ir_grid) override {
@@ -66,7 +67,7 @@ class IRPrinter : public ir::Visitor {
             }
             output << ir_grid->shape[i];
         }
-        output << "]{\n";
+        output << "] {\n";
 
         indent_level++;
         ir_grid->block->ApplyVisitor(this->shared_from_this());
@@ -118,39 +119,14 @@ class IRPrinter : public ir::Visitor {
 
     void Visit(std::shared_ptr<ConstantFloat> ir_constant_float) override {
         Indent();
-        output << GetVariableName(ir_constant_float) << " = ConstantFloat "
-               << TypeToString(ir_constant_float->type) << " ";
-
-        // ToDo是否需要输出？？
-        // if (ir_constant_float->special_value == ConstantFloat::SpecialValue::None) {
-        //     output << (ir_constant_float->is_negative ? "-" : "") << ir_constant_float->value;
-        // } else {
-        //     switch (ir_constant_float->special_value) {
-        //         case ConstantFloat::SpecialValue::Smallest:
-        //             output << "smallest";
-        //             break;
-        //         case ConstantFloat::SpecialValue::Largest:
-        //             output << "largest";
-        //             break;
-        //         case ConstantFloat::SpecialValue::NaN:
-        //             output << "nan";
-        //             break;
-        //         case ConstantFloat::SpecialValue::Inf:
-        //             output << (ir_constant_float->is_negative ? "-inf" : "inf");
-        //             break;
-        //         default:
-        //             output << "unknown";
-        //     }
-        // }
-        output << ";\n";
+        output << GetVariableName(ir_constant_float) << " = "
+               << TypeToString(ir_constant_float->type) << " " << ir_constant_float->value << ";\n";
     }
 
     void Visit(std::shared_ptr<ConstantInt> ir_constant_int) override {
         Indent();
-        output << GetVariableName(ir_constant_int) << " = ConstantInt "
-               << TypeToString(ir_constant_int->type) << " ";
-
-        output << ";\n";
+        output << GetVariableName(ir_constant_int) << " = " << TypeToString(ir_constant_int->type)
+               << " " << ir_constant_int->value << ";\n";
     }
 
     void Visit(std::shared_ptr<Call> ir_call) override {
