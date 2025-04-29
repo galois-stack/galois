@@ -46,15 +46,15 @@ class IRPrinter : public ir::Visitor {
 
     void Visit(std::shared_ptr<Block> ir_block) override {
         for (auto& tensor : *ir_block) {
-            // output << "                        ; Visiting: "
-            // << tensor->tag << "\n";  // 调试信息
+            // 调试信息使用
+            // output << "                        ; Visiting: " << tensor->tag << "\n";
             tensor->ApplyVisitor(this->shared_from_this());
         }
     }
 
     void Visit(std::shared_ptr<Alloca> ir_alloca) override {
         indent();
-        output << getVarName(ir_alloca) << "  = Alloca" << ir_alloca->type->name << ";\n";
+        output << getVarName(ir_alloca) << "  = Alloca " << ir_alloca->type->name << ";\n";
     }
 
     void Visit(std::shared_ptr<Grid> ir_grid) override {
@@ -160,6 +160,13 @@ class IRPrinter : public ir::Visitor {
             output << getVarName(ir_call->Input(i));
         }
         output << ");\n";
+    }
+
+    void Visit(std::shared_ptr<UnaryIntrinsic> ir_unary_intrinsic) override {
+        indent();
+        output << getVarName(ir_unary_intrinsic) << " = " << ir_unary_intrinsic->intrinsic_name
+               << " " << TypeToString(ir_unary_intrinsic->type) << " "
+               << getVarName(ir_unary_intrinsic->Operand()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Tensor> ir_tensor) override {}
