@@ -17,8 +17,8 @@ class IRPrinter : public ir::Visitor {
     }
 
     std::string Print(std::shared_ptr<Tensor> tensor) {
-        varCounter = 0;
-        varNameMap.clear();  // 清空变量名映射
+        var_counter = 0;
+        var_name_dict.clear();  // 清空变量名映射
         output.str("");      // 清空输出
         tensor->ApplyVisitor(this->shared_from_this());
         return output.str();
@@ -31,16 +31,16 @@ class IRPrinter : public ir::Visitor {
                 output << ", ";
             }
             output << ir_operator->inputs[i]->type->name << " "
-                   << getVarName(ir_operator->inputs[i]);
+                   << GetVariableName(ir_operator->inputs[i]);
         }
 
         output << ")->" << ir_operator->GetOperatorType()->output_type->name << " {\n";
 
-        indentLevel++;
+        indent_level++;
         ir_operator->block->ApplyVisitor(this->shared_from_this());
-        indentLevel--;
+        indent_level--;
 
-        indent();
+        Indent();
         output << "}\n";
     }
 
@@ -53,12 +53,12 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<Alloca> ir_alloca) override {
-        indent();
-        output << getVarName(ir_alloca) << "  = Alloca " << ir_alloca->type->name << ";\n";
+        Indent();
+        output << GetVariableName(ir_alloca) << "  = Alloca " << ir_alloca->type->name << ";\n";
     }
 
     void Visit(std::shared_ptr<Grid> ir_grid) override {
-        indent();
+        Indent();
         output << "grid [";
         for (int i = 0; i < ir_grid->shape.size(); ++i) {
             if (i > 0) {
@@ -68,33 +68,33 @@ class IRPrinter : public ir::Visitor {
         }
         output << "]{\n";
 
-        indentLevel++;
+        indent_level++;
         ir_grid->block->ApplyVisitor(this->shared_from_this());
-        indentLevel--;
+        indent_level--;
 
-        indent();
+        Indent();
         output << "}\n";
     }
 
     void Visit(std::shared_ptr<Accessor> ir_accessor) override {
-        indent();
-        output << getVarName(ir_accessor) << " = Accessor " << getVarName(ir_accessor->Tensor())
+        Indent();
+        output << GetVariableName(ir_accessor) << " = Accessor " << GetVariableName(ir_accessor->Tensor())
                << ";\n";
     }
 
     void Visit(std::shared_ptr<Write> ir_write) override {
-        indent();
-        output << "Write " << getVarName(ir_write->Tensor()) << ", "
-               << getVarName(ir_write->Variable()) << ";\n";
+        Indent();
+        output << "Write " << GetVariableName(ir_write->Tensor()) << ", "
+               << GetVariableName(ir_write->Variable()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Return> ir_return) override {
-        indent();
-        output << "return " << getVarName(ir_return->Tensor()) << ";\n";
+        Indent();
+        output << "return " << GetVariableName(ir_return->Tensor()) << ";\n";
     }
 
     void Visit(std::shared_ptr<ArithmeticInstruction> ir_arith) override {
-        indent();
+        Indent();
 
         std::string op;
         switch (ir_arith->operation) {
@@ -111,13 +111,13 @@ class IRPrinter : public ir::Visitor {
                 op = "Div";
                 break;
         }
-        output << getVarName(ir_arith) << " = " << op << " " << getVarName(ir_arith->GetOperand(0))
-               << ", " << getVarName(ir_arith->GetOperand(1)) << ";\n";
+        output << GetVariableName(ir_arith) << " = " << op << " " << GetVariableName(ir_arith->GetOperand(0))
+               << ", " << GetVariableName(ir_arith->GetOperand(1)) << ";\n";
     }
 
     void Visit(std::shared_ptr<ConstantFloat> ir_constant_float) override {
-        indent();
-        output << getVarName(ir_constant_float) << " = ConstantFloat "
+        Indent();
+        output << GetVariableName(ir_constant_float) << " = ConstantFloat "
                << TypeToString(ir_constant_float->type) << " ";
 
         // ToDo是否需要输出？？
@@ -145,28 +145,28 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ConstantInt> ir_constant_int) override {
-        indent();
-        output << getVarName(ir_constant_int) << " = ConstantInt "
+        Indent();
+        output << GetVariableName(ir_constant_int) << " = ConstantInt "
                << TypeToString(ir_constant_int->type) << " ";
 
         output << ";\n";
     }
 
     void Visit(std::shared_ptr<Call> ir_call) override {
-        indent();
-        output << getVarName(ir_call) << " = Call @" << ir_call->Operator()->name << "(";
+        Indent();
+        output << GetVariableName(ir_call) << " = Call @" << ir_call->Operator()->name << "(";
         for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
             if (i > 0) output << ", ";
-            output << getVarName(ir_call->Input(i));
+            output << GetVariableName(ir_call->Input(i));
         }
         output << ");\n";
     }
 
     void Visit(std::shared_ptr<UnaryIntrinsic> ir_unary_intrinsic) override {
-        indent();
-        output << getVarName(ir_unary_intrinsic) << " = " << ir_unary_intrinsic->intrinsic_name
+        Indent();
+        output << GetVariableName(ir_unary_intrinsic) << " = " << ir_unary_intrinsic->intrinsic_name
                << " " << TypeToString(ir_unary_intrinsic->type) << " "
-               << getVarName(ir_unary_intrinsic->Operand()) << ";\n";
+               << GetVariableName(ir_unary_intrinsic->Operand()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Tensor> ir_tensor) override {}
@@ -175,29 +175,29 @@ class IRPrinter : public ir::Visitor {
 
    private:
     std::ostringstream output;
-    int indentLevel = 0;  // 缩进级别
-    int varCounter = 0;   // 寄存器计数器
-    std::unordered_map<std::shared_ptr<Tensor>, std::string> varNameMap;
+    int indent_level = 0;  // 缩进级别
+    int var_counter = 0;   // 寄存器计数器
+    std::unordered_map<std::shared_ptr<Tensor>, std::string> var_name_dict;
 
-    void indent() {
-        output << std::string(indentLevel * 2, ' ');  // 每级缩进2个空格
+    void Indent() {
+        output << std::string(indent_level * 2, ' ');  // 每级缩进2个空格
     }
     std::string TypeToString(std::shared_ptr<TensorType> type) {
         if (!type) return "void";
         return type->name;
     }
     // 获取变量名
-    std::string getVarName(std::shared_ptr<Tensor> tensor) {
-        if (varNameMap.find(tensor) != varNameMap.end()) {
-            return varNameMap[tensor];
+    std::string GetVariableName(std::shared_ptr<Tensor> tensor) {
+        if (var_name_dict.find(tensor) != var_name_dict.end()) {
+            return var_name_dict[tensor];
         }
         std::string name;
         if (!tensor->name.empty()) {
             return "%" + tensor->name;
         } else {
-            name = "%" + std::to_string(varCounter++);
+            name = "%" + std::to_string(var_counter++);
         }
-        varNameMap[tensor] = name;
+        var_name_dict[tensor] = name;
         return name;
     }
 };
