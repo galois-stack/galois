@@ -1,11 +1,10 @@
-
 #include <iostream>
 
 #include "galois/ir/ir_print_visitor.hpp"
 #include "galois/op/matrix_multiply.hpp"
+#include "galois/op/softmax.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
-#include "galois/op/softmax.hpp"
 
 TEST(GaloisTests, TestIRPrintMM) {
     auto ir_mat_type_a = ir::f32->Tile(4, 8);
@@ -97,14 +96,11 @@ TEST(GaloisTests, TestIRPrintSoftmax) {
     std::cout << output << "\n";
 }
 
-
-
 TEST(GaloisTests, TestIRPrintUnaryIntrinsic) {
-
     auto ir_input_type = ir::f32;
     auto ir_builder = ir::Builder::Create();
-    auto ir_operator =
-        ir_builder->template CreateOperatorByCreator<op::UnaryInstrinsicCreator>({ir_input_type}, "sin");
+    auto ir_operator = ir_builder->template CreateOperatorByCreator<op::UnaryInstrinsicCreator>(
+        {ir_input_type}, "sin");
 
     auto ir_print_visitor = ir::IRPrinter::Create();
     auto output = ir_print_visitor->Print(ir_operator);

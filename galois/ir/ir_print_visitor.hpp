@@ -19,7 +19,7 @@ class IRPrinter : public ir::Visitor {
     std::string Print(std::shared_ptr<Tensor> tensor) {
         var_counter = 0;
         var_name_dict.clear();  // 清空变量名映射
-        output.str("");      // 清空输出
+        output.str("");         // 清空输出
         tensor->ApplyVisitor(this->shared_from_this());
         return output.str();
     }
@@ -78,8 +78,8 @@ class IRPrinter : public ir::Visitor {
 
     void Visit(std::shared_ptr<Accessor> ir_accessor) override {
         Indent();
-        output << GetVariableName(ir_accessor) << " = Accessor " << GetVariableName(ir_accessor->Tensor())
-               << ";\n";
+        output << GetVariableName(ir_accessor) << " = Accessor "
+               << GetVariableName(ir_accessor->Tensor()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Write> ir_write) override {
@@ -111,8 +111,9 @@ class IRPrinter : public ir::Visitor {
                 op = "Div";
                 break;
         }
-        output << GetVariableName(ir_arith) << " = " << op << " " << GetVariableName(ir_arith->GetOperand(0))
-               << ", " << GetVariableName(ir_arith->GetOperand(1)) << ";\n";
+        output << GetVariableName(ir_arith) << " = " << op << " "
+               << GetVariableName(ir_arith->GetOperand(0)) << ", "
+               << GetVariableName(ir_arith->GetOperand(1)) << ";\n";
     }
 
     void Visit(std::shared_ptr<ConstantFloat> ir_constant_float) override {
