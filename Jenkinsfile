@@ -86,6 +86,7 @@ pipeline{
                         }
                         stage('format') {
                             steps {
+                                sh 'clang-format --version'
                                 sh 'echo "Running clang-format check..."'
                                 sh './scripts/check_clang_format.sh'
                             }
