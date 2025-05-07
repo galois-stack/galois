@@ -38,13 +38,12 @@ TensorType::value_type *-- TensorType
 
 ### 张量的属性
 张量的关键属性有：`shape`,`layout`,`stride`,`value_type`,参考`TensorType`类图：
-- **shape**：一个向量（Vector），表示张量的维度大小。例如，二维矩阵的 `shape` 为 `(m, n)`，表示 \( m \) 行 \( n \) 列；标量的 `shape` 为空 `()`。
+- **shape**：一个向量，表示张量的维度大小。例如，二维矩阵的 `shape` 为 `(m, n)`，表示 \( m \) 行 \( n \) 列；标量的 `shape` 为空 `()`。
 - **layout**：`LayoutType` 类型，描述张量数据在内存中的存储方式，例如行优先（Row-Major）、列优先（Column-Major）。
 - **stride**：一个向量，表示从一个元素到下一个元素在内存中的偏移量。例如，在行优先布局的二维张量中，`stride` 可能是 `(n, 1)`，表示跨行跳过 \( n \) 个元素，跨列跳过 1 个元素。
 - **value_type**：张量元素的类型，支持嵌套结构（例如，元素本身可以是张量）。通常是 `RealNumberType` 的子类，如 `FloatType` 或 `IntType`，定义了元素的精度（如 `bits` 和 `bytes`）和性质（如 `signed`）。
 
-这些属性共同定义了张量的数据结构和存储方式，为高效计算和内存管理提供了基础。
-     
+
 
 ### 如何表示矩阵
 矩阵是二维张量，通常表示一个具有行和列的数组。例如，一个`mxn`的矩阵可以表示为:
@@ -129,10 +128,72 @@ a_{m1} & a_{m2} & \cdots & a_{mn}
 * 二阶：4×4 网格，由四个一阶曲线通过特定旋转和连接组成（图 2）。
 
 ## 张量张量
+在galois项目中，张量的创建方式非常简单，如：`ir::f32->Tile(2,2)`,若想创建张量张量也非常简单，则只需要:`ir::f32->Tile(2,2)->Tile(3,2)`。下面结合着代码实现简单解释一下：
+`Tile` 方法用于创建一个新的 TensorType，其底层类型（`value_type`）是当前的类型，并指定新的形状。
+`Tile(2,2)` 调用的是以下模板方法：
 
-### 张量张量的Layout
+```cpp
+template <typename... Dims>
+std::shared_ptr<TensorType> Tile(Dims... dims) {
+    std::array<int64_t, std::tuple_size<std::tuple<Dims...>>::value> shape_array = {dims...};
+    Eigen::VectorXi64 shape(shape_array.size());
+    std::copy(RANGE(shape_array), shape.begin());
+    return TensorType::Create(this->shared_from_this(), shape);
+}
+```
 
-### LLM的关键运算矩阵乘法·
+- 对于 `Tile(2,2)`：
+  - 参数 `dims` 是 `2, 2`，因此 `shape_array = {2, 2}`。
+  - 创建一个 `Eigen::VectorXi64 shape(2)`，其值为 `[2, 2]`。
+  - 调用 `TensorType::Create(this->shared_from_this(), shape)`，其中 `this` 是 `ir::f32`（`FloatType` 类型），`shape = [2, 2]`。
+
+在 `TensorType::Create` 方法中：
+
+```cpp
+static std::shared_ptr<TensorType> Create(std::shared_ptr<TensorType> value_type,
+                                          Eigen::VectorXi64 shape) {
+    return TensorType::Create(value_type, shape, TensorType::GetStride(shape));
+}
+```
+
+- `value_type` 是 `ir::f32`（标量 `FloatType`）。
+- `shape` 是 `[2, 2]`。
+- `GetStride(shape)` 计算步幅：`stride = [2, 1]`。
+- 创建一个新的 `TensorType`：
+  - `value_type = ir::f32`。
+  - `shape = [2, 2]`。
+  - `stride = [2, 1]`。
+ 
+
+因此，`ir::f32->Tile(2,2)` 创建一个形状为 `[2, 2]` 的张量，其元素类型为 `f32`。
+
+对形状为 `[2, 2]` 的张量再次调用 `Tile(3,2)`：
+
+- 当前的 `TensorType`：
+  - `value_type = ir::f32`（标量 `FloatType`）。
+  - `shape = [2, 2]`。
+ 
+- 调用 `Tile(3,2)`：
+  - 参数 `dims` 是 `3, 2`，因此 `shape_array = {3, 2}`。
+  - 创建 `shape = [3, 2]`。
+  - 调用 `TensorType::Create(this->shared_from_this(), shape)`，其中 `this` 是形状为 `[2, 2]` 的 `TensorType`，`shape = [3, 2]`。
+- 在 `TensorType::Create` 中：
+  - `value_type` 是形状为 `[2, 2]` 的 `TensorType`。
+  - `shape = [3, 2]`。
+  - `stride = GetStride([3, 2])`：`stride = [2, 1]`。
+   
+  - 创建新的 `TensorType`：
+    - `value_type` 是形状为 `[2, 2]` 的 `TensorType`（其 `value_type` 是 `f32`）。
+    - `shape = [3, 2]`。
+   
+最终张量的 `shape` 是 `[3, 2]`，但其 `value_type` 是一个形状为 `[2, 16]` 的张量（元素为 `f32`），该张量张量的layout如下图所示：
+
+![alt text](image-12.png)
+
+
+### LLM的关键运算矩阵乘法
+
+
 
 
 
