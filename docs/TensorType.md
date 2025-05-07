@@ -37,7 +37,7 @@ TensorType::value_type *-- TensorType
 ![alt text](image-10.png)
 
 ### 张量的属性
-根据 `TensorType` 类图，张量具有以下关键属性：
+张量的关键属性有：`shape`,`layout`,`stride`,`value_type`,参考`TensorType`类图：
 - **shape**：一个向量（Vector），表示张量的维度大小。例如，二维矩阵的 `shape` 为 `(m, n)`，表示 \( m \) 行 \( n \) 列；标量的 `shape` 为空 `()`。
 - **layout**：`LayoutType` 类型，描述张量数据在内存中的存储方式，例如行优先（Row-Major）、列优先（Column-Major）。
 - **stride**：一个向量，表示从一个元素到下一个元素在内存中的偏移量。例如，在行优先布局的二维张量中，`stride` 可能是 `(n, 1)`，表示跨行跳过 \( n \) 个元素，跨列跳过 1 个元素。
@@ -77,12 +77,13 @@ a_{m1} & a_{m2} & \cdots & a_{mn}
 
 ### 内存布局
 张量的内存布局(layout)描述了多维数据在一维内存中存储方式，直接影响计算效率。常见的布局包括：
-* **行优先(Row-Major)**: 按行顺序存储，C/C++和PyTorch默认使用。
-* **列优先(Column-Major)**: 按列顺序存储，Fortran 和 MATLAB 默认使用。
+* **行优先(Row-Major)**: 按行顺序存储，shape(3,2,2) 三维张量,按列优先数据布局，如图：
+ ![alt text](image-15.png)
+* **列优先(Column-Major)**: 按列顺序存储，shape(3,2,2) 三维张量,按列优先数据布局
+如图：
+ ![alt text](image-14.png)
   
-`stride` 定义了沿着每个维度移动时的内存偏移量。例如，对于一个`shape`为`(m,n)`的矩阵：
-* **行优先**: stride=(n, 1), 跨行跳 n 个元素, 跨列跳 1 个元素。
-* **列优先**: stride=(1, m), 跨列跳 1 个元素, 跨行跳 m 个元素。
+
 
 ### 我们为什么推荐使用Matrix来表示Vector
 向量是一维张量，但推荐使用二维矩阵(如 nx1 或 1xn) 表示向量，原因如下：
@@ -93,8 +94,10 @@ a_{m1} & a_{m2} & \cdots & a_{mn}
 ### 行向量和列向量
 
 - **行向量**：形如 \( [a_1, a_2, \dots, a_n] \)，表示为 \( 1 \times n \) 矩阵，`shape=(1, n)`。
+  ![alt text](image-19.png)
 - **列向量**：形如 \( \begin{bmatrix} a_1 \\ a_2 \\ \vdots \\ a_n \end{bmatrix} \)，表示为 \( n \times 1 \) 矩阵，`shape=(n, 1)`。
-在矩阵乘法中，行向量和列向量的选择影响运算规则。例如，列向量 \( v \)（\( n \times 1 \)）与矩阵 \( A \)（\( m \times n \)）相乘得 \( A \cdot v \)，结果为 \( m \times 1 \)。
+   ![alt text](image-18.png)
+
 
 ## 希尔伯特曲线
 
@@ -107,9 +110,8 @@ a_{m1} & a_{m2} & \cdots & a_{mn}
 
 
 
-
-![alt text](image-9.png)  ![alt text](image-8.png)
-图 4 - 变体，前三阶迭代  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    图 5 - 生产规则
+![alt text](image-9.png)  ![alt text](image-8.png)   ![alt text](image-20.png)
+图 4 - 变体，前三阶迭代  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    图 5 - 生产规则 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 用颜色显示进度的三维希尔伯特曲线
 
 
 
