@@ -60,17 +60,13 @@ flowchart LR
 
 ```bash
 # 下载代码
-git clone --recursive https://github.com/galois-stack/galois --jobs=16
+git clone https://github.com/galois-stack/galois
 ```
-
-"--jobs=16"表示同时下载submodule的任务数, 可自行设定. "--recursive"表示下载内部的submodules, 如果这里省略的话, 得自行下载submodules.
-
-如果在下载的代码中出现错误频繁出现错误,  可查阅[git submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
 
 ### Ubuntu 20.04 需要安装的一些依赖库
 
 ```bash
-apt install git clang wget libgnutls28-dev libsodium-dev uuid-dev build-essential libssl-dev cmake
+apt install git clang wget libgnutls28-dev libsodium-dev uuid-dev build-essential libssl-dev cmake ninja-build
 ```
 
 也可以参考"dockerfiles/ubuntu_dev.dockerfile"来配置
@@ -81,6 +77,7 @@ apt install git clang wget libgnutls28-dev libsodium-dev uuid-dev build-essentia
 值得注意的是目前Prajna只支持Clang的编译器, 若使用GCC或其他编译器可能需要自己适配.
 
 ```bash
+./scripts/clone_submodules.sh --jobs=8 --depth=50 # 下载依赖库
 ./scripts/configure.sh release # 配置为release模式
 ./scripts/build.sh release
 ./scripts/test.sh release # 我们可以通过改指令来运行测试, 这是非必须的步骤
