@@ -659,13 +659,7 @@ class Grid : public Tensor {
         return self;
     }
 
-    int64_t GetAffineDimSize() const {
-        if (this->parent_grid && !this->is_local) {
-            return this->shape.size() + this->parent_grid->GetAffineDimSize();
-        } else {
-            return this->shape.size();
-        }
-    }
+    int64_t GetAffineDimSize() const { return this->shape.size(); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Grid>(this->shared_from_this()));
@@ -674,11 +668,8 @@ class Grid : public Tensor {
     Eigen::VectorXi64 shape;
     std::shared_ptr<Block> block = nullptr;
     std::shared_ptr<GridIndex> index = nullptr;
-    std::shared_ptr<Grid> parent_grid = nullptr;
     bool enable_multi_thread = false;
     bool unroll_grid = false;
-
-    bool is_local = true;
 };
 
 class PthreadBlock : public Block {

@@ -81,9 +81,6 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Grid> ir_grid) override {
         GALOIS_ASSERT(!ir_grid->pir_value);
-        if (this->grid_stack.size()) {
-            ir_grid->parent_grid = this->grid_stack.top();
-        }
         this->grid_stack.push(ir_grid);
         auto guard = ScopeGuard::Create([=]() { this->grid_stack.pop(); });
 
