@@ -114,8 +114,9 @@ inline std::vector<Eigen::VectorXi64> GenerateIndexGrid(Eigen::VectorXi64 shape)
 
 inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
     auto index_grid = GenerateIndexGrid(ir_grid->shape);
-    GALOIS_ASSERT(ir_grid->parent_block);
-    auto ir_grid_iter = std::find(RANGE((*ir_grid->parent_block)), ir_grid);
+    auto parent_block_ptr = ir_grid->parent_block.lock();
+    GALOIS_ASSERT(parent_block_ptr);
+    auto ir_grid_iter = std::find(RANGE((*parent_block_ptr)), ir_grid);
 
     auto ir_external_tensor_set = transform::CaptureExternalTensors(ir_grid->block);
     std::unordered_map<std::shared_ptr<ir::Tensor>, std::shared_ptr<ir::Tensor>> tensor_dict;
@@ -136,11 +137,16 @@ inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
                 }
             }
 
-            ir_grid->parent_block->insert(ir_grid_iter, ir_value_clone);
+            auto parent = ir_grid->parent_block.lock();
+            GALOIS_ASSERT(parent);
+            parent->insert(ir_grid_iter,ir_value_clone);
         }
     }
 
-    ir_grid->parent_block->remove(ir_grid);
+    auto parent = ir_grid->parent_block.lock();
+    GALOIS_ASSERT(parent);
+    parent->remove(ir_grid);
+
     ir_grid->Finalize();
 }
 

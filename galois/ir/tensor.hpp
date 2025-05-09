@@ -60,7 +60,7 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     virtual void Detach() {
         // 只是解除依赖, 不是销毁数据,
         this->instruction_with_index_list.clear();
-        this->parent_block = nullptr;
+        this->parent_block.reset();  // 安全清空 weak_ptr
     }
 
     /// @brief 实例需要销毁前调用
@@ -71,21 +71,23 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     }
 
     std::shared_ptr<Block> ParentBlock() {
-        if (!this->parent_block) {
+        if(auto parent = this->parent_block.lock()) {
+            return Cast<Tensor>(parent)->ParentBlock();
+        } else {
             // GALOIS_ASSERT(Is<Block>(this->shared_from_this()));
             return Cast<Block>(this->shared_from_this());
-        } else {
-            return Cast<Tensor>(this->parent_block)->ParentBlock();
         }
     }
 
     bool IsInsideOf(std::shared_ptr<Block> ir_block) {
-        if (this->parent_block == ir_block) {
-            return true;
+        if (auto parent = this->parent_block.lock()) {
+            if (parent == ir_block) {
+                return true;
+            }
         }
 
-        if (this->parent_block) {
-            return Cast<Tensor>(this->parent_block)->IsInsideOf(ir_block);
+        if (auto parent = this->parent_block.lock()) {
+            return Cast<Tensor>(parent)->IsInsideOf(ir_block);
         }
 
         return false;
@@ -102,7 +104,7 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::shared_ptr<ir::TensorType> type = nullptr;
     std::unordered_map<std::string, std::list<std::string>> annotation_dict;
     std::list<InstructionAndOperandIndex> instruction_with_index_list;
-    std::shared_ptr<Block> parent_block = nullptr;
+    std::weak_ptr<Block> parent_block;
     std::shared_ptr<pir::Value> pir_value = nullptr;
     std::string tag = "Tensor";
 };
