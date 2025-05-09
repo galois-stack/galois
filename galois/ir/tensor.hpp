@@ -674,7 +674,6 @@ class Grid : public Tensor {
     Eigen::VectorXi64 shape;
     std::shared_ptr<Block> block = nullptr;
     std::shared_ptr<GridIndex> index = nullptr;
-    std::shared_ptr<Operator> parent_operator = nullptr;
     std::shared_ptr<Grid> parent_grid = nullptr;
     bool enable_multi_thread = false;
     bool unroll_grid = false;
