@@ -20,7 +20,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 内积是通过将一个向量与另一个向量对应元素相乘并累加, 最终得到一个标量结果.
 
-图1![alt text](image-5.png)
+图1![alt text](images/image-5.png)
 
 例如, 在ARM NEON中, 可以通过vmulq_f32和vaddvq_f32计算浮点向量的点积:
 
@@ -35,7 +35,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 外积实现是从RAM加载A的一列和B的一行到向量寄存器中, 计算两个向量之间的外积, 并将外积的结果添加到矩阵C中.
 
-图2 ![alt text](image-4.png)
+图2 ![alt text](images/image-4.png)
 
 例如，在ARM NEON中, 可以通过带广播的vfmaq_laneq_f32计算浮点向量的外积:
 
@@ -66,7 +66,7 @@ NEON中的融合"乘加"（FMA, Fused Multiply-Add）指令是NEON指令集中�
 
 我们以FMA为例, 如果多条FMA指令存在依赖，那它们的执行如下图所示:
 
-图3![alt text](image.png)
+图3![alt text](images/image.png)
 
 FMA的输入值（a、b、c）**依赖前面的指令结果, 那么就必须等前面的指令执行完. 尤其是累加型的循环, 比如：
 
@@ -82,7 +82,7 @@ FMA的输入值（a、b、c）**依赖前面的指令结果, 那么就必须等�
 
 **无指令依赖：**
 
-图4![alt text](image-1.png)
+图4![alt text](images/image-1.png)
 
 如果我们的fma指令不存在依赖关系, 那它们就可以如上图所示流水线执行, 它们的指令延迟会得到很好的掩盖.
 
@@ -106,7 +106,7 @@ for (int i = 0; i < 4; ++i)
 
 如下图所示我们可以将simd kernel进一步展开, 很多资料里把它称作register tile.
 
-图5 ![alt text](image-2.png)
+图5 ![alt text](images/image-2.png)
 
 这些参数存在这样的关系:
 
