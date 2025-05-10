@@ -50,8 +50,19 @@ auto Cast(std::shared_ptr<SrcType_> ir_src) -> std::shared_ptr<DstType_> {
 }
 
 template <typename DstType_, typename SrcType_>
+auto Cast(std::weak_ptr<SrcType_> ir_src) -> std::shared_ptr<DstType_> {
+    if (ir_src.expired()) return nullptr;
+    return std::dynamic_pointer_cast<DstType_>(ir_src.lock());
+}
+
+template <typename DstType_, typename SrcType_>
 bool Is(std::shared_ptr<SrcType_> ir_src) {
     return Cast<DstType_, SrcType_>(ir_src) != nullptr;
+}
+
+template <typename DstType_, typename SrcType_>
+bool Is(std::weak_ptr<SrcType_> ir_src) {
+    return Is<DstType_>(ir_src.lock());
 }
 
 template <typename TensorType>

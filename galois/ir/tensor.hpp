@@ -42,13 +42,13 @@ namespace galois::ir {
 class Instruction;
 
 struct InstructionAndOperandIndex {
-    std::shared_ptr<Instruction> instruction;
+    std::weak_ptr<Instruction> instruction;
     int64_t operand_index;
 };
 
 inline bool operator==(galois::ir::InstructionAndOperandIndex lhs,
                        galois::ir::InstructionAndOperandIndex rhs) {
-    return lhs.instruction == rhs.instruction && lhs.operand_index == rhs.operand_index;
+    return lhs.instruction.lock() == rhs.instruction.lock() && lhs.operand_index == rhs.operand_index;
 }
 
 class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
@@ -877,7 +877,7 @@ template <>
 struct std::hash<galois::ir::InstructionAndOperandIndex> {
     std::int64_t operator()(galois::ir::InstructionAndOperandIndex inst_with_idx) const noexcept {
         std::int64_t h1 =
-            std::hash<std::shared_ptr<galois::ir::Instruction>>{}(inst_with_idx.instruction);
+            std::hash<std::shared_ptr<galois::ir::Instruction>>{}(inst_with_idx.instruction.lock());
         std::int64_t h2 = std::hash<int64_t>{}(inst_with_idx.operand_index);
         // 这里哈希函数应该不重要, 应该不会导致性能问题
         return h1 ^ (h2 << 1);
