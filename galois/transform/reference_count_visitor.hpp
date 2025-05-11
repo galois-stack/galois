@@ -91,8 +91,7 @@ class DecreaseVisitor : public ir::Visitor {
 
    private:
     static void FreeTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
-        auto ir_parent_block = ir_tensor->parent_block.lock();
-        GALOIS_ASSERT(ir_parent_block);
+        auto ir_parent_block = Lock(ir_tensor->parent_block);
         auto ir_free = ir::Free::Create(ir_tensor);
         ir_free->parent_block = ir_parent_block;
         auto iter =

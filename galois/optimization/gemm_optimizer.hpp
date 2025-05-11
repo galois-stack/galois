@@ -136,15 +136,12 @@ inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
                     ir_accessor->transform_matrix.resize(0, 0);
                 }
             }
-
-            auto parent = ir_grid->parent_block.lock();
-            GALOIS_ASSERT(parent);
+            auto parent = Lock(ir_grid->parent_block);
             parent->insert(ir_grid_iter,ir_value_clone);
         }
     }
 
-    auto parent = ir_grid->parent_block.lock();
-    GALOIS_ASSERT(parent);
+    auto parent = Lock(ir_grid->parent_block);
     parent->remove(ir_grid);
 
     ir_grid->Finalize();

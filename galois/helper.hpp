@@ -49,11 +49,6 @@ auto Cast(std::shared_ptr<SrcType_> ir_src) -> std::shared_ptr<DstType_> {
     return ir_dst;
 }
 
-template <typename DstType_, typename SrcType_>
-auto Cast(std::weak_ptr<SrcType_> ir_src) -> std::shared_ptr<DstType_> {
-    if (ir_src.expired()) return nullptr;
-    return std::dynamic_pointer_cast<DstType_>(ir_src.lock());
-}
 
 template <typename DstType_, typename SrcType_>
 bool Is(std::shared_ptr<SrcType_> ir_src) {
@@ -97,6 +92,15 @@ inline void* auto_aligned_alloc(size_t len) {
     }
 
     return std::malloc(len);
+}
+
+
+
+template<typename T>
+std::shared_ptr<T> Lock(std::weak_ptr<T>& weak) {
+    auto ptr = weak.lock();
+    GALOIS_ASSERT(ptr);
+    return ptr;
 }
 
 }  // namespace galois
