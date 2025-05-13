@@ -26,7 +26,7 @@ class FillCreator : public op::Creator {
     void ExpressInline(std::shared_ptr<ir::Tensor> ir_ts, std::shared_ptr<ir::Tensor> ir_value,
                        std::shared_ptr<ir::Builder> ir_builder) {
         if (ir_ts->type->IsScalar()) {
-            ir_builder->Create<ir::Write>(ir_value, ir_ts);
+            ir_builder->Write(ir_value, ir_ts);
         } else {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_ts->type->shape);
             auto ir_accessor = ir_builder->CreateIdentityAccessor(ir_ts);

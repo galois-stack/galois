@@ -28,7 +28,7 @@ class PaddingCreator : public UnaryCreator {
         auto output_shape = ir_output->type->shape;
 
         if (input_shape.size() == 0) {
-            ir_builder->Create<ir::Write>(ir_input, ir_output);
+            ir_builder->Write(ir_input, ir_output);
             return;
         }
 

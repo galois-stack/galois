@@ -25,9 +25,9 @@ class SliceCreator : public op::Creator {
     void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                  std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_output_type = this->InferType(ir::GetTensorTypes(ir_inputs));
-        auto ir_output = ir_builder->Create<ir::Alloca>(ir_output_type);
+        auto ir_output = ir_builder->Alloca(ir_output_type);
         this->_Express({ir_inputs[0], ir_output}, ir_builder);
-        ir_builder->Create<ir::Return>(ir_output);
+        ir_builder->Return(ir_output);
     }
 
     void _Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
@@ -40,7 +40,7 @@ class SliceCreator : public op::Creator {
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(output_shape);
         auto ir_output_accessor = ir_builder->CreateIdentityAccessor(ir_output);
         auto ir_input_accessor = ir_builder->CreateIdentityAccessor(ir_input);
-        ir_builder->Create<ir::Write>(ir_input_accessor, ir_output_accessor);
+        ir_builder->Write(ir_input_accessor, ir_output_accessor);
     }
 
     Eigen::VectorXi64 slice_shape;

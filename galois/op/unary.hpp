@@ -21,9 +21,9 @@ class UnaryCreator : public Creator {
 
     void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                  std::shared_ptr<ir::Builder> ir_builder) override {
-        auto ir_output = ir_builder->Create<ir::Alloca>(this->InferTypeImpl(ir_inputs[0]->type));
+        auto ir_output = ir_builder->Alloca(this->InferTypeImpl(ir_inputs[0]->type));
         this->ExpressInline(ir_inputs[0], ir_output, ir_builder);
-        ir_builder->Create<ir::Return>(ir_output);
+        ir_builder->Return(ir_output);
     }
 };
 

@@ -168,6 +168,24 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return this->Create<ir::Call>(ir_operator, ir_inputs);
     }
 
+    std::shared_ptr<ir::Alloca> Alloca(std::shared_ptr<ir::TensorType> ir_tensor_type) {
+        return this->Create<ir::Alloca>(ir_tensor_type);
+    }
+
+    std::shared_ptr<ir::Write> Write(std::shared_ptr<ir::Tensor> ir_value,
+                                     std::shared_ptr<ir::Tensor> ir_variable) {
+        return this->Create<ir::Write>(ir_value, ir_variable);
+    }
+
+    std::shared_ptr<ir::BitCast> BitCast(std::shared_ptr<ir::Tensor> ir_value,
+                                         std::shared_ptr<ir::TensorType> ir_type) {
+        return this->Create<ir::BitCast>(ir_value, ir_type);
+    }
+
+    std::shared_ptr<ir::Return> Return(std::shared_ptr<ir::Tensor> ir_value) {
+        return this->Create<ir::Return>(ir_value);
+    }
+
     template <typename Creator, typename... CreatorArgs>
     std::shared_ptr<Operator> CreateOperatorByCreator(
         std::vector<std::shared_ptr<TensorType>> ir_input_types, CreatorArgs... creator_args) {

@@ -137,7 +137,7 @@ inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
                 }
             }
             auto parent = Lock(ir_grid->parent_block);
-            parent->insert(ir_grid_iter,ir_value_clone);
+            parent->insert(ir_grid_iter, ir_value_clone);
         }
     }
 
@@ -343,7 +343,7 @@ class GemmOptimizer {
         auto ir_mat_c =
             ir_builder->ExpressCreator<op::SliceCreator>({ir_unpacked_mat_c}, ir_mat_c_type->shape);
 
-        ir_builder->Create<ir::Return>(ir_mat_c);
+        ir_builder->Return(ir_mat_c);
 
         return ir_gemm_operator;
     }

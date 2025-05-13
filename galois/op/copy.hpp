@@ -26,7 +26,7 @@ class CopyCreator : public op::Creator {
     void ExpressInline(std::shared_ptr<ir::Tensor> ir_src, std::shared_ptr<ir::Tensor> ir_dst,
                        std::shared_ptr<ir::Builder> ir_builder) {
         if (ir_src->type->IsScalar()) {
-            ir_builder->Create<ir::Write>(ir_src, ir_dst);
+            ir_builder->Write(ir_src, ir_dst);
         } else {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_src->type->shape);
             auto ir_accessor_src = ir_builder->CreateIdentityAccessor(ir_src);

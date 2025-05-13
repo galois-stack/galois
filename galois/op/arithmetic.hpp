@@ -27,7 +27,7 @@ class ArithmeticCreator : public BinaryCreator {
         if (ir_input0->type->IsScalar() && ir_input1->type->IsScalar()) {
             auto ir_re =
                 ir_builder->Create<ir::ArithmeticInstruction>(Operation, ir_input0, ir_input1);
-            ir_builder->Create<ir::Write>(ir_re, ir_output);
+            ir_builder->Write(ir_re, ir_output);
             return;
         }
 

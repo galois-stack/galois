@@ -30,7 +30,7 @@ class PackCreator : public UnaryCreator {
         GALOIS_ASSERT(ir_input->type->shape == ir_output_normalize_shape);
 
         if (ir_input->type->IsScalar()) {
-            ir_builder->Create<ir::Write>(ir_input, ir_output);
+            ir_builder->Write(ir_input, ir_output);
             return;
         }
 
