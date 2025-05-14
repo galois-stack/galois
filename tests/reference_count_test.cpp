@@ -1,3 +1,4 @@
+#include "galois/ir/ir_print_visitor.hpp"
 #include "galois/op/fill.hpp"
 #include "galois/transform/reference_count_visitor.hpp"
 #include "galois_test.hpp"
@@ -9,11 +10,12 @@ TEST(GaloisTests, TestReferenceCount) {
     auto ir_alloc = ir_builder->Alloca(ir::i8->Tile(1123));  // 一个特殊的尺寸以便检查内存泄漏
     scope = nullptr;
 
+    auto ir_printer = ir::IRPrinter::Create();
+    ir_printer->Dump(ir_operator);
+    fmt::print("---after optimization--- \n");
     auto ir_reference_visitor = transform::ReferenceCountVisitor::Create();
     ir_operator->ApplyVisitor(ir_reference_visitor);
-
-    auto jit_engine = jit::Engine::Create();
-    auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)()>(ir_operator);
+    ir_printer->Dump(ir_operator);
 }
 
 TEST(GaloisTests, TestReferenceCountReturn) {
@@ -25,11 +27,12 @@ TEST(GaloisTests, TestReferenceCountReturn) {
     ir_builder->Return(ir_alloc);
     scope = nullptr;
 
+    auto ir_printer = ir::IRPrinter::Create();
+    ir_printer->Dump(ir_operator);
+    fmt::print("---after optimization--- \n");
     auto ir_reference_visitor = transform::ReferenceCountVisitor::Create();
     ir_operator->ApplyVisitor(ir_reference_visitor);
-
-    auto jit_engine = jit::Engine::Create();
-    auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)()>(ir_operator);
+    ir_printer->Dump(ir_operator);
 }
 
 TEST(GaloisTests, TestReferenceCountCall) {
@@ -48,10 +51,12 @@ TEST(GaloisTests, TestReferenceCountCall) {
     }
     std::vector<std::shared_ptr<ir::Tensor>> ir_arguments;
     ir_builder->Call(ir_callee, {});
-    auto ir_reference_visitor = transform::ReferenceCountVisitor::Create();
-    ir_operator->ApplyVisitor(ir_reference_visitor);
     scope = nullptr;
 
-    auto jit_engine = jit::Engine::Create();
-    auto fill_fun = jit_engine->EmitOperatorSymbol<void (*)()>(ir_operator);
+    auto ir_printer = ir::IRPrinter::Create();
+    ir_printer->Dump(ir_operator);
+    fmt::print("---after optimization--- \n");
+    auto ir_reference_visitor = transform::ReferenceCountVisitor::Create();
+    ir_operator->ApplyVisitor(ir_reference_visitor);
+    ir_printer->Dump(ir_operator);
 }

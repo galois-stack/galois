@@ -24,6 +24,11 @@ class IRPrinter : public ir::Visitor {
         return output.str();
     }
 
+    void Dump(std::shared_ptr<Tensor> tensor) {
+        auto str = this->Print(tensor);
+        std::cout << str;
+    }
+
     void Visit(std::shared_ptr<Operator> ir_operator) override {
         Indent();
         output << "operator " << ir_operator->name << "(";
@@ -56,6 +61,11 @@ class IRPrinter : public ir::Visitor {
     void Visit(std::shared_ptr<Alloca> ir_alloca) override {
         Indent();
         output << GetVariableName(ir_alloca) << " = Alloca " << ir_alloca->type->name << ";\n";
+    }
+
+    void Visit(std::shared_ptr<Free> ir_free) override {
+        Indent();
+        output << "Free " << GetVariableName(ir_free->Tensor()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Grid> ir_grid) override {
