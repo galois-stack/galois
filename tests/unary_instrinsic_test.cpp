@@ -37,5 +37,19 @@ TEST(GaloisTests, TestUnaryIntrinsic) {
 
     float input = 3.1415f / 2.0f;
     auto value = *sin_fun(&input);
-    fmt::print("sin(3.1415) = {}\n", value);
+    fmt::print("sin({}) = {}\n", input, value);
+}
+
+TEST(GaloisTests, TestRelu6) {
+    auto ir_input_type = ir::f32;
+    auto ir_builder = ir::Builder::Create();
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::UnaryInstrinsicCreator>({ir_input_type}, "relu6");
+
+    auto jit_engine = jit::Engine::Create();
+    auto sin_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
+
+    float input = -1.0f;
+    auto value = *sin_fun(&input);
+    fmt::print("relu6({}) = {}\n", input, value);
 }

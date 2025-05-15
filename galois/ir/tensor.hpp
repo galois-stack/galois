@@ -843,6 +843,28 @@ class UnaryIntrinsic : public Instruction {
     std::string intrinsic_name;
 };
 
+class Relu6 : public Instruction {
+   protected:
+    Relu6() = default;
+
+   public:
+    static std::shared_ptr<Relu6> Create(std::shared_ptr<Tensor> ir_oprand) {
+        std::shared_ptr<Relu6> self(new Relu6);
+        self->OperandResize(1);
+        self->SetOperand(0, ir_oprand);
+        self->type = ir_oprand->type;
+        self->tag = "Relu6";
+        return self;
+    }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<Relu6>(this->shared_from_this()));
+    }
+
+    std::shared_ptr<Tensor> Operand() { return this->GetOperand(0); }
+    void Operand(std::shared_ptr<Tensor> ir_oprand) { this->SetOperand(0, ir_oprand); }
+};
+
 class Builder;
 
 template <typename DataType, typename... Args>

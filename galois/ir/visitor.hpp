@@ -4,6 +4,10 @@
 namespace galois::ir {
 
 class Tensor;
+class Constant;
+class ConstantRealNumber;
+class ConstantInt;
+class ConstantFloat;
 class Block;
 class Grid;
 class Instruction;
@@ -27,10 +31,7 @@ class SqueezeDimView;
 class SliceView;
 class Accessor;
 class SqueezeView;
-class Constant;
-class ConstantRealNumber;
-class ConstantInt;
-class ConstantFloat;
+class Relu6;
 
 namespace io {
 class LoadBinary;
@@ -38,6 +39,10 @@ class LoadBinary;
 
 class Visitor : public std::enable_shared_from_this<Visitor> {
    public:
+    virtual void Visit(std::shared_ptr<ir::Constant> ir_constant) {}
+    virtual void Visit(std::shared_ptr<ir::ConstantRealNumber> ir_constant_real_number) {}
+    virtual void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) {}
+    virtual void Visit(std::shared_ptr<ir::ConstantFloat> ir_constant_float) {}
     virtual void Visit(std::shared_ptr<ir::Tensor> ir_tensor) {}
     virtual void Visit(std::shared_ptr<ir::Input> ir_input) {}
     virtual void Visit(std::shared_ptr<ir::Block> ir_block) {}
@@ -62,11 +67,8 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) {}
     virtual void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) {}
     virtual void Visit(std::shared_ptr<ir::Operator> ir_operator) {}
-    virtual void Visit(std::shared_ptr<ir::Constant> ir_constant) {}
-    virtual void Visit(std::shared_ptr<ir::ConstantRealNumber> ir_constant_real_number) {}
-    virtual void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) {}
-    virtual void Visit(std::shared_ptr<ir::ConstantFloat> ir_constant_float) {}
     virtual void Visit(std::shared_ptr<ir::io::LoadBinary> ir_load_binary) {}
+    virtual void Visit(std::shared_ptr<ir::Relu6> ir_relu6) {}
 };
 
 }  // namespace galois::ir
