@@ -25,6 +25,10 @@
 *.bmp
 *.gif
 
+*.bin
+*.raw
+*.data
+
 *.xcodeproj
 build
 build_debug

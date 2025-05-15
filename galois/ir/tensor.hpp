@@ -48,7 +48,8 @@ struct InstructionAndOperandIndex {
 
 inline bool operator==(galois::ir::InstructionAndOperandIndex lhs,
                        galois::ir::InstructionAndOperandIndex rhs) {
-    return lhs.instruction.lock() == rhs.instruction.lock() && lhs.operand_index == rhs.operand_index;
+    return lhs.instruction.lock() == rhs.instruction.lock() &&
+           lhs.operand_index == rhs.operand_index;
 }
 
 class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
@@ -71,7 +72,7 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     }
 
     std::shared_ptr<Block> ParentBlock() {
-        if(auto parent = this->parent_block.lock()) {
+        if (auto parent = this->parent_block.lock()) {
             return Cast<Tensor>(parent)->ParentBlock();
         } else {
             // GALOIS_ASSERT(Is<Block>(this->shared_from_this()));

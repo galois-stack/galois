@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 
 #include "galois/helper.hpp"
 #include "galois/ir/ir.hpp"
@@ -619,6 +620,20 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
     void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) override {
         auto ir_captured_tensors = transform::CaptureExternalTensors(ir_pthread_block);
+    }
+
+    void Visit(std::shared_ptr<ir::io::LoadBinary> ir_load_binary) override {
+        std::ifstream ifs(ir_load_binary->filename, std::ios::binary);
+        GALOIS_ASSERT(ifs.good());
+        auto p_data = auto_aligned_alloc(ir_load_binary->type->bytes);
+        ifs.read(reinterpret_cast<char *>(p_data), ir_load_binary->type->bytes);
+        ifs.close();
+
+        ir_load_binary->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::CastInstruction>(
+                pir::CastInstruction::Operation::IntToPtr,
+                pir_builder->GetInt64Constant(reinterpret_cast<int64_t>(p_data)),
+                pir::PointerType::Create(ir_load_binary->type->pir_type)));
     }
 
     std::shared_ptr<pir::Value> PirNew(std::shared_ptr<pir::Type> pir_type) {
