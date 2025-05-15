@@ -8,6 +8,7 @@ add_executable(galois_test
     softmatx_test.cpp
     full_test.cpp
     slice_test.cpp
+    stack_test.cpp
     padding_test.cpp
     tile_matrix_multiply_test.cpp
     reference_count_test.cpp
