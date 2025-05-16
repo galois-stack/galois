@@ -7,5 +7,7 @@
 #include "galois/op/pack.hpp"
 #include "galois/op/padding.hpp"
 #include "galois/op/slice.hpp"
+#include "galois/op/softmax.hpp"
 #include "galois/op/sum.hpp"
+#include "galois/op/unary_intrinsic.hpp"
 #include "galois/op/unpack.hpp"
