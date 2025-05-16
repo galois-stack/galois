@@ -32,7 +32,7 @@ There are already many AI infrastructures centered around compilers. Galois draw
 
 ### With IR Based on Affine Expression as the Core, Multi-Level IR Smoothing Is Excessive
 
-### Block-Level Programming Instead of Thread-Level
+### Programming Based Tile Instead of Thread
 
 Matrix multiplication is the core computation of LLMs. Both hardware and software achieve efficiency by processing data in blocks. Therefore, programmability should focus on blocks rather than individual threads.
 
