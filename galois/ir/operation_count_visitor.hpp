@@ -82,7 +82,7 @@ class OperationCounter : public ir::Visitor {
     void Visit(std::shared_ptr<ir::GridIndex> ir_grid_index) override {}
     void Visit(std::shared_ptr<ir::Instruction> ir_instruction) override {}
 
-    void Visit(std::shared_ptr<ir::BitCast> ir_bit_cast) override {}
+    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {}
     void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override {}
     void Visit(std::shared_ptr<ir::Free> ir_free) override {}
     void Visit(std::shared_ptr<ir::Return> ir_return) override {}

@@ -50,10 +50,10 @@ class SimdMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
         auto ir_simd_type_a = ir::TensorType::Create(ir_data_type, lanes_a);
         auto ir_simd_type_b = ir::TensorType::Create(ir_data_type, lanes_b);
 
-        auto ir_vec_bit_cast_a = ir_builder->BitCast(ir_mat_a, ir_simd_type_a);
-        auto ir_vec_bit_cast_b = ir_builder->BitCast(ir_mat_b, ir_simd_type_b);
+        auto ir_vec_bit_cast_a = ir_builder->BitCastView(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->BitCastView(ir_mat_b, ir_simd_type_b);
         auto ir_mat_bit_cast_c =
-            ir_builder->BitCast(ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
+            ir_builder->BitCastView(ir_mat_c, ir::TensorType::Create(ir_simd_type_b, lanes_a));
 
         for (int64_t i = 0; i < lanes_a[0]; ++i) {
             auto ir_vector_broadcast_a =
@@ -113,9 +113,9 @@ class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
         auto ir_simd_type_a = ir_data_type->Tile(simd_lanes)->Tile(lanes_a / simd_lanes);
         auto ir_simd_type_b = ir_data_type->Tile(simd_lanes)->Tile(lanes_b / simd_lanes);
 
-        auto ir_vec_bit_cast_a = ir_builder->BitCast(ir_mat_a, ir_simd_type_a);
-        auto ir_vec_bit_cast_b = ir_builder->BitCast(ir_mat_b, ir_simd_type_b);
-        auto ir_mat_bit_cast_c = ir_builder->BitCast(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
+        auto ir_vec_bit_cast_a = ir_builder->BitCastView(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->BitCastView(ir_mat_b, ir_simd_type_b);
+        auto ir_mat_bit_cast_c = ir_builder->BitCastView(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
 
         for (int64_t r = 0; r < ir_simd_type_a->shape[0]; ++r) {
             auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
@@ -190,16 +190,16 @@ class AvxMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
         auto ir_simd_type_a = ir_data_type->Tile(lanes_a);
         auto ir_simd_type_b = ir_data_type->Tile(simd_lanes)->Tile(lanes_b / simd_lanes);
 
-        auto ir_vec_bit_cast_a = ir_builder->BitCast(ir_mat_a, ir_simd_type_a);
-        auto ir_vec_bit_cast_b = ir_builder->BitCast(ir_mat_b, ir_simd_type_b);
-        auto ir_mat_bit_cast_c = ir_builder->BitCast(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
+        auto ir_vec_bit_cast_a = ir_builder->BitCastView(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->BitCastView(ir_mat_b, ir_simd_type_b);
+        auto ir_mat_bit_cast_c = ir_builder->BitCastView(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
 
         for (int64_t i = 0; i < lanes_a; ++i) {
             auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
             ir_accessor_a->transform_matrix.resize(0, 0);
             ir_accessor_a->shift_vector[0] = i;
             auto ir_accessor_a_vector =
-                ir_builder->BitCast(ir_accessor_a, ir_accessor_a->type->Tile(1));
+                ir_builder->BitCastView(ir_accessor_a, ir_accessor_a->type->Tile(1));
             auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(
                 ir_accessor_a_vector, ir_vec_bit_cast_b->type->value_type, 0);
             for (int64_t c = 0; c < ir_simd_type_b->shape[0]; ++c) {

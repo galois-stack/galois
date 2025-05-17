@@ -399,7 +399,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ir_vector_broadcast->Vector()->pir_value, pir_constant_vector_lane_id_mask);
     }
 
-    void Visit(std::shared_ptr<ir::BitCast> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
         this->EmitType(ir_bit_cast->type);
         ir_bit_cast->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(

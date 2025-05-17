@@ -10,7 +10,7 @@ class Instruction;
 class ArithmeticInstruction;
 class Operator;
 class Input;
-class BitCast;
+class BitCastView;
 class Alloca;
 class Free;
 class Return;
@@ -46,7 +46,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::GridIndex> ir_grid_index) {}
     virtual void Visit(std::shared_ptr<ir::Instruction> ir_instruction) {}
     virtual void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) {}
-    virtual void Visit(std::shared_ptr<ir::BitCast> ir_bit_cast) {}
+    virtual void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) {}
     virtual void Visit(std::shared_ptr<ir::Alloca> ir_alloca) {}
     virtual void Visit(std::shared_ptr<ir::Free> ir_free) {}
     virtual void Visit(std::shared_ptr<ir::Return> ir_return) {}

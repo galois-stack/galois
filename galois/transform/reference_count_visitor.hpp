@@ -27,7 +27,7 @@ class IncreaseVisitor : public ir::Visitor {
         }
     }
 
-    void Visit(std::shared_ptr<ir::BitCast> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
         this->IncreaseViewInstruction(ir_bit_cast);
     }
 
@@ -118,7 +118,7 @@ class DecreaseVisitor : public ir::Visitor {
         }
     }
 
-    void Visit(std::shared_ptr<ir::BitCast> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
         this->DecreaseViewInstruction(ir_bit_cast);
     }
 

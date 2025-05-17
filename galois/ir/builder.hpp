@@ -177,9 +177,9 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return this->Create<ir::Write>(ir_value, ir_variable);
     }
 
-    std::shared_ptr<ir::BitCast> BitCast(std::shared_ptr<ir::Tensor> ir_value,
-                                         std::shared_ptr<ir::TensorType> ir_type) {
-        return this->Create<ir::BitCast>(ir_value, ir_type);
+    std::shared_ptr<ir::BitCastView> BitCastView(std::shared_ptr<ir::Tensor> ir_value,
+                                                 std::shared_ptr<ir::TensorType> ir_type) {
+        return this->Create<ir::BitCastView>(ir_value, ir_type);
     }
 
     std::shared_ptr<ir::Return> Return(std::shared_ptr<ir::Tensor> ir_value) {

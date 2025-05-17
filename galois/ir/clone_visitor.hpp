@@ -78,12 +78,12 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_arithmetic_instruction] = ir_new;
     }
 
-    void Visit(std::shared_ptr<BitCast> ir_bit_cast) override {
+    void Visit(std::shared_ptr<BitCastView> ir_bit_cast) override {
         if (tensor_dict.count(ir_bit_cast)) {
             return;
         }
         ir_bit_cast->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = BitCast::Create(tensor_dict[ir_bit_cast->Tensor()], ir_bit_cast->type);
+        auto ir_new = BitCastView::Create(tensor_dict[ir_bit_cast->Tensor()], ir_bit_cast->type);
         tensor_dict[ir_bit_cast] = ir_new;
     }
 

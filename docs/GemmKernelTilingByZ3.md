@@ -221,10 +221,10 @@ class NeonMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
         auto ir_simd_type_a = ir_data_type->Tile(simd_lanes)->Tile(lanes_a / simd_lanes);
         auto ir_simd_type_b = ir_data_type->Tile(simd_lanes)->Tile(lanes_b / simd_lanes);
 
-        auto ir_vec_bit_cast_a = ir_builder->BitCast(ir_mat_a, ir_simd_type_a);
-        auto ir_vec_bit_cast_b = ir_builder->BitCast(ir_mat_b, ir_simd_type_b);
+        auto ir_vec_bit_cast_a = ir_builder->BitCastView(ir_mat_a, ir_simd_type_a);
+        auto ir_vec_bit_cast_b = ir_builder->BitCastView(ir_mat_b, ir_simd_type_b);
         auto ir_mat_bit_cast_c =
-            ir_builder->BitCast(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
+            ir_builder->BitCastView(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
 
         for (int64_t r = 0; r < ir_simd_type_a->shape[0]; ++r) {
             auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);

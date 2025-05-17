@@ -427,28 +427,6 @@ class PthreadBlock : public Block {
     }
 };
 
-class BitCast : public Instruction {
-   public:
-    static std::shared_ptr<BitCast> Create(std::shared_ptr<Tensor> ir_value,
-                                           std::shared_ptr<TensorType> ir_type) {
-        GALOIS_ASSERT(ir_type);
-        std::shared_ptr<BitCast> self(new BitCast);
-        GALOIS_ASSERT(ir_value->type->bytes == ir_type->bytes);
-        self->OperandResize(1);
-        self->Tensor(ir_value);
-        self->type = ir_type;
-        self->tag = "BitCast";
-        return self;
-    }
-
-    std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<BitCast>(this->shared_from_this()));
-    }
-};
-
 class Call : public Instruction {
    protected:
     Call() = default;
