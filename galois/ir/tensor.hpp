@@ -15,28 +15,6 @@
 #include "galois/ir/tensor_type.hpp"
 #include "galois/ir/visitor.hpp"
 
-template <typename Matrix_>
-inline void RemoveRow(Matrix_& matrix, int64_t index) {
-    unsigned int numRows = matrix.rows() - 1;
-    unsigned int numCols = matrix.cols();
-
-    if (index < numRows)
-        matrix.block(index, 0, numRows - index, numCols) = matrix.bottomRows(numRows - index);
-
-    matrix.conservativeResize(numRows, numCols);
-}
-
-template <typename Matrix_>
-inline void RemoveColumn(Matrix_& matrix, int64_t index) {
-    unsigned int numRows = matrix.rows();
-    unsigned int numCols = matrix.cols() - 1;
-
-    if (index < numCols)
-        matrix.block(0, index, numRows, numCols - index) = matrix.rightCols(numCols - index);
-
-    matrix.conservativeResize(numRows, numCols);
-}
-
 namespace galois::ir {
 
 class Instruction;
@@ -108,74 +86,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::weak_ptr<Block> parent_block;
     std::shared_ptr<pir::Value> pir_value = nullptr;
     std::string tag = "Tensor";
-};
-
-class Constant : public Tensor {
-   public:
-    virtual ~Constant() {}
-
-    void Detach() override { this->instruction_with_index_list.clear(); }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<Constant>(this->shared_from_this()));
-    }
-};
-
-class ConstantRealNumber : public Constant {
-   protected:
-    ConstantRealNumber() = default;
-
-    virtual void ApplyVisitor(std::shared_ptr<Visitor> interpreter) {
-        interpreter->Visit(Cast<ConstantRealNumber>(this->shared_from_this()));
-    }
-};
-
-class ConstantInt : public ConstantRealNumber {
-   protected:
-    ConstantInt() = default;
-
-   public:
-    static std::shared_ptr<ConstantInt> Create(std::shared_ptr<TensorType> ir_type, int64_t value) {
-        GALOIS_ASSERT(ir_type);
-        std::shared_ptr<ConstantInt> self(new ConstantInt);
-        self->type = ir_type;
-        self->value = value;
-        self->tag = "ConstantInt";
-        return self;
-    }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<ConstantInt>(this->shared_from_this()));
-    }
-
-   public:
-    uint64_t value;
-};
-
-class ConstantFloat : public ConstantRealNumber {
-   protected:
-    ConstantFloat() = default;
-
-   public:
-    enum SpecialValue { None, Smallest, Largest, NaN, Inf };
-
-    static std::shared_ptr<ConstantFloat> Create(std::shared_ptr<TensorType> type, double value) {
-        GALOIS_ASSERT(type);
-        std::shared_ptr<ConstantFloat> self(new ConstantFloat);
-        self->type = type;
-        self->value = value;
-        self->tag = "ConstantFloat";
-        return self;
-    }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<ConstantFloat>(this->shared_from_this()));
-    }
-
-   public:
-    double value;
-    SpecialValue special_value = SpecialValue::None;
-    bool is_negative = false;
 };
 
 class Instruction : virtual public Tensor {
@@ -290,134 +200,6 @@ class Accessor : public Instruction {
    public:
     Eigen::MatrixXi64 transform_matrix;
     Eigen::VectorXi64 shift_vector;
-};
-
-class Viewer : public Instruction {
-   public:
-    static std::shared_ptr<Viewer> Create(std::shared_ptr<Tensor> ir_tensor,
-                                          Eigen::MatrixXi64 transform_matrix,
-                                          Eigen::VectorXi64 shift_vector) {
-        std::shared_ptr<Viewer> self(new Viewer);
-        self->ir_tensor = ir_tensor;
-        self->transform_matrix = transform_matrix;
-        self->type = ir_tensor->type;
-        self->shift_vector = shift_vector;
-        self->tag = "Viewer";
-        return self;
-    }
-
-    static std::shared_ptr<Viewer> Shift(std::shared_ptr<Tensor> ir_tensor,
-                                         Eigen::VectorXi64 shift_vector) {
-        auto tensor_rank = ir_tensor->type->shape.size();
-        auto identity_matrix = Eigen::MatrixXi64::Identity(tensor_rank, tensor_rank);
-        GALOIS_ASSERT(shift_vector.size() == tensor_rank);
-        return Create(ir_tensor, identity_matrix, shift_vector);
-    }
-
-    static std::shared_ptr<Viewer> Stride(std::shared_ptr<Tensor> ir_tensor,
-                                          Eigen::VectorXi64 stride_vector) {
-        auto tensor_rank = ir_tensor->type->shape.size();
-        GALOIS_ASSERT(stride_vector.size() == tensor_rank);
-        Eigen::MatrixXi64 transform_matrix = Eigen::MatrixXi64::Zero(tensor_rank, tensor_rank);
-        for (int64_t i = 0; i < tensor_rank; ++i) {
-            transform_matrix(i, i) = stride_vector[i];
-        }
-        return Create(ir_tensor, transform_matrix, Eigen::VectorXi64::Zero(tensor_rank));
-    }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<Viewer>(this->shared_from_this()));
-    }
-
-    Eigen::MatrixXi64 transform_matrix;
-    Eigen::VectorXi64 shift_vector;
-    std::shared_ptr<Tensor> ir_tensor = nullptr;
-};
-
-class SliceView : public Instruction {
-   public:
-    static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_origin,
-                                             Eigen::VectorXi64 shape) {
-        GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
-        std::shared_ptr<SliceView> self(new SliceView);
-        self->OperandResize(1);
-        self->Origin(ir_origin);
-        self->shape = shape;
-
-        auto stride = ir_origin->Tensor()->type->stride;
-        GALOIS_ASSERT(ir_origin->Tensor()->type->value_type);
-        self->type = ir::TensorType::Create(ir_origin->Tensor()->type->value_type, shape, stride);
-        self->tag = "SliceView";
-        return self;
-    }
-
-    std::shared_ptr<Accessor> Origin() { return Cast<Accessor>(this->GetOperand(0)); }
-    void Origin(std::shared_ptr<ir::Accessor> ir_accessor) { this->SetOperand(0, ir_accessor); }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<SliceView>(this->shared_from_this()));
-    }
-
-    Eigen::VectorXi64 shape;
-};
-
-class SqueezeDimView : public Instruction {
-   public:
-    static std::shared_ptr<SqueezeDimView> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
-        std::shared_ptr<SqueezeDimView> self(new SqueezeDimView);
-        self->OperandResize(1);
-        self->Tensor(ir_tensor);
-
-        auto shape = ir_tensor->type->shape;
-        auto stride = ir_tensor->type->stride;
-        RemoveRow(shape, dim);
-        RemoveColumn(stride, dim);
-        self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
-        self->dim = dim;
-        self->tag = "Squeeze";
-        return self;
-    }
-
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<SqueezeDimView>(this->shared_from_this()));
-    }
-
-    int64_t dim;
-};
-
-class SqueezeView : public Instruction {
-   public:
-    static std::shared_ptr<SqueezeView> Create(std::shared_ptr<Tensor> ir_tensor) {
-        std::shared_ptr<SqueezeView> self(new SqueezeView);
-        self->OperandResize(1);
-        self->Tensor(ir_tensor);
-
-        int64_t valid_shape_size = 0;
-        Eigen::VectorXi64 shape(ir_tensor->type->shape.size());
-        Eigen::VectorXi64 stride(ir_tensor->type->stride.size());
-        for (int64_t i = 0; i < ir_tensor->type->shape.size(); ++i) {
-            if (ir_tensor->type->shape[i] != 1) {
-                shape[valid_shape_size] = ir_tensor->type->shape[i];
-                stride[valid_shape_size] = ir_tensor->type->stride[i];
-                valid_shape_size++;
-            }
-        }
-        shape.conservativeResize(valid_shape_size);
-        stride.conservativeResize(valid_shape_size);
-        self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
-        self->tag = "Squeeze";
-        return self;
-    }
-
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<SqueezeView>(this->shared_from_this()));
-    }
 };
 
 class ArithmeticInstruction : public Instruction {
@@ -566,49 +348,6 @@ class Block : public Tensor, public std::list<std::shared_ptr<Tensor>> {
 
     //    public:
     // std::list<std::shared_ptr<Tensor>> tensors;
-};
-
-class VoidType : public TensorType {
-   protected:
-    VoidType() = default;
-
-   public:
-    static std::shared_ptr<VoidType> Create() {
-        for (auto ir_type : global_context.created_types) {
-            if (auto ir_void_type = Cast<VoidType>(ir_type)) {
-                return ir_void_type;
-            }
-        }
-
-        std::shared_ptr<VoidType> self(new VoidType);
-        self->name = "void";
-        self->fullname = "void";
-        global_context.created_types.push_back(self);
-        return self;
-    }
-};
-
-class OperatorType : public TensorType {
-   public:
-    static std::shared_ptr<OperatorType> Create(
-        std::vector<std::shared_ptr<TensorType>> ir_in_types,
-        std::shared_ptr<TensorType> ir_out_types) {
-        std::shared_ptr<OperatorType> self(new OperatorType);
-        self->ir_input_types = ir_in_types;
-        self->output_type = ir_out_types;
-        self->name = "(";
-        for (auto ir_in_type : ir_in_types) {
-            self->name += ir_in_type->name + ",";
-        }
-
-        self->name += ") -> " + ir_out_types->name;
-        self->fullname = self->name;
-        return self;
-    }
-
-   public:
-    std::vector<std::shared_ptr<TensorType>> ir_input_types;
-    std::shared_ptr<TensorType> output_type;
 };
 
 class Input : public Tensor {
@@ -845,24 +584,6 @@ class UnaryIntrinsic : public Instruction {
 
 class Builder;
 
-template <typename DataType, typename... Args>
-inline std::shared_ptr<TensorType> CreateScalarType(Args... args) {
-    auto ir_data_type = DataType::Create(args...);
-    auto fullname = ir_data_type->name + "[]";
-    for (auto ir_type : global_context.created_types) {
-        if (ir_type->fullname == fullname) {
-            return Cast<TensorType>(ir_type);
-        }
-    }
-
-    std::shared_ptr<TensorType> self(new TensorType);
-    self->value_type = nullptr;
-    self->shape.resize(0);
-    self->stride.resize(0);
-    self->fullname = fullname;
-    global_context.created_types.push_back(self);
-    return self;
-}
 inline std::vector<std::shared_ptr<TensorType>> GetTensorTypes(
     std::vector<std::shared_ptr<Tensor>> ir_tensors) {
     std::vector<std::shared_ptr<TensorType>> ir_types;
@@ -873,14 +594,3 @@ inline std::vector<std::shared_ptr<TensorType>> GetTensorTypes(
 }
 
 }  // namespace galois::ir
-
-template <>
-struct std::hash<galois::ir::InstructionAndOperandIndex> {
-    std::int64_t operator()(galois::ir::InstructionAndOperandIndex inst_with_idx) const noexcept {
-        std::int64_t h1 =
-            std::hash<std::shared_ptr<galois::ir::Instruction>>{}(inst_with_idx.instruction.lock());
-        std::int64_t h2 = std::hash<int64_t>{}(inst_with_idx.operand_index);
-        // 这里哈希函数应该不重要, 应该不会导致性能问题
-        return h1 ^ (h2 << 1);
-    }
-};

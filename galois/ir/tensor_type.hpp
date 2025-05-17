@@ -226,4 +226,47 @@ class IntType : public RealNumberType {
     bool is_signed = true;
 };
 
+class VoidType : public TensorType {
+   protected:
+    VoidType() = default;
+
+   public:
+    static std::shared_ptr<VoidType> Create() {
+        for (auto ir_type : global_context.created_types) {
+            if (auto ir_void_type = Cast<VoidType>(ir_type)) {
+                return ir_void_type;
+            }
+        }
+
+        std::shared_ptr<VoidType> self(new VoidType);
+        self->name = "void";
+        self->fullname = "void";
+        global_context.created_types.push_back(self);
+        return self;
+    }
+};
+
+class OperatorType : public TensorType {
+   public:
+    static std::shared_ptr<OperatorType> Create(
+        std::vector<std::shared_ptr<TensorType>> ir_in_types,
+        std::shared_ptr<TensorType> ir_out_types) {
+        std::shared_ptr<OperatorType> self(new OperatorType);
+        self->ir_input_types = ir_in_types;
+        self->output_type = ir_out_types;
+        self->name = "(";
+        for (auto ir_in_type : ir_in_types) {
+            self->name += ir_in_type->name + ",";
+        }
+
+        self->name += ") -> " + ir_out_types->name;
+        self->fullname = self->name;
+        return self;
+    }
+
+   public:
+    std::vector<std::shared_ptr<TensorType>> ir_input_types;
+    std::shared_ptr<TensorType> output_type;
+};
+
 }  // namespace galois::ir

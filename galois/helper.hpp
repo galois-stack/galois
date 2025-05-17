@@ -49,7 +49,6 @@ auto Cast(std::shared_ptr<SrcType_> ir_src) -> std::shared_ptr<DstType_> {
     return ir_dst;
 }
 
-
 template <typename DstType_, typename SrcType_>
 bool Is(std::shared_ptr<SrcType_> ir_src) {
     return Cast<DstType_, SrcType_>(ir_src) != nullptr;
@@ -94,9 +93,7 @@ inline void* auto_aligned_alloc(size_t len) {
     return std::malloc(len);
 }
 
-
-
-template<typename T>
+template <typename T>
 std::shared_ptr<T> Lock(std::weak_ptr<T>& weak) {
     auto ptr = weak.lock();
     GALOIS_ASSERT(ptr);
@@ -104,3 +101,26 @@ std::shared_ptr<T> Lock(std::weak_ptr<T>& weak) {
 }
 
 }  // namespace galois
+
+// For Eigen
+template <typename Matrix_>
+inline void RemoveRow(Matrix_& matrix, int64_t index) {
+    unsigned int numRows = matrix.rows() - 1;
+    unsigned int numCols = matrix.cols();
+
+    if (index < numRows)
+        matrix.block(index, 0, numRows - index, numCols) = matrix.bottomRows(numRows - index);
+
+    matrix.conservativeResize(numRows, numCols);
+}
+
+template <typename Matrix_>
+inline void RemoveColumn(Matrix_& matrix, int64_t index) {
+    unsigned int numRows = matrix.rows();
+    unsigned int numCols = matrix.cols() - 1;
+
+    if (index < numCols)
+        matrix.block(0, index, numRows, numCols - index) = matrix.rightCols(numCols - index);
+
+    matrix.conservativeResize(numRows, numCols);
+}

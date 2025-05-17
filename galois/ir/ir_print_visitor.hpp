@@ -2,7 +2,7 @@
 #include <sstream>
 #include <string>
 
-#include "tensor.hpp"
+#include "galois/ir/ir.hpp"
 
 namespace galois::ir {
 

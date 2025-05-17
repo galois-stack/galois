@@ -36,28 +36,6 @@ inline std::list<std::shared_ptr<Tensor_>> GetAll(std::shared_ptr<ir::Block> ir_
     return ir_values;
 }
 
-template <typename Matrix_>
-inline void RemoveRow(Matrix_& matrix, int64_t index) {
-    unsigned int numRows = matrix.rows() - 1;
-    unsigned int numCols = matrix.cols();
-
-    if (index < numRows)
-        matrix.block(index, 0, numRows - index, numCols) = matrix.bottomRows(numRows - index);
-
-    matrix.conservativeResize(numRows, numCols);
-}
-
-template <typename Matrix_>
-inline void RemoveColumn(Matrix_& matrix, int64_t index) {
-    unsigned int numRows = matrix.rows();
-    unsigned int numCols = matrix.cols() - 1;
-
-    if (index < numCols)
-        matrix.block(0, index, numRows, numCols - index) = matrix.rightCols(numCols - index);
-
-    matrix.conservativeResize(numRows, numCols);
-}
-
 inline void ApplyTransformMatrix(std::shared_ptr<ir::Grid> op, Eigen::Matrix2Xi transform_matrix) {
     // auto t_matrix = transform_matrix.transpose();
     // op->shape =
