@@ -23,7 +23,6 @@ TEST(GaloisTests, Concatenate_2x2Dim0) {
     for (size_t i = 0; i < expected.size(); ++i) {
         GALOIS_ASSERT(output[i] == expected[i]);
     }
-
 }
 
 TEST(GaloisTests, Concatenate_2x2Dim1) {
@@ -49,5 +48,4 @@ TEST(GaloisTests, Concatenate_2x2Dim1) {
     for (size_t i = 0; i < expected.size(); ++i) {
         GALOIS_ASSERT(output[i] == expected[i]);
     }
-    boost::scope::scope_exit free_mem([output] { free(output); });
 }
