@@ -2,6 +2,7 @@
 
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/binary.hpp"
+#include "galois/op/concatenate.hpp"
 #include "galois/op/full.hpp"
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/op/pack.hpp"

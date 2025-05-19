@@ -17,6 +17,7 @@ add_executable(galois_test
     matrix_multiply_kernel_test.cpp
     ir_print_test.cpp
     load_binary_test.cpp
+    concatenate_test.cpp
 )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
