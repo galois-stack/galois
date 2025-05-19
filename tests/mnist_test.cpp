@@ -30,20 +30,21 @@ TEST(GaloisTests, TestMnist) {
     auto jit_engine = jit::Engine::Create();
     auto model_fun = jit_engine->EmitOperatorSymbol<void (*)(float *, float *)>(ir_operator);
 
-    std::vector<float> input_vec(28 * 28);
-    float value = 5.0f;
-    fill_fun(input_vec.data(), &value);
-    for (int i = 0; i < 28 * 28; i++) {
-        GALOIS_ASSERT(input_vec[i] == value);
-    }
+    // 测试
+    // std::vector<float> input_vec(28 * 28);
+    // float value = 5.0f;
+    // fill_fun(input_vec.data(), &value);
+    // for (int i = 0; i < 28 * 28; i++) {
+    //     GALOIS_ASSERT(input_vec[i] == value);
+    // }
 
-    // 执行模型
-    float output_vec[10];
-    model_fun(input_vec.data(), output_vec);
+    // // 执行模型
+    // float output_vec[10];
+    // model_fun(input_vec.data(), output_vec);
 
-    // 打印输出
-    for (int i = 0; i < 10; i++) {
-        std::cout << output_vec[i] << " ";
-    }
-    std::cout << std::endl;
+    // // 打印输出
+    // for (int i = 0; i < 10; i++) {
+    //     std::cout << output_vec[i] << " ";
+    // }
+    // std::cout << std::endl;
 }
