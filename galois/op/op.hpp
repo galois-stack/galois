@@ -8,5 +8,6 @@
 #include "galois/op/pack.hpp"
 #include "galois/op/padding.hpp"
 #include "galois/op/slice.hpp"
+#include "galois/op/stack.hpp"
 #include "galois/op/sum.hpp"
 #include "galois/op/unpack.hpp"
