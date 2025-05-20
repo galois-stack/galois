@@ -73,6 +73,9 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {
         this->callback(ir_squeeze_view);
     }
+    void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {
+        this->callback(ir_flatten_view);
+    }
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
         this->callback(ir_operator);
         for (auto ir_input : ir_operator->inputs) {

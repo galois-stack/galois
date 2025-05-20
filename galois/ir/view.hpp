@@ -194,4 +194,37 @@ class UnsqueezeDimView : public Instruction {
     int64_t dim;
 };
 
+class FlattenView : public Instruction {
+   public:
+    static std::shared_ptr<FlattenView> Create(std::shared_ptr<Tensor> ir_tensor) {
+        GALOIS_ASSERT(ir_tensor);
+        std::shared_ptr<FlattenView> self(new FlattenView);
+        self->OperandResize(1);
+        self->Tensor(ir_tensor);
+
+        int64_t total_size = 1;
+        const auto& shape = ir_tensor->type->shape;
+        for (int64_t i = 0; i < shape.size(); ++i) {
+            total_size *= shape[i];
+        }
+
+        Eigen::VectorXi64 new_shape(1);
+        new_shape(0) = total_size;
+
+        Eigen::VectorXi64 new_stride(1);
+        new_stride(0) = 1;
+
+        self->type = TensorType::Create(ir_tensor->type->value_type, new_shape, new_stride);
+        self->tag = "FlattenView";
+        return self;
+    }
+
+    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<FlattenView>(this->shared_from_this()));
+    }
+};
+
 }  // namespace galois::ir
