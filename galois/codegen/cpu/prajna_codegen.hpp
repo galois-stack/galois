@@ -503,6 +503,17 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir_pointer_type));
     }
 
+    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+        this->EmitType(ir_unsqueeze_dim_view->type);
+        auto pir_pointer_type = pir::PointerType::Create(ir_unsqueeze_dim_view->type->pir_type);
+
+        ir_unsqueeze_dim_view->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
+                prajna::Cast<pir::DeferencePointer>(ir_unsqueeze_dim_view->Tensor()->pir_value)
+                    ->Pointer(),
+                pir_pointer_type));
+    }
+
     void Visit(std::shared_ptr<ir::Call> ir_call) override {
         if (!ir_call->annotation_dict.count("enable_multi_thread")) {
             std::list<std::shared_ptr<pir::Value>> pir_arguments;

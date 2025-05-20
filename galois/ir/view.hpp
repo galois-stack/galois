@@ -154,4 +154,44 @@ class SqueezeView : public Instruction {
     }
 };
 
+class UnsqueezeDimView : public Instruction {
+   public:
+    static std::shared_ptr<UnsqueezeDimView> Create(std::shared_ptr<Tensor> ir_tensor,
+                                                    int64_t dim) {
+        std::shared_ptr<UnsqueezeDimView> self(new UnsqueezeDimView);
+        self->OperandResize(1);
+        self->Tensor(ir_tensor);
+
+        auto old_shape = ir_tensor->type->shape;
+        auto old_stride = ir_tensor->type->stride;
+        int64_t old_rank = old_shape.size();
+        int64_t new_rank = old_rank + 1;
+
+        Eigen::VectorXi64 shape(new_rank);
+        shape.head(dim) = old_shape.head(dim);
+        shape(dim) = 1;
+        shape.tail(new_rank - dim - 1) = old_shape.tail(old_rank - dim);
+
+        Eigen::VectorXi64 stride(new_rank);
+        stride.head(dim) = old_stride.head(dim);
+        int64_t inserted_stride = (dim < old_stride.size()) ? old_stride(dim) : 1;
+        stride(dim) = inserted_stride;
+        stride.tail(new_rank - dim - 1) = old_stride.tail(old_rank - dim);
+
+        self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
+        self->dim = dim;
+        self->tag = "Unsqueeze";
+        return self;
+    }
+
+    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<UnsqueezeDimView>(this->shared_from_this()));
+    }
+
+    int64_t dim;
+};
+
 }  // namespace galois::ir

@@ -92,6 +92,7 @@ class OperationCounter : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Viewer> ir_viewer) override {}
     void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {}
+    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {}
     void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {}
     void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {}
 
