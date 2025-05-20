@@ -1,2 +1,7 @@
 *.png filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
+tests/data/MNIST/raw/train-images-idx3-ubyte filter=lfs diff=lfs merge=lfs -text
+tests/data/MNIST/raw/train-labels-idx1-ubyte filter=lfs diff=lfs merge=lfs -text
+tests/data/MNIST filter=lfs diff=lfs merge=lfs -text
+tests/data/weight1_cpp.bin filter=lfs diff=lfs merge=lfs -text
+tests/data/weight2_cpp.bin filter=lfs diff=lfs merge=lfs -text

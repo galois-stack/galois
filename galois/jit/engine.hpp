@@ -8,7 +8,7 @@
 #include "prajna/jit/execution_engine.h"
 #include "thpool.h"
 
-inline float relu6(float x) { return std::fminf(std::fmaxf(x, 0.0f), 6.0f); }
+inline float relu6(float x) { return std::fminf(0.0f, x); }
 
 namespace galois::jit {
 
