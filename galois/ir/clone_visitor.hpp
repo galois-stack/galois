@@ -1,7 +1,6 @@
 #pragma once
 
 #include "galois/ir/tensor.hpp"
-#include "visitor.hpp"
 
 namespace galois::ir {
 
@@ -200,6 +199,15 @@ class CloneVisitor : public Visitor {
         ir_squeeze_view->Tensor()->ApplyVisitor(this->shared_from_this());
         auto ir_new = SqueezeView::Create(tensor_dict[ir_squeeze_view->Tensor()]);
         tensor_dict[ir_squeeze_view] = ir_new;
+    }
+
+    void Visit(std::shared_ptr<FlattenView> ir_flatten_view) override {
+        if (tensor_dict.count(ir_flatten_view)) {
+            return;
+        }
+        ir_flatten_view->Tensor()->ApplyVisitor(this->shared_from_this());
+        auto ir_new = FlattenView::Create(tensor_dict[ir_flatten_view->Tensor()]);
+        tensor_dict[ir_flatten_view] = ir_new;
     }
 
     void Visit(std::shared_ptr<Operator> ir_operator) override {
