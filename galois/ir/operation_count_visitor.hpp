@@ -96,6 +96,7 @@ class OperationCounter : public ir::Visitor {
     void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {}
     void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {}
     void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {}
+    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {}
 
    private:
     std::stack<int64_t> operation_count_stack;

@@ -11,4 +11,5 @@
 #include "galois/op/slice.hpp"
 #include "galois/op/stack.hpp"
 #include "galois/op/sum.hpp"
+#include "galois/op/transpose.hpp"
 #include "galois/op/unpack.hpp"

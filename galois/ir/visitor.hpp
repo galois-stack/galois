@@ -27,6 +27,7 @@ class SqueezeDimView;
 class UnsqueezeDimView;
 class SliceView;
 class FlattenView;
+class TransposeView;
 class Accessor;
 class SqueezeView;
 class Constant;
@@ -65,6 +66,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) {}
     virtual void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) {}
     virtual void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) {}
+    virtual void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) {}
     virtual void Visit(std::shared_ptr<ir::Operator> ir_operator) {}
     virtual void Visit(std::shared_ptr<ir::Constant> ir_constant) {}
     virtual void Visit(std::shared_ptr<ir::ConstantRealNumber> ir_constant_real_number) {}
