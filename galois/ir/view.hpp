@@ -227,4 +227,44 @@ class FlattenView : public Instruction {
     }
 };
 
+class TransposeView : public Instruction {
+   public:
+    static std::shared_ptr<TransposeView> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim0,
+                                                 int64_t dim1) {
+        GALOIS_ASSERT(ir_tensor);
+        const auto& old_shape = ir_tensor->type->shape;
+        const auto& old_stride = ir_tensor->type->stride;
+        int64_t rank = old_shape.size();
+        GALOIS_ASSERT(dim0 >= 0 && dim0 < rank);
+        GALOIS_ASSERT(dim1 >= 0 && dim1 < rank);
+        GALOIS_ASSERT(dim0 != dim1);
+
+        std::shared_ptr<TransposeView> self(new TransposeView);
+        self->OperandResize(1);
+        self->Tensor(ir_tensor);
+        self->dim0 = dim0;
+        self->dim1 = dim1;
+
+        Eigen::VectorXi64 new_shape = old_shape;
+        Eigen::VectorXi64 new_stride = old_stride;
+
+        std::swap(new_shape(dim0), new_shape(dim1));
+        std::swap(new_stride(dim0), new_stride(dim1));
+
+        self->type = TensorType::Create(ir_tensor->type->value_type, new_shape, new_stride);
+        self->tag = "TransposeView";
+        return self;
+    }
+
+    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<TransposeView>(this->shared_from_this()));
+    }
+
+    int64_t dim0;
+    int64_t dim1;
+};
+
 }  // namespace galois::ir

@@ -73,6 +73,10 @@ class IncreaseVisitor : public ir::Visitor {
         this->IncreaseViewInstruction(ir_flatten_view);
     }
 
+    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {
+        this->IncreaseViewInstruction(ir_transpose_view);
+    }
+
     void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {
         this->IncreaseViewInstruction(ir_accessor);
     }
@@ -175,6 +179,10 @@ class DecreaseVisitor : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {
         this->DecreaseViewInstruction(ir_flatten_view);
+    }
+
+    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {
+        this->DecreaseViewInstruction(ir_transpose_view);
     }
 
     void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {

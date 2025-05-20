@@ -210,6 +210,16 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_flatten_view] = ir_new;
     }
 
+    void Visit(std::shared_ptr<TransposeView> ir_transpose_view) override {
+        if (tensor_dict.count(ir_transpose_view)) {
+            return;
+        }
+        ir_transpose_view->Tensor()->ApplyVisitor(this->shared_from_this());
+        auto ir_new = TransposeView::Create(tensor_dict[ir_transpose_view->Tensor()],
+                                            ir_transpose_view->dim0, ir_transpose_view->dim1);
+        tensor_dict[ir_transpose_view] = ir_new;
+    }
+
     void Visit(std::shared_ptr<Operator> ir_operator) override {
         if (tensor_dict.count(ir_operator)) {
             return;
