@@ -64,6 +64,9 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {
         this->callback(ir_squeeze_dim_view);
     }
+    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+        this->callback(ir_unsqueeze_dim_view);
+    }
     void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {
         this->callback(ir_slice_view);
     }
