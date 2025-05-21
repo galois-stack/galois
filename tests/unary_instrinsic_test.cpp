@@ -39,3 +39,30 @@ TEST(GaloisTests, TestUnaryIntrinsic) {
     auto value = *sin_fun(&input);
     fmt::print("sin(3.1415) = {}\n", value);
 }
+
+TEST(GaloisTests, TestUnaryIntrinsic3x3) {
+    int rows = 3, cols = 3;
+    int length = rows * cols;
+    auto ir_input_type = ir::f32->Tile({rows, cols});
+    auto ir_builder = ir::Builder::Create();
+    auto ir_operator =
+        ir_builder->CreateOperatorByCreator<op::UnaryInstrinsicCreator>({ir_input_type}, "sin");
+
+    auto jit_engine = jit::Engine::Create();
+    auto sin_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
+
+    std::vector<float> input = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    std::vector<float> output(length);
+
+    float *result = sin_fun(input.data());
+    for (int i = 0; i < length; ++i) {
+        float expected = std::sin(input[i]);
+        EXPECT_NEAR(result[i], expected, 1e-5)
+            << "Mismatch at index " << i << ": input=" << input[i];
+        output[i] = result[i];
+    }
+
+    fmt::print("sin(3x3 matrix) output: ");
+    for (float v : output) fmt::print("{} ", v);
+    fmt::print("\n");
+}
