@@ -1,6 +1,3 @@
-#include <cmath>  // 添加cmath头文件，支持isnan和isinf
-#include <typeinfo>  // 需要添加头文件
-
 #include "galois/op/fill.hpp"
 #include "tests/galois_test.hpp"
 
