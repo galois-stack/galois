@@ -43,7 +43,7 @@ TEST(GaloisTests, TestUnaryIntrinsic) {
 TEST(GaloisTests, TestUnaryIntrinsic3x3) {
     int rows = 3, cols = 3;
     int length = rows * cols;
-    auto ir_input_type = ir::f32->Tile({rows, cols});
+    auto ir_input_type = ir::f32->Tile(rows, cols);
     auto ir_builder = ir::Builder::Create();
     auto ir_operator =
         ir_builder->CreateOperatorByCreator<op::UnaryInstrinsicCreator>({ir_input_type}, "sin");
