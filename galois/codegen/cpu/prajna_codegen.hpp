@@ -92,15 +92,14 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 {pir::IntType::Create(32, true)}, pir::IntType::Create(64, true));
             auto pir_thpool_init =
                 pir_builder->GetIntrinsic("thpool_init", pir_i32_function_type_i64);
-            auto pir_thread_pool = pir_builder->Create<pir::Call>(pir_thpool_init, pir_thread_num);
+            auto pir_thread_pool = pir_builder->Call(pir_thpool_init, pir_thread_num);
             this->pir_thpool = pir_thread_pool;
             auto pir_i64_function_type = pir::FunctionType::Create({pir::IntType::Create(64, true)},
                                                                    pir::VoidType::Create());
             thread_guard = std::move(ScopeGuard::Create([=]() {
-                pir_builder->Create<pir::Call>(
-                    pir_builder->GetIntrinsic("thpool_wait", pir_i64_function_type),
-                    pir_thread_pool);
-                pir_builder->Create<pir::Call>(
+                pir_builder->Call(pir_builder->GetIntrinsic("thpool_wait", pir_i64_function_type),
+                                  pir_thread_pool);
+                pir_builder->Call(
                     pir_builder->GetIntrinsic("thpool_destroy", pir_i64_function_type),
                     pir_thread_pool);
             }));
@@ -360,7 +359,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         pir_arguments.push_back(pir_builder->GetInt32Constant(0));
         pir_arguments.push_back(pir_builder->GetInt32Constant(0));
         pir_arguments.push_back(pir_builder->GetInt32Constant(1));
-        pir_builder->Create<pir::Call>(pir_prefetch_function, pir_arguments);
+        pir_builder->Call(pir_prefetch_function, pir_arguments);
     }
     void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) override {
         ir_broadcast->Tensor()->ApplyVisitor(this->shared_from_this());
@@ -421,7 +420,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             auto pir_aligned_alloc =
                 pir_builder->GetIntrinsic("auto_aligned_alloc", pir_function_type);
             auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-                pir_builder->Create<pir::Call>(pir_aligned_alloc, pir_arguments),
+                pir_builder->Call(pir_aligned_alloc, pir_arguments),
                 pir::PointerType::Create(this->EmitType(ir_tensor_type)));
             ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
             return;
@@ -460,7 +459,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Free> ir_free) override {
-        ir_free->pir_value = pir_builder->Create<pir::Call>(
+        ir_free->pir_value = pir_builder->Call(
             pir_builder->GetIntrinsic(
                 "free", pir::FunctionType::Create(
                             {pir::PointerType::Create(pir::IntType::Create(8, false))},
@@ -545,8 +544,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                     pir_builder->VariableLikedNormalize(ir_call->Input(i)->pir_value)));
             }
 
-            ir_call->pir_value =
-                pir_builder->Create<pir::Call>(ir_call->Operator()->pir_value, pir_arguments);
+            ir_call->pir_value = pir_builder->Call(ir_call->Operator()->pir_value, pir_arguments);
 
             // TODO: warlaround
             auto ir_operator_type = ir_call->Operator()->GetOperatorType();
@@ -588,7 +586,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                    return pir_builder->Create<pir::AccessField>(
                                        pir_async_parameter_deference, pir_field);
                                });
-                pir_builder->Create<pir::Call>(ir_call->Operator()->pir_value, pir_inner_arguments);
+                pir_builder->Call(ir_call->Operator()->pir_value, pir_inner_arguments);
                 this->PirFree(pir_builder->Create<pir::AccessField>(
                     pir_async_parameter_deference,
                     *std::next(pir_fields.begin(), grid_argument_index)));
@@ -627,16 +625,15 @@ class PrajnaCodegen : public galois::ir::Visitor {
             auto pir_i64_type = pir::IntType::Create(64, true);
             auto pir_function_type = pir::FunctionType::Create(
                 {pir_i64_type, pir_i64_type, pir_i64_type}, pir::VoidType::Create());
-            pir_builder->Create<pir::Call>(
-                pir_builder->GetIntrinsic("thpool_add_work", pir_function_type),
-                std::list<std::shared_ptr<pir::Value>>{
-                    this->pir_thpool,
-                    pir_builder->Create<pir::CastInstruction>(
-                        pir::CastInstruction::Operation::PtrToInt, pir_async_function,
-                        pir_i64_type),
-                    pir_builder->Create<pir::CastInstruction>(
-                        pir::CastInstruction::Operation::PtrToInt, pir_async_args_struct,
-                        pir_i64_type)});
+            pir_builder->Call(pir_builder->GetIntrinsic("thpool_add_work", pir_function_type),
+                              std::list<std::shared_ptr<pir::Value>>{
+                                  this->pir_thpool,
+                                  pir_builder->Create<pir::CastInstruction>(
+                                      pir::CastInstruction::Operation::PtrToInt, pir_async_function,
+                                      pir_i64_type),
+                                  pir_builder->Create<pir::CastInstruction>(
+                                      pir::CastInstruction::Operation::PtrToInt,
+                                      pir_async_args_struct, pir_i64_type)});
         }
     }
 
@@ -647,8 +644,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         auto llvm_intrinsic_name =
             "llvm." + ir_intrinsic->intrinsic_name + "." + pir_operand_type->name;
         auto pir_intrinsic = pir_builder->GetIntrinsic(llvm_intrinsic_name, pir_intrinsic_type);
-        ir_intrinsic->pir_value =
-            pir_builder->Create<pir::Call>(pir_intrinsic, ir_operand->pir_value);
+        ir_intrinsic->pir_value = pir_builder->Call(pir_intrinsic, ir_operand->pir_value);
     }
 
     void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) override {
@@ -675,18 +671,16 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                       pir::PointerType::Create(pir::IntType::Create(8, false)));
         auto pir_malloc = pir_builder->GetIntrinsic("malloc", pir_function_type);
         return pir_builder->Create<pir::BitCast>(
-            pir_builder->Create<pir::Call>(pir_malloc,
-                                           pir_builder->GetInt64Constant(pir_type->bytes)),
+            pir_builder->Call(pir_malloc, pir_builder->GetInt64Constant(pir_type->bytes)),
             pir::PointerType::Create(pir_type));
     }
 
     void PirFree(std::shared_ptr<pir::Value> pir_value) {
         auto pir_function_type = pir::FunctionType::Create(
             {pir::PointerType::Create(pir::IntType::Create(8, false))}, pir::VoidType::Create());
-        pir_builder->Create<pir::Call>(
-            pir_builder->GetIntrinsic("free", pir_function_type),
-            pir_builder->Create<pir::BitCast>(
-                pir_value, pir::PointerType::Create(pir::IntType::Create(8, false))));
+        pir_builder->Call(pir_builder->GetIntrinsic("free", pir_function_type),
+                          pir_builder->Create<pir::BitCast>(
+                              pir_value, pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
 
    public:
