@@ -8,6 +8,8 @@
 #include "prajna/jit/execution_engine.h"
 #include "thpool.h"
 
+inline float relu(float x) { return std::fmaxf(0.0f, x); }
+
 namespace galois::jit {
 
 class Engine {
@@ -37,6 +39,9 @@ class Engine {
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(free), "free");
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(auto_aligned_alloc),
                                                    "auto_aligned_alloc");
+
+        /// TODO: 这里后面需要重构, 名字里不应该带llvm前缀
+        prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(relu), "llvm.relu.f32");
         return prajna_compiler;
     }
 

@@ -625,6 +625,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::io::LoadBinary> ir_load_binary) override {
+        this->EmitType(ir_load_binary->type);
         std::ifstream ifs(ir_load_binary->filename, std::ios::binary);
         GALOIS_ASSERT(ifs.good());
         auto p_data = auto_aligned_alloc(ir_load_binary->type->bytes);
