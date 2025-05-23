@@ -50,9 +50,6 @@ class Engine {
                 codegen::cpu::PrajnaCodegen::Create(prajna_compiler->_symbol_table);
             prajna_codegen->EmitOperator(ir_operator);
             prajna_compiler->GenLlvm(prajna_codegen->pir_builder->module);
-
-            transform::Each<ir::Tensor>(
-                ir_operator, [&](std::shared_ptr<ir::Tensor> ir_tensor) { ir_tensor->Detach(); });
         }
 
         GALOIS_ASSERT(ir_operator->pir_value->llvm_value);

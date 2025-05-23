@@ -143,8 +143,6 @@ inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
 
     auto parent = Lock(ir_grid->parent_block);
     parent->remove(ir_grid);
-
-    ir_grid->Finalize();
 }
 
 class NeonGemmTilePolicy {

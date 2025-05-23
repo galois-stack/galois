@@ -35,20 +35,6 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     Tensor() {}
 
    public:
-    /// @brief 释放不必要的依赖, 解除循环引用
-    virtual void Detach() {
-        // 只是解除依赖, 不是销毁数据,
-        this->instruction_with_index_list.clear();
-        this->parent_block.reset();  // 安全清空 weak_ptr
-    }
-
-    /// @brief 实例需要销毁前调用
-    virtual void Finalize() {
-        GALOIS_ASSERT(this->instruction_with_index_list.size() == 0);
-        this->Detach();
-        this->is_finalized = true;
-    }
-
     std::shared_ptr<Block> ParentBlock() {
         if (auto parent = this->parent_block.lock()) {
             return Cast<Tensor>(parent)->ParentBlock();
@@ -121,20 +107,6 @@ class Instruction : virtual public Tensor {
         if (ir_value)
             ir_value->instruction_with_index_list.push_back(
                 {Cast<Instruction>(this->shared_from_this()), i});
-    }
-
-    void Finalize() override {
-        Tensor::Finalize();
-
-        for (int64_t i = 0; i < OperandSize(); ++i) {
-            auto ir_old_value = this->operands[i];
-            if (ir_old_value) {
-                ir_old_value->instruction_with_index_list.remove(
-                    {Cast<Instruction>(this->shared_from_this()), i});
-            }
-        }
-
-        this->OperandResize(0);
     }
 
    protected:

@@ -8,8 +8,6 @@ class Constant : public Tensor {
    public:
     virtual ~Constant() {}
 
-    void Detach() override { this->instruction_with_index_list.clear(); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Constant>(this->shared_from_this()));
     }
