@@ -22,6 +22,7 @@ add_executable(galois_test
     flatten_test.cpp
     transpose_test.cpp
     sigmoid_test.cpp
+    free_after_last_use_test.cpp
 )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
