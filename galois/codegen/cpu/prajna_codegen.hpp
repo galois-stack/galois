@@ -80,6 +80,14 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_indices->pir_value = pir_builder->Create<pir::LocalVariable>(ir_indices->type->pir_type);
     }
 
+    void Visit(std::shared_ptr<ir::Block> ir_block) override {
+        pir_builder->CreateAndPushBlock();
+        for (auto ir_tensor : *ir_block) {
+            ir_tensor->ApplyVisitor(this->shared_from_this());
+        }
+        pir_builder->PopBlock();
+    }
+
     void Visit(std::shared_ptr<ir::Grid> ir_grid) override {
         GALOIS_ASSERT(!ir_grid->pir_value);
         this->grid_stack.push(ir_grid);
@@ -126,9 +134,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                       ir_grid->index->pir_value, pir_builder->GetInt64Constant(i)));
         }
 
-        for (auto ir_tensor : *ir_grid->block) {
-            ir_tensor->ApplyVisitor(this->shared_from_this());
-        }
+        ir_grid->block->ApplyVisitor(this->shared_from_this());
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
             pir_builder->PopBlock();
@@ -181,18 +187,8 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ++pir_function_parameters_iter;
         }
 
-        // for (int64_t i = 0; i < ir_operator->output_types.size();
-        //      ++i, ++pir_function_parameters_iter) {
-        //     ir_operator->outputs[i]->pir_value =
-        //         pir_builder->Create<pir::DeferencePointer>(*pir_function_parameters_iter);
-        //     (*pir_function_parameters_iter)->no_alias = true;
-        //     (*pir_function_parameters_iter)->no_capture = true;
-        //     (*pir_function_parameters_iter)->no_undef = true;
-        // }
-
-        for (auto ir_tensor : *ir_operator->block) {
-            ir_tensor->ApplyVisitor(this->shared_from_this());
-        }
+        //
+        ir_operator->block->ApplyVisitor(shared_from_this());
 
         pir_builder->ReturnVoid();
     }
