@@ -30,7 +30,6 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<Operator> ir_operator) override {
-        Indent();
         output << "operator " << ir_operator->name << "(";
         for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
             if (i > 0) {
@@ -40,36 +39,32 @@ class IRPrinter : public ir::Visitor {
                    << GetVariableName(ir_operator->inputs[i]);
         }
 
-        output << ")->" << ir_operator->GetOperatorType()->output_type->name << " {\n";
-
-        indent_level++;
+        output << ")->" << ir_operator->GetOperatorType()->output_type->name << "\n";
         ir_operator->block->ApplyVisitor(this->shared_from_this());
-        indent_level--;
-
-        Indent();
-        output << "}\n";
     }
 
     void Visit(std::shared_ptr<Block> ir_block) override {
+        this->Indent();
+        output << "{\n";
+        ++indent_level;
         for (auto& tensor : *ir_block) {
-            // 调试信息使用
-            // output << "                        ; Visiting: " << tensor->tag << "\n";
+            this->Indent();
             tensor->ApplyVisitor(this->shared_from_this());
         }
+        --indent_level;
+        this->Indent();
+        output << "}\n";
     }
 
     void Visit(std::shared_ptr<Alloca> ir_alloca) override {
-        Indent();
         output << GetVariableName(ir_alloca) << " = Alloca " << ir_alloca->type->name << ";\n";
     }
 
     void Visit(std::shared_ptr<Free> ir_free) override {
-        Indent();
         output << "Free " << GetVariableName(ir_free->Tensor()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Grid> ir_grid) override {
-        Indent();
         output << "grid [";
         for (int i = 0; i < ir_grid->shape.size(); ++i) {
             if (i > 0) {
@@ -77,36 +72,26 @@ class IRPrinter : public ir::Visitor {
             }
             output << ir_grid->shape[i];
         }
-        output << "] {\n";
+        output << "]\n";
 
-        indent_level++;
         ir_grid->block->ApplyVisitor(this->shared_from_this());
-        indent_level--;
-
-        Indent();
-        output << "}\n";
     }
 
     void Visit(std::shared_ptr<Accessor> ir_accessor) override {
-        Indent();
         output << GetVariableName(ir_accessor) << " = Accessor "
                << GetVariableName(ir_accessor->Tensor()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Write> ir_write) override {
-        Indent();
         output << "Write " << GetVariableName(ir_write->Tensor()) << ", "
                << GetVariableName(ir_write->Variable()) << ";\n";
     }
 
     void Visit(std::shared_ptr<Return> ir_return) override {
-        Indent();
         output << "return " << GetVariableName(ir_return->Tensor()) << ";\n";
     }
 
     void Visit(std::shared_ptr<ArithmeticInstruction> ir_arith) override {
-        Indent();
-
         std::string op;
         switch (ir_arith->operation) {
             case galois::ir::ArithmeticInstruction::Add:
@@ -128,19 +113,16 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ConstantFloat> ir_constant_float) override {
-        Indent();
         output << GetVariableName(ir_constant_float) << " = "
                << TypeToString(ir_constant_float->type) << " " << ir_constant_float->value << ";\n";
     }
 
     void Visit(std::shared_ptr<ConstantInt> ir_constant_int) override {
-        Indent();
         output << GetVariableName(ir_constant_int) << " = " << TypeToString(ir_constant_int->type)
                << " " << ir_constant_int->value << ";\n";
     }
 
     void Visit(std::shared_ptr<Call> ir_call) override {
-        Indent();
         output << GetVariableName(ir_call) << " = Call @" << ir_call->Operator()->name << "(";
         for (int64_t i = 0; i < ir_call->InputSize(); ++i) {
             if (i > 0) output << ", ";
@@ -150,7 +132,6 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<UnaryIntrinsic> ir_unary_intrinsic) override {
-        Indent();
         output << GetVariableName(ir_unary_intrinsic) << " = " << ir_unary_intrinsic->intrinsic_name
                << " " << TypeToString(ir_unary_intrinsic->type) << " "
                << GetVariableName(ir_unary_intrinsic->Operand()) << ";\n";
