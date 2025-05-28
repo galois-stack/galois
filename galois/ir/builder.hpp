@@ -69,8 +69,7 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return {ir_grid, std::move(scope_guard)};
     }
 
-    std::tuple<std::shared_ptr<Block>, std::unique_ptr<ScopeGuard>> CreateBlock(
-        Eigen::VectorXi64 shape) {
+    std::tuple<std::shared_ptr<Block>, std::unique_ptr<ScopeGuard>> CreateBlock() {
         auto ir_block = this->Create<Block>();
         this->block_stack.push(ir_block);
         this->iterator_stack.push(ir_block->end());

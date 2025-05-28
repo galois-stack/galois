@@ -106,6 +106,7 @@ class DecreaseVisitor : public ir::Visitor {
 
    private:
     static void FreeTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
+        //  在这里实现一个“由后向前遍历的”的visitor, 然后找到最后一次使用的地方插入
         auto ir_parent_block = Lock(ir_tensor->parent_block);
         auto ir_free = ir::Free::Create(ir_tensor);
         ir_free->parent_block = ir_parent_block;
@@ -224,6 +225,10 @@ class ReferenceCountVisitor : public ir::Visitor {
         // 进入Block时, 需要增加Tensor的引用计数
         for (auto ir_tensor : *ir_block) {
             ir_tensor->ApplyVisitor(this->increase_visitor);
+        }
+
+        for (auto ir_tensor : *ir_block) {
+            ir_tensor->ApplyVisitor(shared_from_this());
         }
 
         // 推出Block时, 需要减少Tensor的引用计数
