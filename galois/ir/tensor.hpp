@@ -360,19 +360,6 @@ class Grid : public Tensor {
     bool unroll_grid = false;
 };
 
-class PthreadBlock : public Block {
-   public:
-    static std::shared_ptr<PthreadBlock> Create() {
-        std::shared_ptr<PthreadBlock> self(new PthreadBlock);
-        self->tag = "PthreadBlock";
-        return self;
-    }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<PthreadBlock>(this->shared_from_this()));
-    }
-};
-
 class Call : public Instruction {
    protected:
     Call() = default;

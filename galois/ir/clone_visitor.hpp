@@ -113,13 +113,6 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_return] = ir_new;
     }
 
-    void Visit(std::shared_ptr<PthreadBlock> ir_pthread_block) override {
-        if (tensor_dict.count(ir_pthread_block)) {
-            return;
-        }
-        GALOIS_UNIMPLEMENT;
-    }
-
     void Visit(std::shared_ptr<Write> ir_write) override {
         if (tensor_dict.count(ir_write)) {
             return;

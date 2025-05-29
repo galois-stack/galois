@@ -15,7 +15,6 @@ class Alloca;
 class Free;
 class Return;
 class Prefetch;
-class PthreadBlock;
 class Write;
 class VectorBroadcast;
 class Call;
@@ -53,7 +52,6 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::Free> ir_free) {}
     virtual void Visit(std::shared_ptr<ir::Return> ir_return) {}
     virtual void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) {}
-    virtual void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) {}
     virtual void Visit(std::shared_ptr<ir::Write> ir_write) {}
     virtual void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) {}
     virtual void Visit(std::shared_ptr<ir::Call> ir_call) {}

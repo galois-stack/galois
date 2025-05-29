@@ -624,10 +624,6 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_intrinsic->pir_value = pir_builder->Call(pir_intrinsic, ir_operand->pir_value);
     }
 
-    void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) override {
-        auto ir_captured_tensors = transform::CaptureExternalTensors(ir_pthread_block);
-    }
-
     void Visit(std::shared_ptr<ir::io::LoadBinary> ir_load_binary) override {
         std::ifstream ifs(ir_load_binary->filename, std::ios::binary);
         GALOIS_ASSERT(ifs.good());

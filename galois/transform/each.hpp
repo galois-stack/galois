@@ -46,9 +46,6 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::Free> ir_free) override { this->callback(ir_free); }
     void Visit(std::shared_ptr<ir::Return> ir_return) override { this->callback(ir_return); }
     void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override { this->callback(ir_prefetch); }
-    void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) override {
-        this->callback(ir_pthread_block);
-    }
     void Visit(std::shared_ptr<ir::Write> ir_write) override { this->callback(ir_write); }
     void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) override {
         this->callback(ir_vector_broadcast);

@@ -81,17 +81,6 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return {ir_block, std::move(scope_guard)};
     }
 
-    std::tuple<std::shared_ptr<PthreadBlock>, std::unique_ptr<ScopeExit>> CreatePthreadBlock() {
-        auto ir_pthread_block = Cast<PthreadBlock>(this->Create<PthreadBlock>());
-        this->block_stack.push(ir_pthread_block);
-        this->iterator_stack.push(ir_pthread_block->end());
-        auto scope_guard = ScopeExit::Create([&]() {
-            this->block_stack.pop();
-            this->iterator_stack.pop();
-        });
-        return {ir_pthread_block, std::move(scope_guard)};
-    }
-
     std::tuple<std::shared_ptr<Operator>, std::unique_ptr<ScopeExit>> CreateOperator(
         std::shared_ptr<OperatorType> ir_operator_type, std::string name) {
         auto ir_operator = Operator::Create(ir_operator_type);
