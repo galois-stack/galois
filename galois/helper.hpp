@@ -25,15 +25,15 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-class ScopeGuard {
+class ScopeExit {
    public:
-    static std::unique_ptr<ScopeGuard> Create(std::function<void()> func) {
-        auto self = std::unique_ptr<ScopeGuard>(new ScopeGuard);
+    static std::unique_ptr<ScopeExit> Create(std::function<void()> func) {
+        auto self = std::unique_ptr<ScopeExit>(new ScopeExit);
         self->_todo = func;
         return self;
     }
 
-    ~ScopeGuard() {
+    ~ScopeExit() {
         if (_todo) {
             _todo();
         }

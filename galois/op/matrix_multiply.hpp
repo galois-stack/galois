@@ -271,7 +271,7 @@ class MatrixMultiplyCreator : public BinaryCreator {
 
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector3i64(
             ir_mat_a->type->shape[0], ir_mat_a->type->shape[1], ir_mat_b->type->shape[1]));
-        // std::unique_ptr<ScopeGuard> pthread_block_scope;
+        // std::unique_ptr<ScopeExit> pthread_block_scope;
         // ir_grid->enable_multi_thread = ir_mat_a->type->enable_multi_thread;
         ir_grid->unroll_grid = ir_mat_a->type->unroll_grid;
 

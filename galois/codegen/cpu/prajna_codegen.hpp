@@ -91,9 +91,9 @@ class PrajnaCodegen : public galois::ir::Visitor {
     void Visit(std::shared_ptr<ir::Grid> ir_grid) override {
         GALOIS_ASSERT(!ir_grid->pir_value);
         this->grid_stack.push(ir_grid);
-        auto guard = ScopeGuard::Create([=]() { this->grid_stack.pop(); });
+        auto guard = ScopeExit::Create([=]() { this->grid_stack.pop(); });
 
-        std::unique_ptr<ScopeGuard> thread_guard;
+        std::unique_ptr<ScopeExit> thread_guard;
         if (ir_grid->enable_multi_thread) {
             auto pir_thread_num = pir_builder->GetInt32Constant(12);
             auto pir_i32_function_type_i64 = pir::FunctionType::Create(
@@ -104,7 +104,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             this->pir_thpool = pir_thread_pool;
             auto pir_i64_function_type = pir::FunctionType::Create({pir::IntType::Create(64, true)},
                                                                    pir::VoidType::Create());
-            thread_guard = std::move(ScopeGuard::Create([=]() {
+            thread_guard = std::move(ScopeExit::Create([=]() {
                 pir_builder->Call(pir_builder->GetIntrinsic("thpool_wait", pir_i64_function_type),
                                   pir_thread_pool);
                 pir_builder->Call(
@@ -143,7 +143,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
         this->operator_stack.push(ir_operator);
-        auto gurad = ScopeGuard::Create([=]() { this->operator_stack.pop(); });
+        auto gurad = ScopeExit::Create([=]() { this->operator_stack.pop(); });
         std::list<std::shared_ptr<pir::Type>> pir_parameter_types;
         for (auto ir_input_type : ir_operator->GetOperatorType()->ir_input_types) {
             pir_parameter_types.push_back(pir::PointerType::Create(this->EmitType(ir_input_type)));
@@ -171,7 +171,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_operator->pir_value = ir_operator->pir_function;
 
         pir_builder->CreateTopBlockForFunction(ir_operator->pir_function);
-        auto prajna_guard = ScopeGuard::Create([=]() {
+        auto prajna_guard = ScopeExit::Create([=]() {
             pir_builder->PopBlock();
             pir_builder->function_stack.pop();
         });
