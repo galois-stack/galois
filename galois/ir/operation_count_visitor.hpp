@@ -74,8 +74,6 @@ class OperationCounter : public ir::Visitor {
         return block_operation_count;
     }
 
-    void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) override {}
-
     void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vbroadcast) override {}
 
     void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {}

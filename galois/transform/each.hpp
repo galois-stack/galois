@@ -53,9 +53,6 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) override {
         this->callback(ir_vector_broadcast);
     }
-    void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) override {
-        this->callback(ir_broadcast);
-    }
     void Visit(std::shared_ptr<ir::Call> ir_call) override { this->callback(ir_call); }
     void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
         this->callback(ir_unary_intrinsic);

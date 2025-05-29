@@ -18,7 +18,6 @@ class Prefetch;
 class PthreadBlock;
 class Write;
 class VectorBroadcast;
-class Broadcast;
 class Call;
 class UnaryIntrinsic;
 class GridIndex;
@@ -57,7 +56,6 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::PthreadBlock> ir_pthread_block) {}
     virtual void Visit(std::shared_ptr<ir::Write> ir_write) {}
     virtual void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) {}
-    virtual void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) {}
     virtual void Visit(std::shared_ptr<ir::Call> ir_call) {}
     virtual void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) {}
     virtual void Visit(std::shared_ptr<ir::Viewer> ir_viewer) {}

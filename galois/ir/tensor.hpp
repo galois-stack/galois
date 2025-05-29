@@ -226,32 +226,6 @@ class Prefetch : public Instruction {
     }
 };
 
-class Broadcast : public Instruction {
-   protected:
-    Broadcast() = default;
-
-   public:
-    static std::shared_ptr<Broadcast> Create(std::shared_ptr<Tensor> ir_value,
-                                             Eigen::VectorXi64 shape) {
-        std::shared_ptr<Broadcast> self(new Broadcast);
-        self->shape = shape;
-        self->OperandResize(1);
-        self->Tensor(ir_value);
-        self->type = TensorType::Create(ir_value->type, shape);
-        self->tag = "Broadcast";
-        return self;
-    }
-
-    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_value) { this->SetOperand(0, ir_value); }
-
-    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<Broadcast>(this->shared_from_this()));
-    }
-
-    Eigen::VectorXi64 shape;
-};
-
 /// @brief For liked fmla.4s v2, v0, v1[0] instruction
 class VectorBroadcast : public Instruction {
    protected:

@@ -357,25 +357,6 @@ class PrajnaCodegen : public galois::ir::Visitor {
         pir_arguments.push_back(pir_builder->GetInt32Constant(1));
         pir_builder->Call(pir_prefetch_function, pir_arguments);
     }
-    void Visit(std::shared_ptr<ir::Broadcast> ir_broadcast) override {
-        ir_broadcast->Tensor()->ApplyVisitor(this->shared_from_this());
-        this->EmitType(ir_broadcast->type);
-
-        std::list<std::shared_ptr<pir::Constant>> prajna_constant_zero_list;
-        for (int64_t i = 0; i < ir_broadcast->type->Size(); ++i) {
-            prajna_constant_zero_list.push_back(pir_builder->GetInt32Constant(0));
-        }
-        auto pir_constant_vector_zero_mask = pir_builder->Create<pir::ConstantVector>(
-            prajna::Cast<pir::VectorType>(ir_broadcast->type->pir_type), prajna_constant_zero_list);
-
-        auto pir_vector_tmp = pir_builder->Create<pir::LocalVariable>(ir_broadcast->type->pir_type);
-        pir_builder->Create<pir::WriteVariableLiked>(
-            ir_broadcast->Tensor()->pir_value,
-            pir_builder->Create<pir::IndexArray>(pir_vector_tmp, pir_builder->GetInt64Constant(0)));
-
-        ir_broadcast->pir_value =
-            pir_builder->Create<pir::ShuffleVector>(pir_vector_tmp, pir_constant_vector_zero_mask);
-    }
 
     void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) override {
         this->EmitType(ir_vector_broadcast->type);
