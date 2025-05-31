@@ -338,7 +338,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir::VoidType::Create());
             pir_prefetch_function = pir::Function::Create(pir_llvm_prefetch_function_type);
             pir_prefetch_function->fullname = "llvm.prefetch";
-            pir_prefetch_function->parent_module = pir_builder->module;
+            pir_prefetch_function->parent = pir_builder->module;
             pir_builder->module->functions.push_back(pir_prefetch_function);
         }
 
