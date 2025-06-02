@@ -37,7 +37,7 @@ TEST(GaloisTests, TestUnaryIntrinsic) {
 
     float input = 3.1415f / 2.0f;
     auto value = *sin_fun(&input);
-    fmt::print("sin(3.1415) = {}\n", value);
+    fmt::print("sin({}) = {}\n", input, value);
 }
 
 TEST(GaloisTests, TestUnaryIntrinsic3x3) {
