@@ -247,6 +247,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ir_arithmetic_instruction->GetOperand(1)->pir_value);
     }
     void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) override {
+        this->EmitType(ir_constant_int->type);
         ir_constant_int->pir_value = pir_builder->Create<pir::ConstantInt>(
             ir_constant_int->type->pir_type, ir_constant_int->value);
         return;
@@ -255,6 +256,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::ConstantFloat> ir_constant_float) override {
+        this->EmitType(ir_constant_float->type);
         ir_constant_float->pir_value = pir_builder->Create<pir::ConstantFloat>(
             ir_constant_float->type->pir_type, ir_constant_float->value);
         return;
@@ -636,6 +638,69 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir::CastInstruction::Operation::IntToPtr,
                 pir_builder->GetInt64Constant(reinterpret_cast<int64_t>(p_data)),
                 pir::PointerType::Create(ir_load_binary->type->pir_type)));
+    }
+
+    void Visit(std::shared_ptr<ir::amx::TileLoad> ir_tile_load) override {
+        auto pir_tile_load_intrinsic = pir_builder->GetIntrinsic(
+            "llvm.x86.tileloadd64",
+            pir::FunctionType::Create(
+                {ir_tile_load->TileRegisterId()->type->pir_type,
+                 pir::PointerType::Create(ir_tile_load->Matrix()->type->pir_type),
+                 ir_tile_load->Stride()->type->pir_type},
+                pir::VoidType::Create()));
+        ir_tile_load->pir_value = pir_builder->Call(
+            pir_tile_load_intrinsic,
+            std::list<std::shared_ptr<pir::Value>>{
+                ir_tile_load->TileRegisterId()->pir_value,
+                pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::DeferencePointer>(ir_tile_load->Matrix()->pir_value)),
+                ir_tile_load->Stride()->pir_value});
+    }
+
+    void Visit(std::shared_ptr<ir::amx::TileStore> ir_tile_store) override {
+        auto pir_tile_store_intrinsic = pir_builder->GetIntrinsic(
+            "llvm.x86.tilestored64",
+            pir::FunctionType::Create(
+                {ir_tile_store->TileRegisterId()->type->pir_type,
+                 pir::PointerType::Create(ir_tile_store->Matrix()->type->pir_type),
+                 ir_tile_store->Stride()->type->pir_type},
+                pir::VoidType::Create()));
+        ir_tile_store->pir_value = pir_builder->Call(
+            pir_tile_store_intrinsic,
+            std::list<std::shared_ptr<pir::Value>>{
+                ir_tile_store->TileRegisterId()->pir_value,
+                pir_builder->Create<pir::GetAddressOfVariableLiked>(
+                    prajna::Cast<pir::DeferencePointer>(ir_tile_store->Matrix()->pir_value)),
+                ir_tile_store->Stride()->pir_value});
+    }
+
+    void Visit(std::shared_ptr<ir::amx::TileProduct> ir_tile_product) override {
+        auto pir_tile_store_intrinsic = pir_builder->GetIntrinsic(
+            "llvm.x86.tdpbssd",
+        pir::FunctionType::Create({
+                ir_tile_product->MatrixC()->type->pir_type,
+                ir_tile_product->MatrixA()->type->pir_type,
+                ir_tile_product->MatrixB()->type->pir_type},
+                pir::VoidType::Create()));
+        ir_tile_product->pir_value = pir_builder->Call(
+            pir_tile_store_intrinsic,
+            std::list<std::shared_ptr<pir::Value>>{
+            ir_tile_product->MatrixC()->pir_value,
+               ir_tile_product->MatrixA()->pir_value,
+               ir_tile_product->MatrixB()->pir_value});
+    }
+
+    void Visit(std::shared_ptr<ir::amx::LoadTileConfig> ir_load_tile_config) override {
+        auto pir_load_tile_config_intrinsic = pir_builder->GetIntrinsic(
+            "InitTileConfig", pir::FunctionType::Create({}, pir::VoidType::Create()));
+        ir_load_tile_config->pir_value =
+            pir_builder->Call(pir_load_tile_config_intrinsic);
+    }
+
+    void Visit(std::shared_ptr<ir::amx::TileRelease> ir_tile_release) override {
+        auto pir_tile_release_intrinsic = pir_builder->GetIntrinsic(
+            "llvm.x86.tilerelease", pir::FunctionType::Create({}, pir::VoidType::Create()));
+        ir_tile_release->pir_value = pir_builder->Call(pir_tile_release_intrinsic);
     }
 
     std::shared_ptr<pir::Value> PirNew(std::shared_ptr<pir::Type> pir_type) {

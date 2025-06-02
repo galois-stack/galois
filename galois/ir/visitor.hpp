@@ -1,6 +1,7 @@
 #pragma once
 
-#include "tensor.hpp"
+#include <memory>
+
 namespace galois::ir {
 
 class Tensor;
@@ -37,6 +38,14 @@ namespace io {
 class LoadBinary;
 }
 
+namespace amx {
+class TileLoad;
+class TileStore;
+class TileProduct;
+class LoadTileConfig;
+class TileRelease;
+}  // namespace amx
+
 class Visitor : public std::enable_shared_from_this<Visitor> {
    public:
     virtual void Visit(std::shared_ptr<ir::Tensor> ir_tensor) {}
@@ -69,6 +78,11 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) {}
     virtual void Visit(std::shared_ptr<ir::ConstantFloat> ir_constant_float) {}
     virtual void Visit(std::shared_ptr<ir::io::LoadBinary> ir_load_binary) {}
+    virtual void Visit(std::shared_ptr<ir::amx::TileLoad> ir_tile_load) {}
+    virtual void Visit(std::shared_ptr<ir::amx::TileStore> ir_tile_store) {}
+    virtual void Visit(std::shared_ptr<ir::amx::TileProduct> ir_tile_product) {}
+    virtual void Visit(std::shared_ptr<ir::amx::LoadTileConfig> ir_load_tile_config) {}
+    virtual void Visit(std::shared_ptr<ir::amx::TileRelease> ir_tile_release) {}
 };
 
 }  // namespace galois::ir

@@ -8,6 +8,28 @@
 #include "prajna/jit/execution_engine.h"
 #include "thpool.h"
 
+#include <immintrin.h>
+
+struct tile_config {
+    uint8_t palette_id;  // 配置模式:0 1
+    uint8_t start_row;
+    uint8_t reserved_0[14];
+    uint16_t colsb[16];  // 每个 tile 的列字节数
+    uint8_t rows[16];    // 每个 tile 的行数
+};
+
+inline void InitTileConfig() {
+    tile_config tileinfo{};
+    tileinfo.palette_id = 1;
+    tileinfo.start_row = 0;
+    for (int i = 0; i < 8; ++i) {
+        tileinfo.colsb[i] = 64;
+        tileinfo.rows[i] = 16;
+    }
+    _tile_loadconfig(&tileinfo);
+}
+
+
 namespace galois::jit {
 
 class Engine {
@@ -18,6 +40,7 @@ class Engine {
     static std::shared_ptr<Engine> Create() {
         std::shared_ptr<Engine> self(new Engine);
         self->prajna_compiler = Engine::CreatePrajnaCompiler();
+
         return self;
     }
 
@@ -37,6 +60,8 @@ class Engine {
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(free), "free");
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(auto_aligned_alloc),
                                                    "auto_aligned_alloc");
+        prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(InitTileConfig),
+                                                   "InitTileConfig");
         return prajna_compiler;
     }
 
