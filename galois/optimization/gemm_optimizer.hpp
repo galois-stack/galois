@@ -22,7 +22,7 @@ class NativeCpuInfo {
         cpuinfo_initialize();
         // 检测指令集并推断 SIMD 寄存器数量和位宽
         self->DetectCpuFeatures();
-        self->cache_sizes.resize(2);
+        self->DetectCacheSizes();
         return self;
     }
 
@@ -88,6 +88,37 @@ class NativeCpuInfo {
         }
     }
 
+    void DetectCacheSizes() {
+        cache_sizes.clear();
+
+        // 获取所有缓存级别
+        const struct cpuinfo_cache* l1i = cpuinfo_get_l1i_cache(0);
+        const struct cpuinfo_cache* l1d = cpuinfo_get_l1d_cache(0);
+        const struct cpuinfo_cache* l2 = cpuinfo_get_l2_cache(0);
+        const struct cpuinfo_cache* l3 = cpuinfo_get_l3_cache(0);
+
+        // 添加 L1 指令和数据缓存（通常大小相同，取其一）
+        if (l1d) {
+            cache_sizes.push_back(l1d->size);
+        } else if (l1i) {
+            cache_sizes.push_back(l1i->size);
+        } else {
+            cache_sizes.push_back(0);
+        }
+
+        if (l2) {
+            cache_sizes.push_back(l2->size);
+        } else {
+            cache_sizes.push_back(0);
+        }
+
+        if (l3) {
+            cache_sizes.push_back(l3->size);
+        } else {
+            cache_sizes.push_back(0);
+        }
+    }
+
     int64_t simd_register_count = 0;
     int64_t simd_bits = 0;
     std::vector<int64_t> cache_sizes;
@@ -145,6 +176,43 @@ inline void UnrollGrid(std::shared_ptr<ir::Grid> ir_grid) {
     parent->remove(ir_grid);
 }
 
+inline std::tuple<int64_t, int64_t, int64_t> EstimateBlockingSizes(
+    std::shared_ptr<ir::TensorType> ir_data_type, std::shared_ptr<NativeCpuInfo> cpu_info,
+    int64_t mr, int64_t nr) {
+    int64_t bytes = ir_data_type->bytes;
+
+    // 读取 cache 层级大小
+    int64_t l1_size = cpu_info->GetCacheSize(0);  // L1
+    int64_t l2_size = cpu_info->GetCacheSize(1);  // L2
+    int64_t l3_size = cpu_info->GetCacheSize(2);  // L3
+
+    // 1. 求 kc ： kc × nr × element_size ≈ l1_cache_size
+    int64_t kc = l1_size / (nr * bytes);
+    kc = std::max<int64_t>(kc, 32);  // 防止除以0或过小
+
+    // 2. 求 mc： mc × kc × element_size ≈ l2_cache_size
+    int64_t mc = (l2_size * 0.5) / (kc * bytes);
+    mc = std::max<int64_t>(mc, 4);
+
+    // 3. 求 nc ： kc × nc × element_size ≈ l3_cache_size
+    int64_t nc = (l3_size * 0.25) / (kc * bytes);
+    nc = std::max<int64_t>(nc, 4);
+
+    // 调整以确保值合理（考虑对齐或硬件约束）
+    // 将 mc, nc, kc 调整为 SIMT lanes 的倍数
+    int64_t simd_lanes = (cpu_info->SimdBits() / 8) / bytes;
+    mc = (mc + simd_lanes - 1) / simd_lanes * simd_lanes;
+    nc = (nc + simd_lanes - 1) / simd_lanes * simd_lanes;
+    kc = (kc + simd_lanes - 1) / simd_lanes * simd_lanes;
+
+    // 设置最大值
+    mc = std::min<int64_t>(mc, 1024);
+    nc = std::min<int64_t>(nc, 1024);
+    kc = std::min<int64_t>(kc, 1024);
+
+    return {mc, nc, kc};
+}
+
 class NeonGemmTilePolicy {
    public:
     static std::shared_ptr<NeonGemmTilePolicy> Create() {
@@ -168,8 +236,8 @@ class NeonGemmTilePolicy {
         z3_optimize.add(z3_register_tile_cols > 0);
         z3_optimize.add(z3_register_tile_rows <= z3_register_tile_cols);  // 我们不需要镜像的解
         // z3_register_tile_rows + z3_register_tile_cols : 行和列的寄存器都需要保留，
-        // 这样才能复用数据 z3_register_tile_rows * z3_register_tile_cols * int32_t(simd_lanes)：
-        // 用于存储外积的结果
+        // 这样才能复用数据 z3_register_tile_rows * z3_register_tile_cols *
+        // int32_t(simd_lanes)： 用于存储外积的结果
         z3_optimize.add(z3_register_tile_rows + z3_register_tile_cols +
                             z3_register_tile_rows * z3_register_tile_cols * simd_lanes <
                         simd_register_count);
@@ -189,8 +257,11 @@ class NeonGemmTilePolicy {
         auto [kernel_tile_rows, kernel_tile_cols] =
             this->GetKernelTileShape(ir_data_type, cpu_info);
 
-        auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
+        auto [mc, nc, kc] =
+            EstimateBlockingSizes(ir_data_type, cpu_info, kernel_tile_rows, kernel_tile_cols);
+        auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, kc)->Tile(mc, 1);
+        auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(kc, 1)->Tile(1, nc);
+
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::NeonMatrixMultiplyKernel::Create(
                                    cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
@@ -237,8 +308,11 @@ class AvxGemmTilePolicy {
         auto kernel_tile_rows = z3_model.eval(z3_kernel_tile_rows).get_numeral_int64();
         auto kernel_tile_cols = z3_model.eval(z3_kernel_tile_cols).get_numeral_int64();
 
-        auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
-        auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
+        auto [mc, nc, kc] =
+            EstimateBlockingSizes(ir_data_type, cpu_info, kernel_tile_rows, kernel_tile_cols);
+        auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, kc)->Tile(mc, 1);
+        auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(kc, 1)->Tile(1, nc);
+        // fmt::print("tensor_type:{}", ir_tile_mat_type_a->name);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::AvxMatrixMultiplyKernel::Create(
                                    cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
