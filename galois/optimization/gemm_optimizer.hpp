@@ -186,16 +186,16 @@ inline std::tuple<int64_t, int64_t, int64_t> EstimateBlockingSizes(
     int64_t l2_size = cpu_info->GetCacheSize(1);  // L2
     int64_t l3_size = cpu_info->GetCacheSize(2);  // L3
 
-    // 1. 求 kc ： kc × nr × element_size ≈ l1_cache_size
-    int64_t kc = l1_size / (nr * bytes);
+    // 1. 求 kc ： kc × mr × bytes ≈ l1_cache_size
+    int64_t kc = (l1_size * 0.25) / (mr * bytes);
     kc = std::max<int64_t>(kc, 32);  // 防止除以0或过小
 
-    // 2. 求 mc： mc × kc × element_size ≈ l2_cache_size
-    int64_t mc = (l2_size * 0.5) / (kc * bytes);
+    // 2. 求 mc： mc × kc x mr × bytes ≈ l2_cache_size
+    int64_t mc = (l2_size * 0.5) / (kc * mr * bytes);
     mc = std::max<int64_t>(mc, 4);
 
-    // 3. 求 nc ： kc × nc × element_size ≈ l3_cache_size
-    int64_t nc = (l3_size * 0.25) / (kc * bytes);
+    // 3. 求 nc ： kc × nc x nr × bytes ≈ l3_cache_size
+    int64_t nc = (l3_size * 0.25) / (kc * nr * bytes);
     nc = std::max<int64_t>(nc, 4);
 
     // 调整以确保值合理（考虑对齐或硬件约束）
@@ -312,7 +312,9 @@ class AvxGemmTilePolicy {
             EstimateBlockingSizes(ir_data_type, cpu_info, kernel_tile_rows, kernel_tile_cols);
         auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, kc)->Tile(mc, 1);
         auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(kc, 1)->Tile(1, nc);
-        // fmt::print("tensor_type:{}", ir_tile_mat_type_a->name);
+        // auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4,
+        // 1); auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32,
+        // 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::AvxMatrixMultiplyKernel::Create(
                                    cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
