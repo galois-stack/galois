@@ -10,7 +10,12 @@
 #include "galois/transform/transform.hpp"
 
 namespace galois::optimization {
-
+struct L1CacheInfo {
+    int64_t total_size;     // 总容量 = NL1 × CL1 × WL1 字节
+    int64_t associativity;  // WL1: set associativity，几路相联（如 4、6、8）
+    int64_t sets;           // NL1: cache sets 数量
+    int64_t line_size;      // CL1: 每条 cache line 大小（字节）
+};
 class NativeCpuInfo {
    public:
     enum Simd { None = 0, SSE, SSE2, AVX, AVX2, AVX512, AMX, NEON, SVE, SME };
@@ -30,7 +35,7 @@ class NativeCpuInfo {
     int64_t SimdRegisterCount() { return this->simd_register_count; }
     int64_t CacheLevel() { return cache_sizes.size(); }
     int64_t GetCacheSize(int64_t level) { return cache_sizes[level]; }
-
+    L1CacheInfo GetL1CacheInfo() { return l1_cache_info; }
     Simd simd;
 
    private:
@@ -97,13 +102,19 @@ class NativeCpuInfo {
         const struct cpuinfo_cache* l2 = cpuinfo_get_l2_cache(0);
         const struct cpuinfo_cache* l3 = cpuinfo_get_l3_cache(0);
 
+        const cpuinfo_cache* l1 = l1d ? l1d : l1i;
         // 添加 L1 指令和数据缓存（通常大小相同，取其一）
-        if (l1d) {
-            cache_sizes.push_back(l1d->size);
-        } else if (l1i) {
-            cache_sizes.push_back(l1i->size);
+        if (l1) {
+            cache_sizes.push_back(l1->size);
+
+            l1_cache_info.total_size = l1->size;
+            l1_cache_info.associativity = l1->associativity;
+            l1_cache_info.sets = l1->sets;
+            l1_cache_info.line_size = l1->line_size;
+
         } else {
             cache_sizes.push_back(0);
+            l1_cache_info = {0, 0, 0, 0};
         }
 
         if (l2) {
@@ -122,6 +133,7 @@ class NativeCpuInfo {
     int64_t simd_register_count = 0;
     int64_t simd_bits = 0;
     std::vector<int64_t> cache_sizes;
+    L1CacheInfo l1_cache_info;
 };
 
 inline std::vector<Eigen::VectorXi64> GenerateIndexGrid(Eigen::VectorXi64 shape) {
@@ -184,20 +196,30 @@ inline std::tuple<int64_t, int64_t, int64_t> EstimateBlockingSizes(
     // 读取 cache 层级大小
     int64_t l1_size = cpu_info->GetCacheSize(0);  // L1
     int64_t l2_size = cpu_info->GetCacheSize(1);  // L2
-    int64_t l3_size = cpu_info->GetCacheSize(2);  // L3
 
-    // 1. 求 kc ： kc × mr × bytes ≈ l1_cache_size
-    double alpha = 0.5;
-    int64_t kc = (l1_size * alpha) / ((mr + nr) * bytes);
-    kc = std::max<int64_t>(kc, 32);  // 防止除以0或过小
+    auto l1 = cpu_info->GetL1CacheInfo();
+    auto NL1 = l1.sets;           // sets 包含多个缓存行
+    auto CL1 = l1.line_size;      // 缓存行大小
+    auto WL1 = l1.associativity;  // set associativity，几路相联（如 4、6、8）
+
+    // 1. 求 kc ：from paper :Analytical Models for the BLIS Framework #4.33
+    // 最大 CAr: micro-panel A 在每个 cache set 中占用的 cache lines
+    double frac = static_cast<double>(nr) / mr;
+    int64_t CAr_max = static_cast<int64_t>(std::floor((WL1 - 1) / (1.0 + frac)));
+    if (CAr_max <= 0) CAr_max = 1;
+
+    // kc = (CAr * NL1 * CL1) / (mr * bytes)
+    // 即：kc= 总缓存字节数被A占用的部分 / A的一列占多少字节
+    int64_t kc = (CAr_max * NL1 * CL1) / (mr * bytes);
+    kc = std::max<int64_t>(kc, 32);  // 避免过小
 
     // 2. 求 mc： mc × kc x mr × bytes ≈ l2_cache_size
-    double alpha1 = 0.25;
+    double alpha1 = 0.3;
     int64_t mc = (l2_size * alpha1) / (kc * mr * bytes);
     mc = std::max<int64_t>(mc, 4);
 
-    // 3. 求 nc ： kc × nc x nr × bytes ≈ l3_cache_size
-    double alpha2 = 0.25;
+    // 3. 求 nc ： kc × nc x nr × bytes ≈ l2_cache_size
+    double alpha2 = 0.3;
     int64_t nc = (l2_size * alpha2) / (kc * nr * bytes);
     nc = std::max<int64_t>(nc, 4);
 
@@ -316,8 +338,9 @@ class AvxGemmTilePolicy {
             EstimateBlockingSizes(ir_data_type, cpu_info, kernel_tile_rows, kernel_tile_cols);
         auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, kc)->Tile(mc, 1);
         auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(kc, 1)->Tile(1, nc);
-        // auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4, 1);
-        // auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32, 1)->Tile(1, 4);
+        // auto ir_tile_mat_type_a = ir_data_type->Tile(kernel_tile_rows, 1)->Tile(1, 32)->Tile(4,
+        // 1); auto ir_tile_mat_type_b = ir_data_type->Tile(1, kernel_tile_cols)->Tile(32,
+        // 1)->Tile(1, 4);
         return std::make_tuple(ir_tile_mat_type_a, ir_tile_mat_type_b,
                                op::AvxMatrixMultiplyKernel::Create(
                                    cpu_info->SimdBits(), kernel_tile_rows, kernel_tile_cols));
