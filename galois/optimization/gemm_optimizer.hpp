@@ -187,23 +187,27 @@ inline std::tuple<int64_t, int64_t, int64_t> EstimateBlockingSizes(
     int64_t l3_size = cpu_info->GetCacheSize(2);  // L3
 
     // 1. 求 kc ： kc × mr × bytes ≈ l1_cache_size
-    int64_t kc = (l1_size * 0.5) / ((mr + nr) * bytes);
+    double alpha = 0.5;
+    int64_t kc = (l1_size * alpha) / ((mr + nr) * bytes);
     kc = std::max<int64_t>(kc, 32);  // 防止除以0或过小
 
     // 2. 求 mc： mc × kc x mr × bytes ≈ l2_cache_size
-    int64_t mc = (l2_size * 0.25) / (kc * mr * bytes);
+    double alpha1 = 0.25;
+    int64_t mc = (l2_size * alpha1) / (kc * mr * bytes);
     mc = std::max<int64_t>(mc, 4);
 
     // 3. 求 nc ： kc × nc x nr × bytes ≈ l3_cache_size
-    int64_t nc = (l2_size * 0.25) / (kc * nr * bytes);
+    double alpha2 = 0.25;
+    int64_t nc = (l2_size * alpha2) / (kc * nr * bytes);
     nc = std::max<int64_t>(nc, 4);
 
     // 调整以确保值合理（考虑对齐或硬件约束）
     // 将 mc, nc, kc 调整为 SIMT lanes 的倍数
     int64_t simd_lanes = (cpu_info->SimdBits() / 8) / bytes;
-    mc = (mc + simd_lanes - 1) / simd_lanes * simd_lanes;
-    nc = (nc + simd_lanes - 1) / simd_lanes * simd_lanes;
-    kc = (kc + simd_lanes - 1) / simd_lanes * simd_lanes;
+    auto align_up = [=](int64_t v) { return (v + simd_lanes - 1) / simd_lanes * simd_lanes; };
+    mc = align_up(mc);
+    nc = align_up(nc);
+    kc = align_up(kc);
 
     // 设置最大值
     mc = std::min<int64_t>(mc, 1024);
