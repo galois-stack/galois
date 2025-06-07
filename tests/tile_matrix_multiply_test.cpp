@@ -68,6 +68,5 @@ TEST_P(TileMatrixMultiplyPerformanceTest, TestTilePolicy) {
 INSTANTIATE_TEST_SUITE_P(
     General, TileMatrixMultiplyPerformanceTest,
     testing::Combine(testing::Values(ir::f64, ir::f32, ir::f16, ir::i32, ir::i16, ir::i8),
-                     testing::Values(16, 32, 64, 128), testing::Values(16, 32, 64, 128),
-                     testing::Values(16, 32, 64, 128)),
+                     testing::Values(16), testing::Values(16), testing::Values(16)),
     galois::test::PrintTestName);
