@@ -471,13 +471,15 @@ class UnaryIntrinsic : public Instruction {
 
    public:
     static std::shared_ptr<UnaryIntrinsic> Create(std::string intrinsic_name,
-                                                  std::shared_ptr<Tensor> ir_oprand) {
+                                                  std::shared_ptr<Tensor> ir_oprand,
+                                                  bool llvm_prefix = true) {
         GALOIS_ASSERT(intrinsic_name.size());
         std::shared_ptr<UnaryIntrinsic> self(new UnaryIntrinsic);
         self->OperandResize(1);
         self->intrinsic_name = intrinsic_name;
         self->SetOperand(0, ir_oprand);
         self->type = ir_oprand->type;
+        self->llvm_prefix = llvm_prefix;
         self->tag = "UnaryIntrinsic";
         return self;
     }
@@ -491,6 +493,7 @@ class UnaryIntrinsic : public Instruction {
 
    public:
     std::string intrinsic_name;
+    bool llvm_prefix;
 };
 
 class Builder;

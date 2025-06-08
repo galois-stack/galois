@@ -618,9 +618,11 @@ class PrajnaCodegen : public galois::ir::Visitor {
         auto ir_operand = ir_intrinsic->GetOperand(0);
         auto pir_operand_type = ir_operand->type->pir_type;
         auto pir_intrinsic_type = pir::FunctionType::Create({pir_operand_type}, pir_operand_type);
-        auto llvm_intrinsic_name =
-            "llvm." + ir_intrinsic->intrinsic_name + "." + pir_operand_type->name;
-        auto pir_intrinsic = pir_builder->GetIntrinsic(llvm_intrinsic_name, pir_intrinsic_type);
+        auto intrinsic_name = ir_intrinsic->intrinsic_name + "." + pir_operand_type->name;
+        if (ir_intrinsic->llvm_prefix) {
+            intrinsic_name = "llvm." + intrinsic_name;
+        }
+        auto pir_intrinsic = pir_builder->GetIntrinsic(intrinsic_name, pir_intrinsic_type);
         ir_intrinsic->pir_value = pir_builder->Call(pir_intrinsic, ir_operand->pir_value);
     }
 

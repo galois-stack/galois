@@ -34,7 +34,8 @@ TEST(GaloisTests, TestMnist) {
         ir_builder->Create<ir::io::LoadBinary>(ir_weights_type2, "tests/models/mnist/weight2.bin");
     // 第一层： 全连接 + relu
     auto ir_full1 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_input, ir_weight1});
-    auto ir_relu1 = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_full1}, "relu");
+    auto ir_relu1 =
+        ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_full1}, "relu", false);
     // 第二层： 全连接 + softmax
     auto ir_full2 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_relu1, ir_weight2});
     auto ir_squeeze_view = ir_builder->Create<ir::SqueezeView>(ir_full2);  // 这里的维度需要改成1

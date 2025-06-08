@@ -6,11 +6,13 @@ namespace galois::op {
 
 class UnaryInstrinsicCreator : public UnaryCreator {
    public:
-    static std::shared_ptr<UnaryInstrinsicCreator> Create(std::string intrinsic_name) {
+    static std::shared_ptr<UnaryInstrinsicCreator> Create(std::string intrinsic_name,
+                                                          bool llvm_prefix = true) {
         auto self = std::make_shared<UnaryInstrinsicCreator>();
         self->intrinsic_name = intrinsic_name;
         self->name = intrinsic_name;
         self->fullname = self->name;
+        self->llvm_prefix = llvm_prefix;
         return self;
     }
 
@@ -22,7 +24,8 @@ class UnaryInstrinsicCreator : public UnaryCreator {
     void ExpressInline(std::shared_ptr<ir::Tensor> ir_input, std::shared_ptr<ir::Tensor> ir_output,
                        std::shared_ptr<ir::Builder> ir_builder) override {
         if (ir_input->type->IsScalar()) {
-            auto ir_value = ir_builder->Create<ir::UnaryIntrinsic>(this->intrinsic_name, ir_input);
+            auto ir_value =
+                ir_builder->Create<ir::UnaryIntrinsic>(this->intrinsic_name, ir_input, llvm_prefix);
             ir_builder->Write(ir_value, ir_output);
         } else {
             auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_input->type->shape);
@@ -34,6 +37,7 @@ class UnaryInstrinsicCreator : public UnaryCreator {
 
    private:
     std::string intrinsic_name;
+    bool llvm_prefix;
 };
 
 }  // namespace galois::op
