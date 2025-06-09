@@ -194,10 +194,21 @@ class AvxMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
         auto ir_vec_bit_cast_b = ir_builder->BitCastView(ir_mat_b, ir_simd_type_b);
         auto ir_mat_bit_cast_c = ir_builder->BitCastView(ir_mat_c, ir_simd_type_b->Tile(lanes_a));
 
+        int64_t prefetch_distance = 4;  // 提前 4 次迭代
         for (int64_t i = 0; i < lanes_a; ++i) {
             auto ir_accessor_a = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
             ir_accessor_a->transform_matrix.resize(0, 0);
             ir_accessor_a->shift_vector[0] = i;
+            // 预取 A 的当前行
+            if (i % 4 == 0) {  // 每 4 次迭代预取一次，减少缓存污染
+                auto ir_prefetch_a = ir_builder->Create<galois::ir::Prefetch>(ir_accessor_a, 0, 3, 1);
+            }
+            if (i + prefetch_distance < lanes_a) {
+                auto ir_accessor_a_next = ir_builder->CreateAccessor(ir_vec_bit_cast_a);
+                ir_accessor_a_next->transform_matrix.resize(0, 0);
+                ir_accessor_a_next->shift_vector[0] = i + prefetch_distance;
+                auto ir_prefetch_a_next = ir_builder->Create<galois::ir::Prefetch>(ir_accessor_a_next, 0, 3, 1);
+            }
             auto ir_accessor_a_vector =
                 ir_builder->BitCastView(ir_accessor_a, ir_accessor_a->type->Tile(1));
             auto ir_vector_broadcast_a = ir_builder->Create<ir::VectorBroadcast>(
@@ -206,13 +217,28 @@ class AvxMatrixMultiplyKernel : public MatrixMultiplyMicroKernel {
                 auto ir_accessor_b = ir_builder->CreateAccessor(ir_vec_bit_cast_b);
                 ir_accessor_b->transform_matrix.resize(0, 0);
                 ir_accessor_b->shift_vector[0] = c;
-                auto ir_mul = ir_builder->Mul(ir_vector_broadcast_a, ir_accessor_b);
+                // 预取 B 的当前列
+                if (c % 4 == 0) {
+                    auto ir_prefetch_b = ir_builder->Create<galois::ir::Prefetch>(ir_accessor_b, 0, 3, 1);
+                }
+                // 预取 B 的下一列
+                if (c + prefetch_distance < ir_simd_type_b->shape[0]) {
+                    auto ir_accessor_b_next = ir_builder->CreateAccessor(ir_vec_bit_cast_b);
+                    ir_accessor_b_next->transform_matrix.resize(0, 0);
+                    ir_accessor_b_next->shift_vector[0] = c + prefetch_distance;
+                    auto ir_prefetch_b_next =
+                        ir_builder->Create<galois::ir::Prefetch>(ir_accessor_b_next, 0, 3, 1);
+                }
+
                 auto ir_accessor_c_row = ir_builder->CreateAccessor(ir_mat_bit_cast_c);
                 ir_accessor_c_row->transform_matrix.resize(0, 0);
                 ir_accessor_c_row->shift_vector[0] = i;
                 auto ir_accessor_c = ir_builder->CreateAccessor(ir_accessor_c_row);
                 ir_accessor_c->transform_matrix.resize(0, 0);
                 ir_accessor_c->shift_vector[0] = c;
+                auto ir_prefetch_c = ir_builder->Create<galois::ir::Prefetch>(ir_accessor_c, 1, 3, 1);
+
+                auto ir_mul = ir_builder->Mul(ir_vector_broadcast_a, ir_accessor_b);
                 auto ir_sum = ir_builder->Add(ir_mul, ir_accessor_c);
                 auto ir_write = ir_builder->Write(ir_sum, ir_accessor_c);
             }
