@@ -9,6 +9,8 @@
 #include "thpool.h"
 
 inline float relu(float x) { return std::fmaxf(0.0f, x); }
+inline float gelu(float x) { 
+    return 0.5f * x * (1.0f + std::tanh(std::sqrt(0.63661977236f) * (x + 0.044715f * x * x * x))); }
 
 namespace galois::jit {
 
@@ -42,6 +44,7 @@ class Engine {
 
         /// TODO: 这里后面需要重构, 名字里不应该带llvm前缀
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(relu), "relu.f32");
+prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(gelu), "gelu.f32");
         return prajna_compiler;
     }
 
