@@ -23,6 +23,7 @@ add_executable(galois_test
     transpose_test.cpp
     sigmoid_test.cpp
     mnist_test.cpp
+    relu_test.cpp
 )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
