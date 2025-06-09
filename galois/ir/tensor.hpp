@@ -207,10 +207,14 @@ class ArithmeticInstruction : public Instruction {
 
 class Prefetch : public Instruction {
    public:
-    static std::shared_ptr<Prefetch> Create(std::shared_ptr<ir::Accessor> ir_address) {
+    static std::shared_ptr<Prefetch> Create(std::shared_ptr<ir::Accessor> ir_address, int64_t rw,
+                                            int64_t locality, int64_t cache_type) {
         std::shared_ptr<Prefetch> self(new Prefetch);
         self->OperandResize(1);
         self->Address(ir_address);
+        self->rw = rw;
+        self->locality = locality;
+        self->cache_type = cache_type;
         self->tag = "Prefetch";
         return self;
     }
@@ -224,6 +228,10 @@ class Prefetch : public Instruction {
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Prefetch>(this->shared_from_this()));
     }
+
+    int64_t rw;          // 读(0)或写(1)
+    int64_t locality;    // 时间局部性  0（无局部性）到 3（极高局部性）
+    int64_t cache_type;  // 缓存类型 (0: 指令缓存, 1: 数据缓存)
 };
 
 /// @brief For liked fmla.4s v2, v0, v1[0] instruction

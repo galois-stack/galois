@@ -352,9 +352,9 @@ class PrajnaCodegen : public galois::ir::Visitor {
         specifies whether the prefetch is performed on the data (1) or
         instruction (0) cache. The ``rw``, ``locality`` and ``cache type``
         arguments must be constant integers.*/
-        pir_arguments.push_back(pir_builder->GetInt32Constant(0));
-        pir_arguments.push_back(pir_builder->GetInt32Constant(0));
-        pir_arguments.push_back(pir_builder->GetInt32Constant(1));
+        pir_arguments.push_back(pir_builder->GetInt32Constant(ir_prefetch->rw));
+        pir_arguments.push_back(pir_builder->GetInt32Constant(ir_prefetch->locality));
+        pir_arguments.push_back(pir_builder->GetInt32Constant(ir_prefetch->cache_type));
         pir_builder->Call(pir_prefetch_function, pir_arguments);
     }
 
