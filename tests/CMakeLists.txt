@@ -23,6 +23,8 @@ add_executable(galois_test
     transpose_test.cpp
     sigmoid_test.cpp
     mnist_test.cpp
+    relu_test.cpp
+    gelu_test.cpp
     copy_test.cpp
 )
 
