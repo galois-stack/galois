@@ -44,7 +44,7 @@ class Engine {
 
         /// TODO: 这里后面需要重构, 名字里不应该带llvm前缀
         prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(relu), "relu.f32");
-prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(gelu), "gelu.f32");
+        prajna_compiler->jit_engine->BindCFunction(reinterpret_cast<void *>(gelu), "gelu.f32");
         return prajna_compiler;
     }
 
