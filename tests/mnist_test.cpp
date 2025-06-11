@@ -19,8 +19,11 @@ TEST(GaloisTests, TestMnist) {
                                       "tests/data/mnist/t10k-labels-idx1-ubyte.bin");
 
     auto ir_builder = ir::Builder::Create();
-    auto [ir_operator, scope] = ir_builder->CreateOperator(
-        ir::OperatorType::Create({ir::f32->Tile(1, 28 * 28)}, ir::f32->Tile(10)), "mnist");
+    int64_t batch_size = 1;
+    auto [ir_operator, scope] =
+        ir_builder->CreateOperator(ir::OperatorType::Create({ir::f32->Tile(batch_size, 28 * 28)},
+                                                            ir::f32->Tile(batch_size, 10)),
+                                   "mnist");
     auto ir_input = ir_operator->inputs[0];
     int image_size = mnist_data_loader.rows * mnist_data_loader.cols;
     int hide_layer_size = 128;
@@ -38,8 +41,7 @@ TEST(GaloisTests, TestMnist) {
         ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_full1}, "relu", false);
     // 第二层： 全连接 + softmax
     auto ir_full2 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_relu1, ir_weight2});
-    auto ir_squeeze_view = ir_builder->Create<ir::SqueezeView>(ir_full2);  // 这里的维度需要改成1
-    auto ir_softmax = ir_builder->ExpressCreator<op::SoftmaxCreator>({ir_squeeze_view});  // softmax
+    auto ir_softmax = ir_builder->ExpressCreator<op::SoftmaxCreator>({ir_full2});  // softmax
     ir_builder->Create<ir::Return>(ir_softmax);
 
     // 生成 JIT 引擎
