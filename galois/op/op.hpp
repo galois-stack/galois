@@ -6,6 +6,7 @@
 #include "galois/op/flatten.hpp"
 #include "galois/op/full.hpp"
 #include "galois/op/matrix_multiply.hpp"
+#include "galois/op/normalize.hpp"
 #include "galois/op/pack.hpp"
 #include "galois/op/padding.hpp"
 #include "galois/op/sigmoid.hpp"
