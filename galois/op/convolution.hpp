@@ -4,7 +4,6 @@
 #include "galois/op/sum.hpp"
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/creator.hpp"
-#include "galois/op/unary_intrinsic.hpp"
 
 namespace galois::op {
 class ConvolutionCreator : public op::Creator {
@@ -26,6 +25,7 @@ class ConvolutionCreator : public op::Creator {
             out_shape[i] = (ir_input_types[0]->shape[i] + 2 * 0 - ir_input_types[1]->shape[i]) / 1 + 1;
             GALOIS_ASSERT( out_shape[i] <= ir_input_types[0]->shape[i] );
         }
+        GALOIS_ASSERT(out_shape.size() == 2);
         
         return ir::TensorType::Create(base_type->value_type, out_shape);
     }
@@ -34,6 +34,8 @@ class ConvolutionCreator : public op::Creator {
                  std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_output_type = this->InferType(ir::GetTensorTypes(ir_inputs));
         auto ir_output = ir_builder->Alloca(ir_output_type);
+        auto zero = ir_builder->GetZero(ir_output->type->DataType());
+        ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
         this->ExpressInline(ir_inputs, ir_output, ir_builder);
         ir_builder->Return(ir_output);
     }
@@ -47,54 +49,33 @@ class ConvolutionCreator : public op::Creator {
         auto input_shape = ir_act->type->shape;
         auto kernel_shape = ir_weight->type->shape;
         auto output_shape = ir_output->type->shape;
-        auto zero = ir_builder->GetZero(ir_output->type->DataType());
-        ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
 
-        for (int i = 0; i < output_shape[0]; ++i) {
-            for (int j = 0; j < output_shape[1]; ++j) {
-                
-                auto output_accessor = ir_builder->CreateAccessor(ir_output);
-                output_accessor->transform_matrix.resize(0, 0);
-                output_accessor->shift_vector[0] = i;
-                output_accessor->shift_vector[1] = j;
+        auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector4i64(
+            output_shape[0], output_shape[1], kernel_shape[0], kernel_shape[1]));
 
-                for (int ki = 0; ki < kernel_shape[0]; ++ki) {
-                    for (int kj = 0; kj < kernel_shape[1]; ++kj) {
-                        int input_i = i + ki;
-                        int input_j = j + kj;
+        auto output_accessor = ir_builder->CreateAccessor(ir_output);
+        output_accessor->transform_matrix(0, 0) = 1;
+        output_accessor->transform_matrix(1, 1) = 1;
 
-                        auto input_accessor = ir_builder->CreateAccessor(ir_act);
-                        input_accessor->transform_matrix.resize(0, 0);
-                        input_accessor->shift_vector[0] = input_i;
-                        input_accessor->shift_vector[1] = input_j;
-                        GALOIS_ASSERT(input_accessor->type->IsScalar());
+        auto input_accessor = ir_builder->CreateAccessor(ir_act);
+        input_accessor->transform_matrix(0, 0) = 1;
+        input_accessor->transform_matrix(0, 2) = 1;
+        input_accessor->transform_matrix(1, 1) = 1;
+        input_accessor->transform_matrix(1, 3) = 1;
 
-                        auto kernel_accessor = ir_builder->CreateAccessor(ir_weight);
-                        kernel_accessor->transform_matrix.resize(0, 0);
-                        kernel_accessor->shift_vector[0] = ki;
-                        kernel_accessor->shift_vector[1] = kj;
-                        GALOIS_ASSERT(kernel_accessor->type->IsScalar());
+        auto kernel_accessor = ir_builder->CreateAccessor(ir_weight);
+        kernel_accessor->transform_matrix(0, 2) = 1;
+        kernel_accessor->transform_matrix(1, 3) = 1;
 
-                        auto mul_result = ir_builder->Mul(input_accessor, kernel_accessor);
-
-                        this->SumInline(output_accessor, mul_result, ir_builder);
-                    }
-                }
-            }
+        if(output_accessor->type->IsScalar()){
+            auto mul_result = ir_builder->Mul(input_accessor, kernel_accessor);
+            auto add_result = ir_builder->Add(output_accessor, mul_result);
+            ir_builder->Write(add_result, output_accessor);
+            return;
         }
-    }
 
-    void SumInline(std::shared_ptr<ir::Tensor> ir_output, std::shared_ptr<ir::Tensor> ir_input,
-                       std::shared_ptr<ir::Builder> ir_builder) {
-        if (ir_input->type->IsScalar()) {
-            auto ir_add = ir_builder->Add(ir_input, ir_output);
-            ir_builder->Write(ir_add, ir_output);
-        } else {
-            auto [ir_grid, scope_guard] = ir_builder->CreateGrid(ir_input->type->shape);
-            auto ir_accessor = ir_builder->CreateIdentityAccessor(ir_input);
-            this->SumInline(ir_accessor, ir_output, ir_builder);
-        }
+        this->ExpressInline({input_accessor, kernel_accessor}, output_accessor, ir_builder);
+        
     }
-
 };
 }  // namespace galois::op
