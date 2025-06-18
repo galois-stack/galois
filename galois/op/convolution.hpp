@@ -22,7 +22,8 @@ class ConvolutionCreator : public op::Creator {
         auto out_shape = base_type->shape;
         int64_t total = 0;
         for (size_t i = 0; i < out_shape.size(); ++i) {
-            out_shape[i] = (ir_input_types[0]->shape[i] + 2 * 0 - ir_input_types[1]->shape[i]) / 1 + 1;
+            // out_w = (in_w + 2*padding - kernel_size) / stride + 1
+            out_shape[i] = (ir_input_types[0]->shape[i] - ir_input_types[1]->shape[i]) + 1;
             GALOIS_ASSERT( out_shape[i] <= ir_input_types[0]->shape[i] );
         }
         GALOIS_ASSERT(out_shape.size() == 2);
