@@ -7,12 +7,8 @@ TEST(GaloisTests, TestStandardKVCache) {
     auto jit_engine = jit::Engine::Create();
     
     const int num_heads = 8;
-    const int head_dim = 64;
-    const int max_seq_len = 128;
-    
-    fmt::print("=== Standard KV Cache Implementation ===\n");
-    fmt::print("Configuration: {} heads × {} dim × {} max_seq_len\n", 
-               num_heads, head_dim, max_seq_len);
+    const int head_dim = 32;
+    const int max_seq_len = 64;
     
     // build complete KV Cache + Attention pipeline
     auto build_complete_kv_attention_pipeline = [&]() {
@@ -61,25 +57,31 @@ TEST(GaloisTests, TestStandardKVCache) {
         
         // Step 5: calculate attention scores Q @ K^T
         auto ir_attention_scores = ir_builder->CreateOperatorByCreator<op::MatrixMultiplyCreator>(
-            {ir_q_matrix->GetOperatorType()->output_type,    // [1, head_dim]
-             ir_k_transpose->GetOperatorType()->output_type}); // [head_dim, seq_len]
+            {ir_q_matrix->GetOperatorType()->output_type, ir_k_transpose->GetOperatorType()->output_type});
         // result: [1, seq_len]
-        
+
         // Step 6: attention weighted Attention @ V
         auto ir_attention_output = ir_builder->CreateOperatorByCreator<op::MatrixMultiplyCreator>(
-            {ir_attention_scores->GetOperatorType()->output_type,  // [1, seq_len]
-             ir_v_matrix->GetOperatorType()->output_type});        // [seq_len, head_dim]
+            {ir_attention_scores->GetOperatorType()->output_type, ir_v_matrix->GetOperatorType()->output_type});
         // result: [1, head_dim]
-        
+
+        // reshape attention output to 3D tensor [1, 1, head_dim]
+        Eigen::VectorXi64 attention_3d_shape(3);
+        attention_3d_shape << 1, 1, head_dim;
+        auto ir_attention_3d_type = ir::TensorType::Create(
+            ir_attention_output->type->value_type, attention_3d_shape);
+
+        auto ir_attention_3d = ir_builder->BitCastView(
+            ir_attention_output, ir_attention_3d_type);
+
         // Step 7: combine all outputs (updated_k, updated_v, attention_output)
         auto ir_k_v_combined = ir_builder->CreateOperatorByCreator<op::ConcatenateCreator>(
             {ir_updated_k->GetOperatorType()->output_type,
              ir_updated_v->GetOperatorType()->output_type}, 0);
-        
+
         auto ir_final_output = ir_builder->CreateOperatorByCreator<op::ConcatenateCreator>(
-            {ir_k_v_combined->GetOperatorType()->output_type,
-             ir_attention_output->GetOperatorType()->output_type}, 0);
-        
+            {ir_k_v_combined->GetOperatorType()->output_type, ir_attention_3d_type}, 0);
+
         return ir_final_output;
     };
     
@@ -122,25 +124,32 @@ TEST(GaloisTests, TestStandardKVCache) {
         
         // parse result
         current_seq_len = std::min(step + 1, max_seq_len);
-        int updated_k_size = num_heads * (current_seq_len + 1) * head_dim;
-        int updated_v_size = num_heads * (current_seq_len + 1) * head_dim;
-        int attention_output_size = 1 * head_dim;
+
+        int layer_size = (max_seq_len + 1) * head_dim; //size : 65 * 32 = 2080
+        int k_layers = num_heads;                      // 8 layers
+        int v_layers = num_heads;                      // 8 layers
+        int attention_layers = 1;                      // 1 layer for attention output
         
         // extract updated KV Cache
-        float* updated_k = result;
-        float* updated_v = result + updated_k_size;
-        float* attention_output = result + updated_k_size + updated_v_size;
-        
+        float* updated_k = result;                      // k: layers 0-7
+        float* updated_v = result + k_layers * layer_size; // v: layers 8-15
+        float* attention_output = result + (k_layers + v_layers) * layer_size; // attention output: layer 16
+
         // update local cache (only keep effective length)
         int effective_seq_len = std::min(current_seq_len + 1, max_seq_len);
         for (int h = 0; h < num_heads; h++) {
             for (int s = 0; s < effective_seq_len; s++) {
                 for (int d = 0; d < head_dim; d++) {
+                    // local cache index: based max_seq_len
                     int cache_idx = h * max_seq_len * head_dim + s * head_dim + d;
-                    int result_idx = h * effective_seq_len * head_dim + s * head_dim + d;
-                    if (result_idx < updated_k_size) {
-                        k_cache[cache_idx] = updated_k[result_idx];
-                        v_cache[cache_idx] = updated_v[result_idx];
+
+                    // result index: based on attention sequence length
+                    int k_result_idx = h * layer_size + s * head_dim + d;
+                    int v_result_idx = h * layer_size + s * head_dim + d;
+
+                    if(s < effective_seq_len && h < num_heads && d < head_dim) {
+                        k_cache[cache_idx] = updated_k[k_result_idx];
+                        v_cache[cache_idx] = updated_v[v_result_idx];
                     }
                 }
             }
@@ -150,11 +159,8 @@ TEST(GaloisTests, TestStandardKVCache) {
         fmt::print("Attention output: [{:.2f}, {:.2f}, {:.2f}, ...]\n", 
                    attention_output[0], attention_output[1], attention_output[2]);
         
-        fmt::print("✅ Step {} completed: seq_len = {}\n", step, effective_seq_len);
-        
         free(result);
     }
-    
     
     EXPECT_TRUE(true);
 }
