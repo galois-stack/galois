@@ -326,6 +326,40 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_accessor->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
     }
 
+    void Visit(std::shared_ptr<ir::Index> ir_index) override {
+        auto pir_linear_index = 
+            pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
+        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetInt64Constant(0),
+                                                     pir_linear_index);
+
+        // Add index vector offset
+        auto product = ir_index->Tensor()->type->stride * ir_index->index_vector;
+        pir_builder->Create<pir::WriteVariableLiked>(
+            pir_builder->Create<pir::BinaryOperator>(pir::BinaryOperator::Operation::Add,
+                                                     pir_linear_index,
+                                                     pir_builder->GetInt64Constant(product)),
+        pir_linear_index);
+        
+        auto pir_tensor_value_type = this->EmitType(ir_index->Tensor()->type->value_type);
+
+        auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
+            this->GetPrajnaPointerFromTensor(ir_index->Tensor()),
+            pir::PointerType::Create(pir_tensor_value_type));
+        ;
+        GALOIS_ASSERT(ir_index->Tensor()->type->value_type == ir_index->type);
+
+        auto pir_tensor_pointer_var =
+            pir_builder->Create<pir::LocalVariable>(pir_tensor_pointer->type);
+        pir_builder->Create<pir::WriteVariableLiked>(pir_tensor_pointer, pir_tensor_pointer_var);
+
+        auto pir_value_poitner = pir_builder->Create<pir::GetPointerElementPointer>(
+            pir_builder->Create<pir::GetAddressOfVariableLiked>(pir_tensor_pointer_var),
+            pir_linear_index);
+
+        ir_index->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
+        
+    }
+
     void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override {
         auto pir_address = pir_builder->GetAddressOf(ir_prefetch->Address()->pir_value);
 

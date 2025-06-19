@@ -24,6 +24,7 @@ class Call;
 class UnaryIntrinsic;
 class GridIndex;
 class Accessor;
+class Index;
 
 namespace view {
 class BitCast;
@@ -51,6 +52,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::Block> ir_block) {}
     virtual void Visit(std::shared_ptr<ir::Grid> ir_grid) {}
     virtual void Visit(std::shared_ptr<ir::Accessor> ir_accessor) {}
+    virtual void Visit(std::shared_ptr<ir::Index> ir_index) {}
     virtual void Visit(std::shared_ptr<ir::GridIndex> ir_grid_index) {}
     virtual void Visit(std::shared_ptr<ir::Instruction> ir_instruction) {}
     virtual void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) {}

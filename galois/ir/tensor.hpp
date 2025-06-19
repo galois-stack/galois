@@ -174,6 +174,50 @@ class Accessor : public Instruction {
     Eigen::VectorXi64 shift_vector;
 };
 
+class Index : public Instruction {
+   public:
+    static std::shared_ptr<Index> Create(std::shared_ptr<Tensor> ir_tensor,
+                                         Eigen::VectorXi64 index_vector) {
+        std::shared_ptr<Index> self(new Index);
+        self->OperandResize(1);
+        self->Tensor(ir_tensor);
+        self->index_vector = index_vector;
+        self->type = ir_tensor->type->value_type;
+        self->tag = "Index";
+        return self;
+    }
+
+    bool IsReaded() {
+        for (auto inst_with_index : this->instruction_with_index_list) {
+            if(!Is<Write>(inst_with_index.instruction) || inst_with_index.operand_index == 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool IsWritten() {
+        for (auto inst_with_index : this->instruction_with_index_list) {
+            if (Is<Write>(inst_with_index.instruction) && inst_with_index.operand_index == 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
+    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<Index>(this->shared_from_this()));
+    }
+
+   public:
+    Eigen::VectorXi64 index_vector;
+};
+
 class ArithmeticInstruction : public Instruction {
    public:
     enum Operation {
