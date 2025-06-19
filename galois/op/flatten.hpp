@@ -34,7 +34,7 @@ class FlattenCreator : public op::Creator {
                  std::shared_ptr<ir::Builder> ir_builder) override {
         GALOIS_ASSERT(ir_inputs.size() == 1);
         auto input = ir_inputs[0];
-        auto ir_flatten_view = ir_builder->Create<ir::FlattenView>(input);
+        auto ir_flatten_view = ir_builder->Create<ir::view::Flatten>(input);
         ir_builder->Return(ir_flatten_view);
     }
 };

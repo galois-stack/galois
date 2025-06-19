@@ -32,7 +32,7 @@ class StackCreator : public op::Creator {
                  std::shared_ptr<ir::Builder> ir_builder) override {
         std::vector<std::shared_ptr<ir::Tensor>> expanded_inputs;
         for (auto& input : ir_inputs) {
-            auto unsqueezed = ir_builder->Create<ir::UnsqueezeDimView>(input, dim);
+            auto unsqueezed = ir_builder->Create<ir::view::UnsqueezeDim>(input, dim);
             expanded_inputs.push_back(unsqueezed);
         }
         auto concat = op::ConcatenateCreator::Create(dim);

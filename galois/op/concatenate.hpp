@@ -52,7 +52,8 @@ class ConcatenateCreator : public op::Creator {
             Eigen::VectorXi64 out_slice_shape = input_shape;
             auto output_accessor = ir_builder->CreateAccessor(ir_output);
             output_accessor->shift_vector[dim] = offset;
-            auto output_slice = ir_builder->Create<ir::SliceView>(output_accessor, out_slice_shape);
+            auto output_slice =
+                ir_builder->Create<ir::view::Slice>(output_accessor, out_slice_shape);
             ir_builder->ExpressCreator<op::CopyCreator>({input, output_slice});
             offset += input_shape[dim];
         }

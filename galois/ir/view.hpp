@@ -2,19 +2,19 @@
 
 #include "galois/ir/tensor.hpp"
 
-namespace galois::ir {
+namespace galois::ir::view {
 
-class BitCastView : public Instruction {
+class BitCast : public Instruction {
    public:
-    static std::shared_ptr<BitCastView> Create(std::shared_ptr<Tensor> ir_value,
-                                               std::shared_ptr<TensorType> ir_type) {
+    static std::shared_ptr<BitCast> Create(std::shared_ptr<Tensor> ir_value,
+                                           std::shared_ptr<TensorType> ir_type) {
         GALOIS_ASSERT(ir_type);
-        std::shared_ptr<BitCastView> self(new BitCastView);
+        std::shared_ptr<BitCast> self(new BitCast);
         GALOIS_ASSERT(ir_value->type->bytes == ir_type->bytes);
         self->OperandResize(1);
         self->Tensor(ir_value);
         self->type = ir_type;
-        self->tag = "BitCastView";
+        self->tag = "BitCast";
         return self;
     }
 
@@ -22,7 +22,7 @@ class BitCastView : public Instruction {
     void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<BitCastView>(this->shared_from_this()));
+        interpreter->Visit(Cast<BitCast>(this->shared_from_this()));
     }
 };
 
@@ -68,12 +68,12 @@ class Viewer : public Instruction {
     std::shared_ptr<Tensor> ir_tensor = nullptr;
 };
 
-class SliceView : public Instruction {
+class Slice : public Instruction {
    public:
-    static std::shared_ptr<SliceView> Create(std::shared_ptr<Accessor> ir_origin,
-                                             Eigen::VectorXi64 shape) {
+    static std::shared_ptr<Slice> Create(std::shared_ptr<Accessor> ir_origin,
+                                         Eigen::VectorXi64 shape) {
         GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
-        std::shared_ptr<SliceView> self(new SliceView);
+        std::shared_ptr<Slice> self(new Slice);
         self->OperandResize(1);
         self->Origin(ir_origin);
         self->shape = shape;
@@ -81,7 +81,7 @@ class SliceView : public Instruction {
         auto stride = ir_origin->Tensor()->type->stride;
         GALOIS_ASSERT(ir_origin->Tensor()->type->value_type);
         self->type = ir::TensorType::Create(ir_origin->Tensor()->type->value_type, shape, stride);
-        self->tag = "SliceView";
+        self->tag = "Slice";
         return self;
     }
 
@@ -89,16 +89,16 @@ class SliceView : public Instruction {
     void Origin(std::shared_ptr<ir::Accessor> ir_accessor) { this->SetOperand(0, ir_accessor); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<SliceView>(this->shared_from_this()));
+        interpreter->Visit(Cast<Slice>(this->shared_from_this()));
     }
 
     Eigen::VectorXi64 shape;
 };
 
-class SqueezeDimView : public Instruction {
+class SqueezeDim : public Instruction {
    public:
-    static std::shared_ptr<SqueezeDimView> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
-        std::shared_ptr<SqueezeDimView> self(new SqueezeDimView);
+    static std::shared_ptr<SqueezeDim> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
+        std::shared_ptr<SqueezeDim> self(new SqueezeDim);
         self->OperandResize(1);
         self->Tensor(ir_tensor);
 
@@ -108,7 +108,7 @@ class SqueezeDimView : public Instruction {
         RemoveColumn(stride, dim);
         self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
         self->dim = dim;
-        self->tag = "Squeeze";
+        self->tag = "SqueezeDim";
         return self;
     }
 
@@ -116,16 +116,16 @@ class SqueezeDimView : public Instruction {
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<SqueezeDimView>(this->shared_from_this()));
+        interpreter->Visit(Cast<SqueezeDim>(this->shared_from_this()));
     }
 
     int64_t dim;
 };
 
-class SqueezeView : public Instruction {
+class Squeeze : public Instruction {
    public:
-    static std::shared_ptr<SqueezeView> Create(std::shared_ptr<Tensor> ir_tensor) {
-        std::shared_ptr<SqueezeView> self(new SqueezeView);
+    static std::shared_ptr<Squeeze> Create(std::shared_ptr<Tensor> ir_tensor) {
+        std::shared_ptr<Squeeze> self(new Squeeze);
         self->OperandResize(1);
         self->Tensor(ir_tensor);
 
@@ -150,15 +150,14 @@ class SqueezeView : public Instruction {
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<SqueezeView>(this->shared_from_this()));
+        interpreter->Visit(Cast<Squeeze>(this->shared_from_this()));
     }
 };
 
-class UnsqueezeDimView : public Instruction {
+class UnsqueezeDim : public Instruction {
    public:
-    static std::shared_ptr<UnsqueezeDimView> Create(std::shared_ptr<Tensor> ir_tensor,
-                                                    int64_t dim) {
-        std::shared_ptr<UnsqueezeDimView> self(new UnsqueezeDimView);
+    static std::shared_ptr<UnsqueezeDim> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
+        std::shared_ptr<UnsqueezeDim> self(new UnsqueezeDim);
         self->OperandResize(1);
         self->Tensor(ir_tensor);
 
@@ -180,7 +179,7 @@ class UnsqueezeDimView : public Instruction {
 
         self->type = TensorType::Create(ir_tensor->type->value_type, shape, stride);
         self->dim = dim;
-        self->tag = "Unsqueeze";
+        self->tag = "UnsqueezeDim";
         return self;
     }
 
@@ -188,17 +187,17 @@ class UnsqueezeDimView : public Instruction {
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<UnsqueezeDimView>(this->shared_from_this()));
+        interpreter->Visit(Cast<UnsqueezeDim>(this->shared_from_this()));
     }
 
     int64_t dim;
 };
 
-class FlattenView : public Instruction {
+class Flatten : public Instruction {
    public:
-    static std::shared_ptr<FlattenView> Create(std::shared_ptr<Tensor> ir_tensor) {
+    static std::shared_ptr<Flatten> Create(std::shared_ptr<Tensor> ir_tensor) {
         GALOIS_ASSERT(ir_tensor);
-        std::shared_ptr<FlattenView> self(new FlattenView);
+        std::shared_ptr<Flatten> self(new Flatten);
         self->OperandResize(1);
         self->Tensor(ir_tensor);
 
@@ -215,7 +214,7 @@ class FlattenView : public Instruction {
         new_stride(0) = 1;
 
         self->type = TensorType::Create(ir_tensor->type->value_type, new_shape, new_stride);
-        self->tag = "FlattenView";
+        self->tag = "Flatten";
         return self;
     }
 
@@ -223,14 +222,14 @@ class FlattenView : public Instruction {
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<FlattenView>(this->shared_from_this()));
+        interpreter->Visit(Cast<Flatten>(this->shared_from_this()));
     }
 };
 
-class TransposeView : public Instruction {
+class Transpose : public Instruction {
    public:
-    static std::shared_ptr<TransposeView> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim0,
-                                                 int64_t dim1) {
+    static std::shared_ptr<Transpose> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim0,
+                                             int64_t dim1) {
         GALOIS_ASSERT(ir_tensor);
         const auto& old_shape = ir_tensor->type->shape;
         const auto& old_stride = ir_tensor->type->stride;
@@ -239,7 +238,7 @@ class TransposeView : public Instruction {
         GALOIS_ASSERT(dim1 >= 0 && dim1 < rank);
         GALOIS_ASSERT(dim0 != dim1);
 
-        std::shared_ptr<TransposeView> self(new TransposeView);
+        std::shared_ptr<Transpose> self(new Transpose);
         self->OperandResize(1);
         self->Tensor(ir_tensor);
         self->dim0 = dim0;
@@ -252,7 +251,7 @@ class TransposeView : public Instruction {
         std::swap(new_stride(dim0), new_stride(dim1));
 
         self->type = TensorType::Create(ir_tensor->type->value_type, new_shape, new_stride);
-        self->tag = "TransposeView";
+        self->tag = "Transpose";
         return self;
     }
 
@@ -260,11 +259,11 @@ class TransposeView : public Instruction {
     void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<TransposeView>(this->shared_from_this()));
+        interpreter->Visit(Cast<Transpose>(this->shared_from_this()));
     }
 
     int64_t dim0;
     int64_t dim1;
 };
 
-}  // namespace galois::ir
+}  // namespace galois::ir::view

@@ -41,8 +41,8 @@ class UnpackCreator : public UnaryCreator {
             auto ir_output_block_origin = ir_builder->CreateIdentityAccessor(ir_output);
             ir_output_block_origin->transform_matrix.diagonal().array() *=
                 input_block_normalize_shape.array();
-            auto ir_output_block = ir_builder->Create<ir::SliceView>(ir_output_block_origin,
-                                                                     input_block_normalize_shape);
+            auto ir_output_block = ir_builder->Create<ir::view::Slice>(ir_output_block_origin,
+                                                                       input_block_normalize_shape);
             this->ExpressInline(ir_input_block, ir_output_block, ir_builder);
         }
     }

@@ -27,7 +27,7 @@ class IncreaseVisitor : public ir::Visitor {
         }
     }
 
-    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {
         this->IncreaseViewInstruction(ir_bit_cast);
     }
 
@@ -49,31 +49,31 @@ class IncreaseVisitor : public ir::Visitor {
         this->IncreaseReferenceCount(ir_call);
     }
 
-    void Visit(std::shared_ptr<ir::Viewer> ir_viewer) override {
+    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {
         this->IncreaseViewInstruction(ir_viewer);
     }
 
-    void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
         this->IncreaseViewInstruction(ir_squeeze_dim_view);
     }
 
-    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) override {
         this->IncreaseViewInstruction(ir_unsqueeze_dim_view);
     }
 
-    void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {
+    void Visit(std::shared_ptr<ir::view::Slice> ir_slice_view) override {
         this->IncreaseViewInstruction(ir_slice_view);
     }
 
-    void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {
+    void Visit(std::shared_ptr<ir::view::Squeeze> ir_squeeze_view) override {
         this->IncreaseViewInstruction(ir_squeeze_view);
     }
 
-    void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {
+    void Visit(std::shared_ptr<ir::view::Flatten> ir_flatten_view) override {
         this->IncreaseViewInstruction(ir_flatten_view);
     }
 
-    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {
+    void Visit(std::shared_ptr<ir::view::Transpose> ir_transpose_view) override {
         this->IncreaseViewInstruction(ir_transpose_view);
     }
 
@@ -133,7 +133,7 @@ class DecreaseVisitor : public ir::Visitor {
         }
     }
 
-    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {
         this->DecreaseViewInstruction(ir_bit_cast);
     }
 
@@ -157,31 +157,31 @@ class DecreaseVisitor : public ir::Visitor {
         }
     }
 
-    void Visit(std::shared_ptr<ir::Viewer> ir_viewer) override {
+    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {
         this->DecreaseViewInstruction(ir_viewer);
     }
 
-    void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
         this->DecreaseViewInstruction(ir_squeeze_dim_view);
     }
 
-    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) override {
         this->DecreaseViewInstruction(ir_unsqueeze_dim_view);
     }
 
-    void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {
+    void Visit(std::shared_ptr<ir::view::Slice> ir_slice_view) override {
         this->DecreaseViewInstruction(ir_slice_view);
     }
 
-    void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {
+    void Visit(std::shared_ptr<ir::view::Squeeze> ir_squeeze_view) override {
         this->DecreaseViewInstruction(ir_squeeze_view);
     }
 
-    void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {
+    void Visit(std::shared_ptr<ir::view::Flatten> ir_flatten_view) override {
         this->DecreaseViewInstruction(ir_flatten_view);
     }
 
-    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {
+    void Visit(std::shared_ptr<ir::view::Transpose> ir_transpose_view) override {
         this->DecreaseViewInstruction(ir_transpose_view);
     }
 

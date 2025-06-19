@@ -39,7 +39,7 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) override {
         this->callback(ir_arithmetic_instruction);
     }
-    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {
         this->callback(ir_bit_cast);
     }
     void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override { this->callback(ir_alloca); }
@@ -54,23 +54,23 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
         this->callback(ir_unary_intrinsic);
     }
-    void Visit(std::shared_ptr<ir::Viewer> ir_viewer) override { this->callback(ir_viewer); }
-    void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override { this->callback(ir_viewer); }
+    void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
         this->callback(ir_squeeze_dim_view);
     }
-    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) override {
         this->callback(ir_unsqueeze_dim_view);
     }
-    void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {
+    void Visit(std::shared_ptr<ir::view::Slice> ir_slice_view) override {
         this->callback(ir_slice_view);
     }
-    void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {
+    void Visit(std::shared_ptr<ir::view::Squeeze> ir_squeeze_view) override {
         this->callback(ir_squeeze_view);
     }
-    void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {
+    void Visit(std::shared_ptr<ir::view::Flatten> ir_flatten_view) override {
         this->callback(ir_flatten_view);
     }
-    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {
+    void Visit(std::shared_ptr<ir::view::Transpose> ir_transpose_view) override {
         this->callback(ir_transpose_view);
     }
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {

@@ -78,7 +78,7 @@ class OperationCounter : public ir::Visitor {
     void Visit(std::shared_ptr<ir::GridIndex> ir_grid_index) override {}
     void Visit(std::shared_ptr<ir::Instruction> ir_instruction) override {}
 
-    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {}
+    void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {}
     void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override {}
     void Visit(std::shared_ptr<ir::Free> ir_free) override {}
     void Visit(std::shared_ptr<ir::Return> ir_return) override {}
@@ -86,13 +86,13 @@ class OperationCounter : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Write> ir_write) override {}
 
-    void Visit(std::shared_ptr<ir::Viewer> ir_viewer) override {}
-    void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {}
-    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {}
-    void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) override {}
-    void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {}
-    void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {}
-    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {}
+    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {}
+    void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {}
+    void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) override {}
+    void Visit(std::shared_ptr<ir::view::Slice> ir_slice_view) override {}
+    void Visit(std::shared_ptr<ir::view::Squeeze> ir_squeeze_view) override {}
+    void Visit(std::shared_ptr<ir::view::Flatten> ir_flatten_view) override {}
+    void Visit(std::shared_ptr<ir::view::Transpose> ir_transpose_view) override {}
 
    private:
     std::stack<int64_t> operation_count_stack;

@@ -36,8 +36,8 @@ TEST(GaloisTests, TestEmbedding) {
     slice_shape[0] = 1;
     slice_shape[1] = embed_dim;
 
-    auto ir_token_slice = ir_builder->Create<ir::SliceView>(ir_token_accessor, slice_shape);
-    auto ir_pos_slice = ir_builder->Create<ir::SliceView>(ir_pos_accessor, slice_shape);
+    auto ir_token_slice = ir_builder->Create<ir::view::Slice>(ir_token_accessor, slice_shape);
+    auto ir_pos_slice = ir_builder->Create<ir::view::Slice>(ir_pos_accessor, slice_shape);
 
     auto ir_result = ir_builder->ExpressCreator<op::AddCreator>({ir_token_slice, ir_pos_slice});
 

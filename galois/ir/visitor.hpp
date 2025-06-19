@@ -14,7 +14,6 @@ class Instruction;
 class ArithmeticInstruction;
 class Operator;
 class Input;
-class BitCastView;
 class Alloca;
 class Free;
 class Return;
@@ -24,14 +23,19 @@ class VectorBroadcast;
 class Call;
 class UnaryIntrinsic;
 class GridIndex;
-class Viewer;
-class SqueezeDimView;
-class UnsqueezeDimView;
-class SliceView;
-class FlattenView;
-class TransposeView;
 class Accessor;
-class SqueezeView;
+
+namespace view {
+class BitCast;
+class Viewer;
+class SqueezeDim;
+class UnsqueezeDim;
+class Slice;
+class Squeeze;
+class Flatten;
+class Transpose;
+}  // namespace view
+
 namespace io {
 class LoadBinary;
 }
@@ -50,7 +54,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::GridIndex> ir_grid_index) {}
     virtual void Visit(std::shared_ptr<ir::Instruction> ir_instruction) {}
     virtual void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) {}
-    virtual void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) {}
+    virtual void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) {}
     virtual void Visit(std::shared_ptr<ir::Alloca> ir_alloca) {}
     virtual void Visit(std::shared_ptr<ir::Free> ir_free) {}
     virtual void Visit(std::shared_ptr<ir::Return> ir_return) {}
@@ -59,13 +63,13 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) {}
     virtual void Visit(std::shared_ptr<ir::Call> ir_call) {}
     virtual void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) {}
-    virtual void Visit(std::shared_ptr<ir::Viewer> ir_viewer) {}
-    virtual void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) {}
-    virtual void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) {}
-    virtual void Visit(std::shared_ptr<ir::SliceView> ir_slice_view) {}
-    virtual void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) {}
-    virtual void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) {}
-    virtual void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) {}
+    virtual void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) {}
+    virtual void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) {}
+    virtual void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) {}
+    virtual void Visit(std::shared_ptr<ir::view::Slice> ir_slice_view) {}
+    virtual void Visit(std::shared_ptr<ir::view::Squeeze> ir_squeeze_view) {}
+    virtual void Visit(std::shared_ptr<ir::view::Flatten> ir_flatten_view) {}
+    virtual void Visit(std::shared_ptr<ir::view::Transpose> ir_transpose_view) {}
     virtual void Visit(std::shared_ptr<ir::Operator> ir_operator) {}
     virtual void Visit(std::shared_ptr<ir::io::LoadBinary> ir_load_binary) {}
 };

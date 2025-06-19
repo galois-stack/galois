@@ -375,7 +375,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ir_vector_broadcast->Vector()->pir_value, pir_constant_vector_lane_id_mask);
     }
 
-    void Visit(std::shared_ptr<ir::BitCastView> ir_bit_cast) override {
+    void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {
         this->EmitType(ir_bit_cast->type);
         ir_bit_cast->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
@@ -446,7 +446,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
 
-    void Visit(std::shared_ptr<ir::SliceView> ir_slice) override {
+    void Visit(std::shared_ptr<ir::view::Slice> ir_slice) override {
         this->EmitType(ir_slice->type);
 
         auto pir_pointer_type = pir::PointerType::Create(ir_slice->type->pir_type);
@@ -457,7 +457,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir_pointer_type));
     }
 
-    void Visit(std::shared_ptr<ir::SqueezeView> ir_squeeze_view) override {
+    void Visit(std::shared_ptr<ir::view::Squeeze> ir_squeeze_view) override {
         this->EmitType(ir_squeeze_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_squeeze_view->type->pir_type);
 
@@ -468,7 +468,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir_pointer_type));
     }
 
-    void Visit(std::shared_ptr<ir::SqueezeDimView> ir_squeeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
         this->EmitType(ir_squeeze_dim_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_squeeze_dim_view->type->pir_type);
 
@@ -479,7 +479,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir_pointer_type));
     }
 
-    void Visit(std::shared_ptr<ir::UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+    void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) override {
         this->EmitType(ir_unsqueeze_dim_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_unsqueeze_dim_view->type->pir_type);
 
@@ -490,7 +490,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir_pointer_type));
     }
 
-    void Visit(std::shared_ptr<ir::FlattenView> ir_flatten_view) override {
+    void Visit(std::shared_ptr<ir::view::Flatten> ir_flatten_view) override {
         this->EmitType(ir_flatten_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_flatten_view->type->pir_type);
 
@@ -501,7 +501,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 pir_pointer_type));
     }
 
-    void Visit(std::shared_ptr<ir::TransposeView> ir_transpose_view) override {
+    void Visit(std::shared_ptr<ir::view::Transpose> ir_transpose_view) override {
         this->EmitType(ir_transpose_view->type);
         auto pir_pointer_type = pir::PointerType::Create(ir_transpose_view->type->pir_type);
 

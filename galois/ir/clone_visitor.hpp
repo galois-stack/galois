@@ -78,12 +78,12 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_arithmetic_instruction] = ir_new;
     }
 
-    void Visit(std::shared_ptr<BitCastView> ir_bit_cast) override {
+    void Visit(std::shared_ptr<view::BitCast> ir_bit_cast) override {
         if (tensor_dict.count(ir_bit_cast)) {
             return;
         }
         ir_bit_cast->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = BitCastView::Create(tensor_dict[ir_bit_cast->Tensor()], ir_bit_cast->type);
+        auto ir_new = view::BitCast::Create(tensor_dict[ir_bit_cast->Tensor()], ir_bit_cast->type);
         tensor_dict[ir_bit_cast] = ir_new;
     }
 
@@ -158,58 +158,58 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_unary_intrinsic] = ir_new;
     }
 
-    void Visit(std::shared_ptr<SqueezeDimView> ir_squeeze_dim_view) override {
+    void Visit(std::shared_ptr<view::SqueezeDim> ir_squeeze_dim_view) override {
         if (tensor_dict.count(ir_squeeze_dim_view)) {
             return;
         }
         ir_squeeze_dim_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = SqueezeDimView::Create(tensor_dict[ir_squeeze_dim_view->Tensor()],
-                                             ir_squeeze_dim_view->dim);
+        auto ir_new = view::SqueezeDim::Create(tensor_dict[ir_squeeze_dim_view->Tensor()],
+                                               ir_squeeze_dim_view->dim);
         tensor_dict[ir_squeeze_dim_view] = ir_new;
     }
 
-    void Visit(std::shared_ptr<UnsqueezeDimView> ir_unsqueeze_dim_view) override {
+    void Visit(std::shared_ptr<view::UnsqueezeDim> ir_unsqueeze_dim_view) override {
         if (tensor_dict.count(ir_unsqueeze_dim_view)) {
             return;
         }
         ir_unsqueeze_dim_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = UnsqueezeDimView::Create(tensor_dict[ir_unsqueeze_dim_view->Tensor()],
-                                               ir_unsqueeze_dim_view->dim);
+        auto ir_new = view::UnsqueezeDim::Create(tensor_dict[ir_unsqueeze_dim_view->Tensor()],
+                                                 ir_unsqueeze_dim_view->dim);
         tensor_dict[ir_unsqueeze_dim_view] = ir_new;
     }
 
-    void Visit(std::shared_ptr<SliceView> ir_slice_view) override {
+    void Visit(std::shared_ptr<view::Slice> ir_slice_view) override {
         if (tensor_dict.count(ir_slice_view)) {
             return;
         }
         GALOIS_UNIMPLEMENT;
     }
 
-    void Visit(std::shared_ptr<SqueezeView> ir_squeeze_view) override {
+    void Visit(std::shared_ptr<view::Squeeze> ir_squeeze_view) override {
         if (tensor_dict.count(ir_squeeze_view)) {
             return;
         }
         ir_squeeze_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = SqueezeView::Create(tensor_dict[ir_squeeze_view->Tensor()]);
+        auto ir_new = view::Squeeze::Create(tensor_dict[ir_squeeze_view->Tensor()]);
         tensor_dict[ir_squeeze_view] = ir_new;
     }
 
-    void Visit(std::shared_ptr<FlattenView> ir_flatten_view) override {
+    void Visit(std::shared_ptr<view::Flatten> ir_flatten_view) override {
         if (tensor_dict.count(ir_flatten_view)) {
             return;
         }
         ir_flatten_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = FlattenView::Create(tensor_dict[ir_flatten_view->Tensor()]);
+        auto ir_new = view::Flatten::Create(tensor_dict[ir_flatten_view->Tensor()]);
         tensor_dict[ir_flatten_view] = ir_new;
     }
 
-    void Visit(std::shared_ptr<TransposeView> ir_transpose_view) override {
+    void Visit(std::shared_ptr<view::Transpose> ir_transpose_view) override {
         if (tensor_dict.count(ir_transpose_view)) {
             return;
         }
         ir_transpose_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = TransposeView::Create(tensor_dict[ir_transpose_view->Tensor()],
-                                            ir_transpose_view->dim0, ir_transpose_view->dim1);
+        auto ir_new = view::Transpose::Create(tensor_dict[ir_transpose_view->Tensor()],
+                                              ir_transpose_view->dim0, ir_transpose_view->dim1);
         tensor_dict[ir_transpose_view] = ir_new;
     }
 

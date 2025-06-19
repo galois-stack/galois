@@ -38,7 +38,7 @@ class TransposeCreator : public op::Creator {
                  std::shared_ptr<ir::Builder> ir_builder) override {
         GALOIS_ASSERT(ir_inputs.size() == 1);
         auto input = ir_inputs[0];
-        auto ir_transpose_view = ir_builder->Create<ir::TransposeView>(input, dim0, dim1);
+        auto ir_transpose_view = ir_builder->Create<ir::view::Transpose>(input, dim0, dim1);
         auto out_type = this->InferType({input->type});
         auto output = ir_builder->Alloca(out_type);
         op::CopyCreator::Create()->ExpressInline(ir_transpose_view, output, ir_builder);
