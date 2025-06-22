@@ -140,6 +140,10 @@ class Builder : public std::enable_shared_from_this<Builder> {
         return nullptr;
     }
 
+    std::shared_ptr<ir::ConstantInt> GetInt64Constant(int64_t v) {
+        return this->Create<ir::ConstantInt>(ir::i64, v);
+    }
+
     std::shared_ptr<ir::ArithmeticInstruction> Add(std::shared_ptr<ir::Tensor> ir_tensor1,
                                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
         return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Add, ir_tensor1,
@@ -162,6 +166,11 @@ class Builder : public std::enable_shared_from_this<Builder> {
                                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
         return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Div, ir_tensor1,
                                                        ir_tensor2);
+    }
+
+    std::shared_ptr<ir::Indexing> Indexing(std::shared_ptr<ir::Tensor> ir_tensor,
+                                           std::vector<std::shared_ptr<ir::Tensor>> ir_indices) {
+        return this->Create<ir::Indexing>(ir_tensor, ir_indices);
     }
 
     std::shared_ptr<ir::Call> Call(std::shared_ptr<ir::Operator> ir_operator,

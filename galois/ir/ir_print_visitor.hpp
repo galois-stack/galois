@@ -82,6 +82,11 @@ class IRPrinter : public ir::Visitor {
                << GetVariableName(ir_accessor->Tensor()) << ";\n";
     }
 
+    void Visit(std::shared_ptr<Indexing> ir_index) override {
+        output << GetVariableName(ir_index) << " = Indexing "
+               << GetVariableName(ir_index->Tensor()) << ";\n";
+    }
+
     void Visit(std::shared_ptr<Write> ir_write) override {
         output << "Write " << GetVariableName(ir_write->Tensor()) << ", "
                << GetVariableName(ir_write->Variable()) << ";\n";

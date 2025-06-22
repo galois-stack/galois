@@ -49,6 +49,21 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_accessor] = ir_new;
     }
 
+    void Visit(std::shared_ptr<Indexing> ir_index) override {
+        if (tensor_dict.count(ir_index)) {
+            return;
+        }
+
+        ir_index->Tensor()->ApplyVisitor(this->shared_from_this());
+        std::vector<std::shared_ptr<Tensor>> ir_indices;
+        for (int64_t i = 0; i < ir_index->IndexSize(); ++i) {
+            ir_index->Index(i)->ApplyVisitor(this->shared_from_this());
+            ir_indices.push_back(tensor_dict[ir_index->Index(i)]);
+        }
+        auto ir_new = Indexing::Create(tensor_dict[ir_index->Tensor()], ir_indices);
+        tensor_dict[ir_index] = ir_new;
+    }
+
     void Visit(std::shared_ptr<GridIndex> ir_grid_index) override {
         if (tensor_dict.count(ir_grid_index)) {
             return;

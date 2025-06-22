@@ -81,6 +81,10 @@ class IncreaseVisitor : public ir::Visitor {
         this->IncreaseViewInstruction(ir_accessor);
     }
 
+    void Visit(std::shared_ptr<ir::Indexing> ir_index) override {
+        this->IncreaseViewInstruction(ir_index);
+    }
+
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
         ir_operator->block->ApplyVisitor(shared_from_this());
     }
@@ -187,6 +191,10 @@ class DecreaseVisitor : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {
         this->DecreaseViewInstruction(ir_accessor);
+    }
+
+    void Visit(std::shared_ptr<ir::Indexing> ir_index) override {
+        this->DecreaseViewInstruction(ir_index);
     }
 
    private:

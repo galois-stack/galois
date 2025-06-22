@@ -94,6 +94,8 @@ class EachTensorVisitor : public ir::Visitor {
         this->callback(ir_constant_float);
     }
 
+    void Visit(std::shared_ptr<ir::Indexing> ir_index) override { this->callback(ir_index); }
+
    private:
     void callback(std::shared_ptr<ir::Tensor> ir_tensor) {
         //   GALOIS_ASSERT(value);
