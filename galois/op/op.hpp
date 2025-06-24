@@ -7,6 +7,7 @@
 #include "galois/op/convolution.hpp"
 #include "galois/op/flatten.hpp"
 #include "galois/op/full.hpp"
+#include "galois/op/gather.hpp"
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/op/normalize.hpp"
 #include "galois/op/pack.hpp"
