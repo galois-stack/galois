@@ -367,59 +367,14 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::view::BroadCast> ir_broad_cast) override {
-        auto pir_linear_index =
-            pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
-        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetInt64Constant(0),
-                                                    pir_linear_index);
+        this->EmitType(ir_broad_cast->type);
 
-        auto original_shape = ir_broad_cast->Tensor()->type->shape;
-        auto broadcast_shape = ir_broad_cast->type->shape;
+        auto pir_pointer_type = pir::PointerType::Create(ir_broad_cast->type->pir_type);
 
-        auto pir_index = grid_stack.top()->index->pir_value;
-
-        for (int64_t i = 0; i < broadcast_shape.size(); ++i) {
-            std::shared_ptr<pir::Value> pir_scalar_index;
-
-            if (original_shape[i] == 1) {
-                pir_scalar_index = pir_builder->Create<pir::IndexArray>(
-                    pir_index, pir_builder->GetInt64Constant(0));
-            } else{
-                pir_scalar_index = pir_builder->Create<pir::IndexArray>(
-                    pir_index, pir_builder->GetInt64Constant(i));
-            }
-
-            // auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
-            //         pir_index, pir_builder->GetInt64Constant(i));
-
-            auto stride = ir_broad_cast->Tensor()->type->stride[i];
-            auto pir_stride = pir_builder->GetInt64Constant(stride);
-
-            auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
-                pir::BinaryOperator::Operation::Mul, pir_scalar_index, pir_stride);
-
-            auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
-                pir::BinaryOperator::Operation::Add, pir_mul_tmp, pir_linear_index);
-
-            pir_builder->Create<pir::WriteVariableLiked>(pir_sum_tmp, pir_linear_index);
-        }
-
-        auto pir_tensor_value_type = this->EmitType(ir_broad_cast->Tensor()->type->value_type);
-
-        auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            this->GetPrajnaPointerFromTensor(ir_broad_cast->Tensor()),
-            pir::PointerType::Create(pir_tensor_value_type));
-
-        GALOIS_ASSERT(ir_broad_cast->Tensor()->type->value_type == ir_broad_cast->type);
-
-        auto pir_tensor_pointer_var =
-            pir_builder->Create<pir::LocalVariable>(pir_tensor_pointer->type);
-        pir_builder->Create<pir::WriteVariableLiked>(pir_tensor_pointer, pir_tensor_pointer_var);
-
-        auto pir_value_poitner = pir_builder->Create<pir::GetPointerElementPointer>(
-            pir_builder->Create<pir::GetAddressOfVariableLiked>(pir_tensor_pointer_var),
-            pir_linear_index);
-
-        ir_broad_cast->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
+        ir_broad_cast->pir_value =
+            pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
+                prajna::Cast<pir::DeferencePointer>(ir_broad_cast->Tensor()->pir_value)->Pointer(),
+                pir_pointer_type));
     }
 
     void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override {

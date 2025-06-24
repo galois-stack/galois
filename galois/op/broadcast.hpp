@@ -8,8 +8,9 @@
 namespace galois::op {
 class BroadCastCreator : public op::Creator {
    public:
-    static std::shared_ptr<BroadCastCreator> Create() {
+    static std::shared_ptr<BroadCastCreator> Create(Eigen::VectorXi64 broadcast_shape) {
         auto self = std::make_shared<BroadCastCreator>();
+        self->broadcast_shape = broadcast_shape;
         self->name = "BroadCast";
         self->fullname = self->name;
         return self;
@@ -18,12 +19,8 @@ class BroadCastCreator : public op::Creator {
     std::shared_ptr<ir::TensorType> InferType(
         std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) override {
         GALOIS_ASSERT(!ir_input_types.empty());
-        auto base_type = Cast<ir::TensorType>(ir_input_types.back());
-        auto out_shape = base_type->shape;
-
-        GALOIS_ASSERT(out_shape.size() == 2);
-        
-        return ir::TensorType::Create(base_type->value_type, out_shape);
+        return ir::TensorType::Create(Cast<ir::TensorType>(ir_input_types.front())->value_type,
+                                      broadcast_shape);
     }
 
     void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
@@ -32,33 +29,38 @@ class BroadCastCreator : public op::Creator {
         auto ir_output = ir_builder->Alloca(ir_output_type);
         auto zero = ir_builder->GetZero(ir_output->type->DataType());
         ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
-        this->ExpressInline(ir_inputs[0], ir_output, ir_builder);
+
+        auto input_broadcast = ir_builder->Create<ir::view::BroadCast>(ir_inputs[0], ir_output_type->shape);
+        this->ExpressInline(input_broadcast, ir_output, ir_builder);
+
         ir_builder->Return(ir_output);
     }
 
-
-    void ExpressInline(std::shared_ptr<ir::Tensor> ir_inputs, 
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_act, 
                 std::shared_ptr<ir::Tensor> ir_output, std::shared_ptr<ir::Builder> ir_builder) {
-        auto ir_act = ir_inputs;
 
         auto input_shape = ir_act->type->shape;
         auto output_shape = ir_output->type->shape;
 
-        auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector2i64(
-            output_shape[0], output_shape[1]));
+        auto [ir_grid, scope_guard] = ir_builder->CreateGrid(output_shape);
 
         auto output_accessor = ir_builder->CreateAccessor(ir_output);
         output_accessor->transform_matrix(0, 0) = 1;
         output_accessor->transform_matrix(1, 1) = 1;
 
-        auto input_accessor = ir_builder->BroadCastView(ir_act, ir_output->type);
-
-        if(output_accessor->type->IsScalar()){
+        auto input_accessor = ir_builder->CreateAccessor(ir_act);
+        input_accessor->transform_matrix(0, 0) = 1;
+        input_accessor->transform_matrix(1, 1) = 1;
+        
+        if(input_accessor->type->IsScalar() ){
             ir_builder->Write(input_accessor, output_accessor);
             return;
         }
 
         this->ExpressInline(input_accessor, output_accessor, ir_builder);
     }
+
+    Eigen::VectorXi64 broadcast_shape;
 };
+
 }  // namespace galois::op
