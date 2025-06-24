@@ -30,8 +30,7 @@ class BroadCastCreator : public op::Creator {
         auto zero = ir_builder->GetZero(ir_output->type->DataType());
         ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
 
-        auto input_broadcast =
-            ir_builder->Create<ir::view::BroadCast>(ir_inputs[0], ir_output_type->shape);
+        auto input_broadcast = ir_builder->Create<ir::view::BroadCast>(ir_inputs[0]);
         this->ExpressInline(input_broadcast, ir_output, ir_builder);
 
         ir_builder->Return(ir_output);

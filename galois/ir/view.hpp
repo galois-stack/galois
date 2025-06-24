@@ -28,13 +28,11 @@ class BitCast : public Instruction {
 
 class BroadCast : public Instruction {
    public:
-    static std::shared_ptr<BroadCast> Create(std::shared_ptr<Tensor> ir_value,
-                                             Eigen::VectorXi64 shape) {
+    static std::shared_ptr<BroadCast> Create(std::shared_ptr<Tensor> ir_value) {
         // GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
         std::shared_ptr<BroadCast> self(new BroadCast);
         self->OperandResize(1);
         self->Tensor(ir_value);
-        self->shape = shape;
 
         auto stride = self->Tensor()->type->stride;
         for (int i = 0; i < stride.size(); ++i) {
@@ -43,7 +41,8 @@ class BroadCast : public Instruction {
         }
 
         GALOIS_ASSERT(self->Tensor()->type->value_type);
-        self->type = ir::TensorType::Create(self->Tensor()->type->value_type, shape, stride);
+        self->type = ir::TensorType::Create(self->Tensor()->type->value_type,
+                                            self->Tensor()->type->shape, stride);
         self->tag = "BroadCast";
         return self;
     }
@@ -54,8 +53,6 @@ class BroadCast : public Instruction {
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<BroadCast>(this->shared_from_this()));
     }
-
-    Eigen::VectorXi64 shape;
 };
 
 class Viewer : public Instruction {
