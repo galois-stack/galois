@@ -2,6 +2,7 @@
 
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/binary.hpp"
+#include "galois/op/broadcast.hpp"
 #include "galois/op/concatenate.hpp"
 #include "galois/op/convolution.hpp"
 #include "galois/op/flatten.hpp"

@@ -1,6 +1,6 @@
 #include "galois/op/normalize.hpp"
-#include "tests/galois_test.hpp"
 
+#include "tests/galois_test.hpp"
 
 float calculate_mean(float *matrix, int rows, int cols) {
     float sum = 0.0;
@@ -31,11 +31,11 @@ void normalize_matrix(float *matrix, float *output, int rows, int cols, float *g
 
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            *(output + i * cols + j) = ((*(matrix + i * cols + j) - mean) / std_dev) * (*gama) + (*beta);
+            *(output + i * cols + j) =
+                ((*(matrix + i * cols + j) - mean) / std_dev) * (*gama) + (*beta);
         }
     }
 }
-
 
 TEST(GaloisTests, TestNormalize3x3) {
     int rows = 3, cols = 3;
@@ -47,9 +47,9 @@ TEST(GaloisTests, TestNormalize3x3) {
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::NormalizeCreator>(
         {ir_input_type, ir_gama_type, ir_beta_type});
 
-
     auto jit_engine = jit::Engine::Create();
-    auto normalize_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator);
+    auto normalize_fun =
+        jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator);
 
     std::vector<float> input = {-1.0f, 2.0f, -3.0f, 4.0f, -5.0f, 6.0f, -7.0f, 8.0f, -9.0f};
     float gama = 0.5f;
@@ -58,7 +58,7 @@ TEST(GaloisTests, TestNormalize3x3) {
 
     float *result = normalize_fun(input.data(), &gama, &beta);
     normalize_matrix(input.data(), output.data(), rows, cols, &gama, &beta);
-    
+
     for (int i = 0; i < length; ++i) {
         EXPECT_NEAR(result[i], output[i], 1e-5)
             << "Mismatch at index " << i << ": input=" << input[i];

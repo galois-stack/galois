@@ -1,8 +1,8 @@
 #include "galois/op/broadcast.hpp"
+
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestBroadCast) {
-
     int rows_in = 1, cols_in = 1;
     int rows_out = 2, cols_out = 2;
 
@@ -20,14 +20,13 @@ TEST(GaloisTests, TestBroadCast) {
         input[i] = static_cast<float>(i + 1);
     }
 
-    std::vector<float> output = {1.0f, 1.0f, 
-                                1.0f, 1.0f};
+    std::vector<float> output = {1.0f, 1.0f, 1.0f, 1.0f};
 
     float *result = broadcast_fun(input.data());
-    
+
     for (int i = 0; i < rows_out * cols_out; ++i) {
         EXPECT_NEAR(result[i], output[i], 1e-5)
-        << "Mismatch at index " << i << ": output=" << output[i];
+            << "Mismatch at index " << i << ": output=" << output[i];
     }
 
     free(result);

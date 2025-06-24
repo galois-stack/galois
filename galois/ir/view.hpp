@@ -29,7 +29,7 @@ class BitCast : public Instruction {
 class BroadCast : public Instruction {
    public:
     static std::shared_ptr<BroadCast> Create(std::shared_ptr<Tensor> ir_value,
-                                         Eigen::VectorXi64 shape) {
+                                             Eigen::VectorXi64 shape) {
         // GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
         std::shared_ptr<BroadCast> self(new BroadCast);
         self->OperandResize(1);
@@ -37,7 +37,7 @@ class BroadCast : public Instruction {
         self->shape = shape;
 
         auto stride = self->Tensor()->type->stride;
-        for(int i = 0; i < stride.size(); ++i){
+        for (int i = 0; i < stride.size(); ++i) {
             stride[i] = 0;
             self->Tensor()->type->stride[i] = 0;
         }

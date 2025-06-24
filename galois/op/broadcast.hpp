@@ -1,9 +1,9 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/sum.hpp"
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/creator.hpp"
+#include "galois/op/sum.hpp"
 
 namespace galois::op {
 class BroadCastCreator : public op::Creator {
@@ -30,15 +30,15 @@ class BroadCastCreator : public op::Creator {
         auto zero = ir_builder->GetZero(ir_output->type->DataType());
         ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
 
-        auto input_broadcast = ir_builder->Create<ir::view::BroadCast>(ir_inputs[0], ir_output_type->shape);
+        auto input_broadcast =
+            ir_builder->Create<ir::view::BroadCast>(ir_inputs[0], ir_output_type->shape);
         this->ExpressInline(input_broadcast, ir_output, ir_builder);
 
         ir_builder->Return(ir_output);
     }
 
-    void ExpressInline(std::shared_ptr<ir::Tensor> ir_act, 
-                std::shared_ptr<ir::Tensor> ir_output, std::shared_ptr<ir::Builder> ir_builder) {
-
+    void ExpressInline(std::shared_ptr<ir::Tensor> ir_act, std::shared_ptr<ir::Tensor> ir_output,
+                       std::shared_ptr<ir::Builder> ir_builder) {
         auto input_shape = ir_act->type->shape;
         auto output_shape = ir_output->type->shape;
 
@@ -51,8 +51,8 @@ class BroadCastCreator : public op::Creator {
         auto input_accessor = ir_builder->CreateAccessor(ir_act);
         input_accessor->transform_matrix(0, 0) = 1;
         input_accessor->transform_matrix(1, 1) = 1;
-        
-        if(input_accessor->type->IsScalar() ){
+
+        if (input_accessor->type->IsScalar()) {
             ir_builder->Write(input_accessor, output_accessor);
             return;
         }

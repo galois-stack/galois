@@ -83,8 +83,8 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<Indexing> ir_index) override {
-        output << GetVariableName(ir_index) << " = Indexing "
-               << GetVariableName(ir_index->Tensor()) << ";\n";
+        output << GetVariableName(ir_index) << " = Indexing " << GetVariableName(ir_index->Tensor())
+               << ";\n";
     }
 
     void Visit(std::shared_ptr<Write> ir_write) override {
@@ -142,7 +142,7 @@ class IRPrinter : public ir::Visitor {
                << GetVariableName(ir_unary_intrinsic->Operand()) << ";\n";
     }
 
-     void Visit(std::shared_ptr<Prefetch> ir_prefetch) override {
+    void Visit(std::shared_ptr<Prefetch> ir_prefetch) override {
         output << "Prefetch " << GetVariableName(ir_prefetch->Address()) << ", " << ir_prefetch->rw
                << ", " << ir_prefetch->locality << ", " << ir_prefetch->cache_type << ";\n";
     }
