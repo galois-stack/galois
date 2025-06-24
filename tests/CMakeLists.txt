@@ -30,6 +30,7 @@ add_executable(galois_test
     normalize_test.cpp
     convolution_test.cpp
     indexing_test.cpp
+    gather_test.cpp
 )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
