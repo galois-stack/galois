@@ -12,19 +12,14 @@ class Convolution3DCreator : public op::Creator {
 private:
     int stride_h = 1;
     int stride_w = 1;
-    int padding_h = 0;
-    int padding_w = 0;
 
 public:
-    static std::shared_ptr<Convolution3DCreator> Create(int stride_h = 1, int stride_w = 1, 
-                                                       int padding_h = 0, int padding_w = 0) {
+    static std::shared_ptr<Convolution3DCreator> Create(int stride_h = 1, int stride_w = 1) {
         auto self = std::make_shared<Convolution3DCreator>();
         self->name = "Convolution3D";
         self->fullname = self->name;
         self->stride_h = stride_h;
         self->stride_w = stride_w;
-        self->padding_h = padding_h;
-        self->padding_w = padding_w;
         return self;
     }
 
@@ -45,9 +40,9 @@ public:
         auto kernel_w = weight_type->shape[3];
         auto out_channels = weight_type->shape[0];
         
-        auto out_h = (input_h + 2 * padding_h - kernel_h) / stride_h + 1;
-        auto out_w = (input_w + 2 * padding_w - kernel_w) / stride_w + 1;
-        
+        auto out_h = (input_h - kernel_h) / stride_h + 1;
+        auto out_w = (input_w - kernel_w) / stride_w + 1;
+
         GALOIS_ASSERT(out_h > 0 && out_w > 0);
         
         Eigen::VectorXi64 out_shape(3);
@@ -76,11 +71,6 @@ public:
         auto input_shape = ir_input->type->shape;   // [C_in, H, W]
         auto weight_shape = ir_weight->type->shape; // [C_out, C_in, KH, KW]
         auto output_shape = ir_output->type->shape; // [C_out, H_out, W_out]
-
-        // Only support padding=0 for now
-        if (padding_h != 0 || padding_w != 0) {
-            GALOIS_ASSERT(false && "Padding is not yet supported in Convolution3DCreator. Please use padding=0.");
-        }
 
         // Create 6D grid: [out_c, out_h, out_w, kernel_h, kernel_w, in_c]
         auto [ir_grid, scope_guard] = ir_builder->CreateGrid(Eigen::Vector<int64_t, 6>(

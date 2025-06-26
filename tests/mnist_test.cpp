@@ -90,11 +90,11 @@ TEST(GaloisTests, TestMnistCNN) {
         ir_fc2_type, "tests/models/mnist/fc2_weight.bin");
  
     // Conv1 + ReLU: [28,28,1] -> [12,12,32] (kernel=5, stride=2, (28-5)/2+1=12)
-    auto ir_conv1 = ir_builder->ExpressCreator<op::Convolution3DCreator>({ir_input, ir_conv1_weights}, 2, 2, 0, 0);
+    auto ir_conv1 = ir_builder->ExpressCreator<op::Convolution3DCreator>({ir_input, ir_conv1_weights}, 2, 2);
     auto ir_relu1 = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_conv1}, "relu", false);
         
     // Conv2 + ReLU: [12,12,32] -> [4,4,64] (kernel=5, stride=2, (12-5)/2+1=4)
-    auto ir_conv2 = ir_builder->ExpressCreator<op::Convolution3DCreator>({ir_relu1, ir_conv2_weights}, 2, 2, 0, 0);
+    auto ir_conv2 = ir_builder->ExpressCreator<op::Convolution3DCreator>({ir_relu1, ir_conv2_weights}, 2, 2);
     auto ir_relu2 = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_conv2}, "relu", false);
         
     // Flatten: [64, 4, 4] -> [1, 1024] 

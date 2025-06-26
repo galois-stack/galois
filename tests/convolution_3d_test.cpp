@@ -105,7 +105,7 @@ TEST(GaloisTests, TestConvolution3D_WithStride) {
     
     auto ir_builder = ir::Builder::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::Convolution3DCreator>(
-        {ir_input_type, ir_weight_type}, stride_h, stride_w, 0, 0);
+        {ir_input_type, ir_weight_type}, stride_h, stride_w);
 
     auto jit_engine = jit::Engine::Create();
     auto conv_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *)>(ir_operator);
