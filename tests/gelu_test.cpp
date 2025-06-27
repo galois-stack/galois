@@ -1,7 +1,7 @@
-#include "galois/op/fill.hpp"
-#include "tests/galois_test.hpp"
 #include "galois/ir/ir.hpp"
 #include "galois/jit/engine.hpp"
+#include "galois/op/fill.hpp"
+#include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestGeLU) {
     int64_t length = 128;
@@ -13,7 +13,7 @@ TEST(GaloisTests, TestGeLU) {
     // fmt::print("ir_operator->inputs:{}  \n", ir_operator->inputs.size());
 
     auto ir_input = ir_operator->inputs[0];
-    auto ir_output = 
+    auto ir_output =
         ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_input}, "gelu", false);
     ir_builder->Create<ir::Return>(ir_output);
 
@@ -29,7 +29,11 @@ TEST(GaloisTests, TestGeLU) {
     auto output_vec = model_fun(float_vec.data());
 
     for (int i = 0; i < length; i++) {
-        float expected = 0.5f * float_vec[i] * (1.0f + std::tanh(std::sqrt(0.63661977236f) * (float_vec[i] + 0.044715f * float_vec[i] * float_vec[i] * float_vec[i])));
+        float expected =
+            0.5f * float_vec[i] *
+            (1.0f +
+             std::tanh(std::sqrt(0.63661977236f) *
+                       (float_vec[i] + 0.044715f * float_vec[i] * float_vec[i] * float_vec[i])));
         GALOIS_ASSERT(output_vec[i] == expected);
     }
 

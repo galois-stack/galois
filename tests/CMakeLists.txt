@@ -31,6 +31,7 @@ add_executable(galois_test
     convolution_test.cpp
     convolution_3d_test.cpp
     indexing_test.cpp
+    broadcast_test.cpp
     gather_test.cpp
 )
 

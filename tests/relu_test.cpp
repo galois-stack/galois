@@ -1,7 +1,7 @@
-#include "galois/op/fill.hpp"
-#include "tests/galois_test.hpp"
 #include "galois/ir/ir.hpp"
 #include "galois/jit/engine.hpp"
+#include "galois/op/fill.hpp"
+#include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestReLU) {
     int64_t length = 128;
@@ -13,7 +13,7 @@ TEST(GaloisTests, TestReLU) {
     // fmt::print("ir_operator->inputs:{}  \n", ir_operator->inputs.size());
 
     auto ir_input = ir_operator->inputs[0];
-    auto ir_output = 
+    auto ir_output =
         ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_input}, "relu", false);
     ir_builder->Create<ir::Return>(ir_output);
 
