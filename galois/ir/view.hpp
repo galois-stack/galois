@@ -28,21 +28,32 @@ class BitCast : public Instruction {
 
 class BroadCast : public Instruction {
    public:
-    static std::shared_ptr<BroadCast> Create(std::shared_ptr<Tensor> ir_value) {
+    static std::shared_ptr<BroadCast> Create(std::shared_ptr<Tensor> ir_value,
+                                             Eigen::MatrixXi64 output_shape) {
         // GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
         std::shared_ptr<BroadCast> self(new BroadCast);
         self->OperandResize(1);
         self->Tensor(ir_value);
+        Eigen::VectorXi64 new_shape(output_shape.size());
+        Eigen::RowVectorXi64 new_stride(output_shape.size());
 
-        auto stride = self->Tensor()->type->stride;
-        for (int i = 0; i < stride.size(); ++i) {
-            stride[i] = 0;
-            self->Tensor()->type->stride[i] = 0;
+        auto input_shape = self->Tensor()->type->shape;
+
+        for (int i = output_shape.size() - 1; i >= 0; --i) {
+            new_stride[i] = 0;
+            if (i - input_shape.size() >= 0) {
+                new_shape[i] = input_shape[i - input_shape.size()];
+            } else {
+                new_shape[i] = 1;
+            }
         }
 
+        self->Tensor()->type->shape = new_shape;
+        self->Tensor()->type->stride = new_stride;
+
         GALOIS_ASSERT(self->Tensor()->type->value_type);
-        self->type = ir::TensorType::Create(self->Tensor()->type->value_type,
-                                            self->Tensor()->type->shape, stride);
+        self->type =
+            ir::TensorType::Create(self->Tensor()->type->value_type, output_shape, new_stride);
         self->tag = "BroadCast";
         return self;
     }
@@ -53,6 +64,8 @@ class BroadCast : public Instruction {
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<BroadCast>(this->shared_from_this()));
     }
+
+    Eigen::MatrixXi64 shape;
 };
 
 class Viewer : public Instruction {
