@@ -3,3 +3,7 @@
 *.bin filter=lfs diff=lfs merge=lfs -text
 *.data filter=lfs diff=lfs merge=lfs -text
 *.raw filter=lfs diff=lfs merge=lfs -text
+tests/models/mnist/conv1_weight.bin filter=lfs diff=lfs merge=lfs -text
+tests/models/mnist/conv2_weight.bin filter=lfs diff=lfs merge=lfs -text
+tests/models/mnist/fc1_weight.bin filter=lfs diff=lfs merge=lfs -text
+tests/models/mnist/fc2_weight.bin filter=lfs diff=lfs merge=lfs -text
