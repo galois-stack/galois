@@ -41,19 +41,19 @@ class BroadCast : public Instruction {
 
         for (int i = output_shape.size() - 1; i >= 0; --i) {
             new_stride[i] = 0;
-            if (i - input_shape.size() >= 0) {
+            if (i - input_shape.size() >= 0 && input_shape.size() > 0) {
                 new_shape[i] = input_shape[i - input_shape.size()];
             } else {
                 new_shape[i] = 1;
             }
         }
 
-        self->Tensor()->type->shape = new_shape;
-        self->Tensor()->type->stride = new_stride;
+        auto new_value_type = self->Tensor()->type->DataType();
 
-        GALOIS_ASSERT(self->Tensor()->type->value_type);
-        self->type =
-            ir::TensorType::Create(self->Tensor()->type->value_type, output_shape, new_stride);
+        self->Tensor()->type = ir::TensorType::Create(new_value_type, new_shape, new_stride);
+
+        self->type = ir::TensorType::Create(new_value_type, output_shape, new_stride);
+
         self->tag = "BroadCast";
         return self;
     }

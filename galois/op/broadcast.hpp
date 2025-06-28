@@ -19,8 +19,9 @@ class BroadCastCreator : public op::Creator {
     std::shared_ptr<ir::TensorType> InferType(
         std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) override {
         GALOIS_ASSERT(!ir_input_types.empty());
-        return ir::TensorType::Create(Cast<ir::TensorType>(ir_input_types.front())->value_type,
-                                      broadcast_shape);
+
+        auto new_value_type = Cast<ir::TensorType>(ir_input_types.front())->DataType();
+        return ir::TensorType::Create(new_value_type, broadcast_shape);
     }
 
     void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
