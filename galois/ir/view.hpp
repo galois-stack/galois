@@ -34,25 +34,23 @@ class BroadCast : public Instruction {
         std::shared_ptr<BroadCast> self(new BroadCast);
         self->OperandResize(1);
         self->Tensor(ir_value);
-        Eigen::VectorXi64 new_shape(output_shape.size());
-        Eigen::RowVectorXi64 new_stride(output_shape.size());
-
         auto input_shape = self->Tensor()->type->shape;
+        auto input_rank = input_shape.size();
+        auto output_rank = output_shape.size();
+        Eigen::VectorXi64 new_shape(output_rank);
+        Eigen::RowVectorXi64 new_stride(output_rank);
 
-        for (int i = output_shape.size() - 1; i >= 0; --i) {
-            new_stride[i] = 0;
-            if (i - input_shape.size() >= 0 && input_shape.size() > 0) {
-                new_shape[i] = input_shape[i - input_shape.size()];
-            } else {
-                new_shape[i] = 1;
-            }
+        for (int i = 0; i < output_rank; ++i) {
+            int input_idx = i - (output_rank - input_rank);
+            new_shape[i] = (input_idx >= 0 && input_idx < input_rank) ? input_shape[input_idx] : 1;
         }
 
         auto new_value_type = self->Tensor()->type->DataType();
 
-        self->Tensor()->type = ir::TensorType::Create(new_value_type, new_shape, new_stride);
-
-        self->type = ir::TensorType::Create(new_value_type, output_shape, new_stride);
+        self->Tensor()->type =
+            ir::TensorType::Create(new_value_type, new_shape, TensorType::GetStride(new_shape));
+        self->type =
+            ir::TensorType::Create(new_value_type, new_shape, TensorType::GetStride(new_shape));
 
         self->tag = "BroadCast";
         return self;
