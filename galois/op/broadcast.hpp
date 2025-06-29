@@ -19,8 +19,9 @@ class BroadCastCreator : public op::Creator {
     std::shared_ptr<ir::TensorType> InferType(
         std::vector<std::shared_ptr<ir::TensorType>> ir_input_types) override {
         GALOIS_ASSERT(!ir_input_types.empty());
-        return ir::TensorType::Create(Cast<ir::TensorType>(ir_input_types.front())->value_type,
-                                      broadcast_shape);
+
+        auto new_value_type = Cast<ir::TensorType>(ir_input_types.front())->DataType();
+        return ir::TensorType::Create(new_value_type, broadcast_shape);
     }
 
     void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
@@ -49,8 +50,13 @@ class BroadCastCreator : public op::Creator {
         output_accessor->transform_matrix(1, 1) = 1;
 
         auto input_accessor = ir_builder->CreateAccessor(ir_act);
-        input_accessor->transform_matrix(0, 0) = 1;
-        input_accessor->transform_matrix(1, 1) = 1;
+        for (int i = 0; i < output_shape.size(); ++i) {
+            if (input_shape[i] == output_shape[i]) {
+                input_accessor->transform_matrix(i, i) = 1;
+            } else {
+                input_accessor->transform_matrix(i, i) = 0;
+            }
+        }
 
         if (input_accessor->type->IsScalar()) {
             ir_builder->Write(input_accessor, output_accessor);
