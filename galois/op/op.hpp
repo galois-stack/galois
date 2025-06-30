@@ -5,7 +5,6 @@
 #include "galois/op/broadcast.hpp"
 #include "galois/op/concatenate.hpp"
 #include "galois/op/convolution.hpp"
-#include "galois/op/convolution_nd.hpp"
 #include "galois/op/flatten.hpp"
 #include "galois/op/full.hpp"
 #include "galois/op/gather.hpp"

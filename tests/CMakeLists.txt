@@ -29,7 +29,6 @@ add_executable(galois_test
     embedding_test.cpp
     normalize_test.cpp
     convolution_test.cpp
-    convolution_nd_test.cpp
     indexing_test.cpp
     broadcast_test.cpp
     gather_test.cpp
