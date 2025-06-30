@@ -12,39 +12,19 @@ template<int N>
 class ConvolutionNDCreator : public op::Creator {
 private:
     std::array<int, N> strides_;
-    std::array<int, N> paddings_;
-    std::array<int, N> dilations_;
 
 public:
     static std::shared_ptr<ConvolutionNDCreator<N>> Create(
-        const std::array<int, N>& strides = {},
-        const std::array<int, N>& paddings = {},
-        const std::array<int, N>& dilations = {}) {
+        const std::array<int, N>& strides = {}) {
         auto self = std::make_shared<ConvolutionNDCreator<N>>();
         self->name = "Convolution" + std::to_string(N) + "D";
         self->fullname = self->name;
         
-        // Initialize default values
         self->strides_ = strides;
-        self->paddings_ = paddings;
-        self->dilations_ = dilations;
         
         // Set defaults if not provided
         for (int i = 0; i < N; ++i) {
             if (self->strides_[i] == 0) self->strides_[i] = 1;
-            if (self->paddings_[i] == 0) self->paddings_[i] = 0;
-            if (self->dilations_[i] == 0) self->dilations_[i] = 1;
-        }
-        
-        // TODO: padding and dilation support will be implemented later
-        // For now, ensure they are set to default values (no padding, no dilation)
-        for (int i = 0; i < N; ++i) {
-            if (self->paddings_[i] != 0) {
-                GALOIS_ASSERT(false, "Padding is not yet implemented");
-            }
-            if (self->dilations_[i] != 1) {
-                GALOIS_ASSERT(false, "Dilation is not yet implemented");
-            }
         }
         
         return self;
@@ -70,7 +50,6 @@ public:
         for (int i = 0; i < N; ++i) {
             auto input_dim = input_type->shape[i + 1];
             auto kernel_dim = weight_type->shape[i + 2];
-            // Simplified calculation without padding and dilation for now
             auto output_dim = (input_dim - kernel_dim) / strides_[i] + 1;
             GALOIS_ASSERT(output_dim > 0);
             output_shape[i + 1] = output_dim;
@@ -123,7 +102,6 @@ public:
             output_accessor->transform_matrix(i + 1, i + 1) = 1; // output spatial dims
         }
 
-        // Input accessor with stride support (padding and dilation will be added later)
         auto input_accessor = ir_builder->CreateAccessor(ir_input);
         input_accessor->transform_matrix(0, 2 * N + 1) = 1; // in_c mapping
         for (int i = 0; i < N; ++i) {
@@ -151,13 +129,11 @@ public:
     }
 };
 
-// 便利函数
+// Factory function to create a ConvolutionND creator with specified strides
 template<int N>
 std::shared_ptr<ConvolutionNDCreator<N>> CreateConvolutionND(
-    const std::array<int, N>& strides = {},
-    const std::array<int, N>& paddings = {},
-    const std::array<int, N>& dilations = {}) {
-    return ConvolutionNDCreator<N>::Create(strides, paddings, dilations);
+    const std::array<int, N>& strides = {}) {
+    return ConvolutionNDCreator<N>::Create(strides);
 }
 
 }  // namespace galois::op
