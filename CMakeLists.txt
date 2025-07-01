@@ -4,9 +4,8 @@ project(galois CXX C)
 
 set(CMAKE_WARN_DEPRECATED OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # 用于智能提示
-set(CMAKE_CXX_STANDARD 17) # c++20目前系统库还不支持, 没有必要
+set(CMAKE_CXX_STANDARD 20) # c++20目前系统库还不支持, 没有必要
 set(CXX_STANDARD_REQUIRED ON)  # 若不支持c++17选项则报错，而不是使用c++14
-set(CMAKE_CXX_EXTENSIONS OFF)  # 使用 -std=c++17而不是 -std=gnu++17
 
 if (${CMAKE_BUILD_TYPE} STREQUAL "debug")
     set(CMAKE_BUILD_TYPE "Debug")
@@ -23,6 +22,15 @@ if (NOT BUILD_SHARED_LIBS)
 else()
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
+
+if (MSVC)
+    add_compile_options(/wd4996)
+else()
+    add_compile_options(-Wno-deprecated-this-capture)
+    add_compile_options(-Wno-deprecated-anon-enum-enum-conversion)
+endif()
+
+
 
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
