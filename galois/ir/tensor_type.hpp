@@ -150,6 +150,14 @@ class TensorType : public Named, public std::enable_shared_from_this<TensorType>
         }
     }
 
+    bool IsMatch(std::shared_ptr<TensorType> other) {
+        return this->value_type == other->value_type && this->shape == other->shape;
+    }
+
+    std::shared_ptr<TensorType> DenseType() {
+        return TensorType::Create(this->value_type, this->shape);
+    }
+
     virtual bool IsScalar() { return this->shape.size() == 0; }
 
    public:

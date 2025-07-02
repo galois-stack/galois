@@ -1,6 +1,7 @@
 #pragma once
 
 #include "galois/ir/builder.hpp"
+#include "galois/ir/view.hpp"
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/sum.hpp"
 #include "galois/op/unary_intrinsic.hpp"
@@ -26,10 +27,10 @@ class SoftmaxCreator : public op::Creator {
         auto ir_input = ir_inputs.front();
         auto ir_exp = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_input}, "exp");
         auto ir_exp_sum = ir_builder->ExpressCreator<op::SumCreator>({ir_exp});
-        auto ir_exp_sum_broadcast = ir_builder->Alloca(ir_exp->type);
-        ir_builder->ExpressCreator<op::FillCreator>({ir_exp_sum_broadcast, ir_exp_sum});
+        auto ir_exp_sum_broadcast_view =
+            ir_builder->Create<ir::view::BroadCast>(ir_exp_sum, ir_exp->type->shape);
         auto ir_softmax =
-            ir_builder->ExpressCreator<op::DivCreator>({ir_exp, ir_exp_sum_broadcast});
+            ir_builder->ExpressCreator<op::DivCreator>({ir_exp, ir_exp_sum_broadcast_view});
         ir_builder->Return(ir_softmax);
     }
 };
