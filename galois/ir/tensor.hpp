@@ -72,6 +72,7 @@ class Tensor : public Named, public std::enable_shared_from_this<Tensor> {
     std::weak_ptr<Block> parent_block;
     std::shared_ptr<pir::Value> pir_value = nullptr;
     std::string tag = "Tensor";
+    std::shared_ptr<ir::TensorType> broadcast_type = nullptr;
 };
 
 class Instruction : virtual public Tensor {

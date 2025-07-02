@@ -43,23 +43,9 @@ class BroadCast : public Instruction {
             int input_idx = i - (output_rank - input_rank);
             new_shape[i] = (input_idx >= 0 && input_idx < input_rank) ? input_shape[input_idx] : 1;
         }
-
         auto new_value_type = self->Tensor()->type->DataType();
         auto new_stride = TensorType::GetStride(new_shape);
 
-        bool all_ones = true;
-        for (int i = 0; i < output_rank; ++i) {
-            if (new_shape[i] != 1) {
-                all_ones = false;
-                break;
-            }
-        }
-
-        if (all_ones) {
-            for (int i = 0; i < output_rank; ++i) {
-                new_stride[i] = 0;
-            }
-        }
 
         self->Tensor()->type =
             ir::TensorType::Create(new_value_type, new_shape, new_stride);
@@ -67,6 +53,10 @@ class BroadCast : public Instruction {
             ir::TensorType::Create(new_value_type, new_shape, new_stride);
 
         self->tag = "BroadCast";
+        self->Tensor()->broadcast_type = 
+            ir::TensorType::Create(new_value_type, output_shape, TensorType::GetStride(output_shape));
+        self->broadcast_type = 
+            ir::TensorType::Create(new_value_type, output_shape, TensorType::GetStride(output_shape));
         return self;
     }
 
