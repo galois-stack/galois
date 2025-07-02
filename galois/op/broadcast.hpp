@@ -1,9 +1,8 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
-#include "galois/op/arithmetic.hpp"
+#include "galois/op/copy.hpp"
 #include "galois/op/creator.hpp"
-#include "galois/op/sum.hpp"
 
 namespace galois::op {
 class BroadCastCreator : public op::Creator {
@@ -28,42 +27,13 @@ class BroadCastCreator : public op::Creator {
                  std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_output_type = this->InferType(ir::GetTensorTypes(ir_inputs));
         auto ir_output = ir_builder->Alloca(ir_output_type);
-        auto zero = ir_builder->GetZero(ir_output->type->DataType());
-        ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
 
         auto input_broadcast =
             ir_builder->Create<ir::view::BroadCast>(ir_inputs[0], ir_output_type->shape);
-        this->ExpressInline(input_broadcast, ir_output, ir_builder);
+        auto ir_copy = op::CopyCreator::Create();
+        ir_copy->ExpressInline(input_broadcast, ir_output, ir_builder);
 
         ir_builder->Return(ir_output);
-    }
-
-    void ExpressInline(std::shared_ptr<ir::Tensor> ir_act, std::shared_ptr<ir::Tensor> ir_output,
-                       std::shared_ptr<ir::Builder> ir_builder) {
-        auto input_shape = ir_act->type->shape;
-        auto output_shape = ir_output->type->shape;
-
-        auto [ir_grid, scope_guard] = ir_builder->CreateGrid(output_shape);
-
-        auto output_accessor = ir_builder->CreateAccessor(ir_output);
-        output_accessor->transform_matrix(0, 0) = 1;
-        output_accessor->transform_matrix(1, 1) = 1;
-
-        auto input_accessor = ir_builder->CreateAccessor(ir_act);
-        for (int i = 0; i < output_shape.size(); ++i) {
-            if (input_shape[i] == output_shape[i]) {
-                input_accessor->transform_matrix(i, i) = 1;
-            } else {
-                input_accessor->transform_matrix(i, i) = 0;
-            }
-        }
-
-        if (input_accessor->type->IsScalar()) {
-            ir_builder->Write(input_accessor, output_accessor);
-            return;
-        }
-
-        this->ExpressInline(input_accessor, output_accessor, ir_builder);
     }
 
     Eigen::VectorXi64 broadcast_shape;
