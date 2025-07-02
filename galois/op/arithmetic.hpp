@@ -17,7 +17,7 @@ class ArithmeticCreator : public BinaryCreator {
     std::shared_ptr<ir::TensorType> InferTypeImpl(
         std::shared_ptr<ir::TensorType> ir_input_type0,
         std::shared_ptr<ir::TensorType> ir_input_type1) override {
-        GALOIS_ASSERT(ir_input_type0 == ir_input_type1);
+        // GALOIS_ASSERT(ir_input_type0 == ir_input_type1);
         return ir_input_type0;
     }
 

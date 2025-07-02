@@ -38,7 +38,6 @@ class BroadCast : public Instruction {
         auto input_rank = input_shape.size();
         auto output_rank = output_shape.size();
         Eigen::VectorXi64 new_shape(output_rank);
-        Eigen::RowVectorXi64 new_stride(output_rank);
 
         for (int i = 0; i < output_rank; ++i) {
             int input_idx = i - (output_rank - input_rank);
@@ -46,11 +45,26 @@ class BroadCast : public Instruction {
         }
 
         auto new_value_type = self->Tensor()->type->DataType();
+        auto new_stride = TensorType::GetStride(new_shape);
+
+        bool all_ones = true;
+        for (int i = 0; i < output_rank; ++i) {
+            if (new_shape[i] != 1) {
+                all_ones = false;
+                break;
+            }
+        }
+
+        if (all_ones) {
+            for (int i = 0; i < output_rank; ++i) {
+                new_stride[i] = 0;
+            }
+        }
 
         self->Tensor()->type =
-            ir::TensorType::Create(new_value_type, new_shape, TensorType::GetStride(new_shape));
+            ir::TensorType::Create(new_value_type, new_shape, new_stride);
         self->type =
-            ir::TensorType::Create(new_value_type, new_shape, TensorType::GetStride(new_shape));
+            ir::TensorType::Create(new_value_type, new_shape, new_stride);
 
         self->tag = "BroadCast";
         return self;
