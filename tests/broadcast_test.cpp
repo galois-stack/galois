@@ -60,3 +60,29 @@ TEST(GaloisTests, TestBroadCast_Tile_1x2_Tile_4x2) {
         }
     }
 }
+
+TEST(GaloisTests, TestBroadCast_Tile_4x1x2_Tile_4x3x2) {
+    auto ir_input_type = ir::f32->Tile(4, 1, 2);
+    auto ir_output_type = ir::f32->Tile(4, 3, 2);
+    auto ir_builder = ir::Builder::Create();
+    auto ir_operator = ir_builder->CreateOperatorByCreator<op::BroadCastCreator>(
+        {ir_input_type}, ir_output_type->shape);
+
+    auto jit_engine = jit::Engine::Create();
+    auto broadcast_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *)>(ir_operator);
+
+    std::array<float, 8> input = {3.1415f, 2.7182f, 1.1415f, 0.7182f,
+                                  4.1415f, 5.7182f, 6.1415f, 7.7182f};
+    float *result = broadcast_fun(input.data());
+    boost::scope::scope_exit guard([&] { free(result); });
+
+    for (size_t i = 0; i < ir_output_type->shape[0]; ++i) {
+        for (size_t j = 0; j < ir_output_type->shape[1]; ++j) {
+            for (size_t k = 0; k < ir_output_type->shape[2]; ++k) {
+                ASSERT_NEAR(result[i * ir_output_type->shape[1] * ir_output_type->shape[2] +
+                                   j * ir_output_type->shape[2] + k],
+                            input[i * ir_output_type->shape[2] + k], 1e-5);
+            }
+        }
+    }
+}
