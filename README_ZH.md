@@ -78,7 +78,7 @@ apt install git clang wget libgnutls28-dev libsodium-dev uuid-dev build-essentia
 
 ```bash
 ./scripts/clone_submodules.sh --jobs=8 --depth=50 # 下载依赖库
-./scripts/configure.sh release # 配置为release模式
+CXX=clang++ CC=clang ./scripts/configure.sh release # 配置为release模式
 ./scripts/build.sh release
 ./scripts/test.sh release # 我们可以通过改指令来运行测试, 这是非必须的步骤
 ```

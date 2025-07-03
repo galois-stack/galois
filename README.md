@@ -73,7 +73,7 @@ You can build Galois in a Docker environment or configure the environment yourse
 
 ```bash
 ./scripts/clone_submodules.sh --jobs=8 --depth=50 # Download dependencies
-./scripts/configure.sh release # Configure for release mode
+CXX=clang++ CC=clang ./scripts/configure.sh release # Configure for release mode
 ./scripts/build.sh release
 ./scripts/test.sh release # Optional: run tests
 ```
