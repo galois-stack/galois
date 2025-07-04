@@ -35,6 +35,7 @@ extern std::shared_ptr<TensorType> u16;
 extern std::shared_ptr<TensorType> u32;
 extern std::shared_ptr<TensorType> u64;
 
+extern std::shared_ptr<TensorType> bool_;
 extern std::shared_ptr<TensorType> void_;
 
 }  // namespace galois::ir

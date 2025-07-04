@@ -234,6 +234,41 @@ class ArithmeticInstruction : public Instruction {
     Operation operation;
 };
 
+class CompareInstruction : public Instruction {
+   public:
+    enum CmpOp {
+        LT,   // <
+        LE,   // <=
+        EQ,   // ==
+        NE,   // !=
+        GT,   // >
+        GE    // >=
+    };
+
+    static std::shared_ptr<CompareInstruction> Create(CmpOp op,
+                                                      std::shared_ptr<Tensor> ir_operand0,
+                                                      std::shared_ptr<Tensor> ir_operand1) {
+        GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
+
+        auto result_shape = ir_operand0->type->NormalizeShape();
+        std::shared_ptr<CompareInstruction> self(new CompareInstruction);
+        self->cmp_op = op;
+        self->OperandResize(2);
+        self->SetOperand(0, ir_operand0);
+        self->SetOperand(1, ir_operand1);
+        self->type = TensorType::Create(bool_, result_shape);  // 输出是 bool 类型张量
+        self->tag = "CompareInstruction";
+        return self;
+    }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<CompareInstruction>(this->shared_from_this()));
+    }
+
+   public:
+    CmpOp cmp_op;
+};
+
 class Prefetch : public Instruction {
    public:
     static std::shared_ptr<Prefetch> Create(std::shared_ptr<ir::Accessor> ir_address, int64_t rw,
