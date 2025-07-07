@@ -366,7 +366,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_indexing->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_value_poitner);
     }
 
-    void Visit(std::shared_ptr<ir::view::BroadCast> ir_broad_cast) override {
+    void Visit(std::shared_ptr<ir::view::Broadcast> ir_broad_cast) override {
         this->EmitType(ir_broad_cast->type);
 
         auto pir_pointer_type = pir::PointerType::Create(ir_broad_cast->type->pir_type);

@@ -10,7 +10,7 @@ class BroadCastCreator : public op::Creator {
     static std::shared_ptr<BroadCastCreator> Create(Eigen::VectorXi64 broadcast_shape) {
         auto self = std::make_shared<BroadCastCreator>();
         self->broadcast_shape = broadcast_shape;
-        self->name = "BroadCast";
+        self->name = "Broadcast";
         self->fullname = self->name;
         return self;
     }
@@ -29,7 +29,7 @@ class BroadCastCreator : public op::Creator {
         auto ir_output = ir_builder->Alloca(ir_output_type);
 
         auto input_broadcast =
-            ir_builder->Create<ir::view::BroadCast>(ir_inputs[0], ir_output_type->shape);
+            ir_builder->Create<ir::view::Broadcast>(ir_inputs[0], ir_output_type->shape);
         auto ir_copy = op::CopyCreator::Create();
         ir_copy->ExpressInline(input_broadcast, ir_output, ir_builder);
 
