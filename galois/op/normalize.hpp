@@ -52,7 +52,7 @@ class NormalizeCreator : public op::Creator {
 
         auto ir_sum = ir_builder->ExpressCreator<op::SumCreator>({ir_inputs[0]});
         auto ir_sum_broadcast =
-            ir_builder->Create<ir::view::BroadCast>(ir_sum, ir_inputs[0]->type->shape);
+            ir_builder->Create<ir::view::Broadcast>(ir_sum, ir_inputs[0]->type->shape);
 
         auto ir_mean =
             ir_builder->ExpressCreator<op::DivCreator>({ir_sum_broadcast, ir_total_size});
@@ -62,7 +62,7 @@ class NormalizeCreator : public op::Creator {
 
         auto ir_pow_sum = ir_builder->ExpressCreator<op::SumCreator>({ir_pow});
         auto ir_pow_sum_broadcast =
-            ir_builder->Create<ir::view::BroadCast>(ir_pow_sum, ir_inputs[0]->type->shape);
+            ir_builder->Create<ir::view::Broadcast>(ir_pow_sum, ir_inputs[0]->type->shape);
 
         auto ir_epsilon = ir_builder->Alloca(ir_inputs[0]->type);
         ir_builder->ExpressCreator<op::FillCreator>(
@@ -74,9 +74,9 @@ class NormalizeCreator : public op::Creator {
         auto ir_standard = ir_builder->ExpressCreator<op::DivCreator>({ir_sub, ir_std});
 
         auto ir_gama_broadcast =
-            ir_builder->Create<ir::view::BroadCast>(ir_inputs[1], ir_inputs[0]->type->shape);
+            ir_builder->Create<ir::view::Broadcast>(ir_inputs[1], ir_inputs[0]->type->shape);
         auto ir_beta_broadcast =
-            ir_builder->Create<ir::view::BroadCast>(ir_inputs[2], ir_inputs[0]->type->shape);
+            ir_builder->Create<ir::view::Broadcast>(ir_inputs[2], ir_inputs[0]->type->shape);
 
         auto result_1 =
             ir_builder->ExpressCreator<op::MulCreator>({ir_standard, ir_gama_broadcast});

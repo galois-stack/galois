@@ -28,7 +28,7 @@ class Indexing;
 
 namespace view {
 class BitCast;
-class BroadCast;
+class Broadcast;
 class Viewer;
 class SqueezeDim;
 class UnsqueezeDim;
@@ -58,7 +58,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::Instruction> ir_instruction) {}
     virtual void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) {}
     virtual void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) {}
-    virtual void Visit(std::shared_ptr<ir::view::BroadCast> ir_broad_cast) {}
+    virtual void Visit(std::shared_ptr<ir::view::Broadcast> ir_broad_cast) {}
     virtual void Visit(std::shared_ptr<ir::Alloca> ir_alloca) {}
     virtual void Visit(std::shared_ptr<ir::Free> ir_free) {}
     virtual void Visit(std::shared_ptr<ir::Return> ir_return) {}

@@ -28,7 +28,7 @@ class SoftmaxCreator : public op::Creator {
         auto ir_exp = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_input}, "exp");
         auto ir_exp_sum = ir_builder->ExpressCreator<op::SumCreator>({ir_exp});
         auto ir_exp_sum_broadcast_view =
-            ir_builder->Create<ir::view::BroadCast>(ir_exp_sum, ir_exp->type->shape);
+            ir_builder->Create<ir::view::Broadcast>(ir_exp_sum, ir_exp->type->shape);
         auto ir_softmax =
             ir_builder->ExpressCreator<op::DivCreator>({ir_exp, ir_exp_sum_broadcast_view});
         ir_builder->Return(ir_softmax);

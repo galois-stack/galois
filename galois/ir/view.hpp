@@ -26,11 +26,11 @@ class BitCast : public Instruction {
     }
 };
 
-class BroadCast : public Instruction {
+class Broadcast : public Instruction {
    public:
-    static std::shared_ptr<BroadCast> Create(std::shared_ptr<Tensor> ir_value,
+    static std::shared_ptr<Broadcast> Create(std::shared_ptr<Tensor> ir_value,
                                              Eigen::MatrixXi64 output_shape) {
-        std::shared_ptr<BroadCast> self(new BroadCast);
+        std::shared_ptr<Broadcast> self(new Broadcast);
         self->OperandResize(1);
         self->Tensor(ir_value);
 
@@ -64,7 +64,7 @@ class BroadCast : public Instruction {
         // self->type = ir::TensorType::Create(ir_value->type->DataType(), output_shape,
         // new_stride);
 
-        self->tag = "BroadCast";
+        self->tag = "Broadcast";
         return self;
     }
 
@@ -72,7 +72,7 @@ class BroadCast : public Instruction {
     void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
 
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
-        interpreter->Visit(Cast<BroadCast>(this->shared_from_this()));
+        interpreter->Visit(Cast<Broadcast>(this->shared_from_this()));
     }
 };
 
