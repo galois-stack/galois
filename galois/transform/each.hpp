@@ -39,6 +39,9 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) override {
         this->callback(ir_arithmetic_instruction);
     }
+    void Visit(std::shared_ptr<ir::CompareInstruction> ir_compare_instruction) override {
+        this->callback(ir_compare_instruction);
+    }
     void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {
         this->callback(ir_bit_cast);
     }

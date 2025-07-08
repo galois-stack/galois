@@ -117,6 +117,33 @@ class IRPrinter : public ir::Visitor {
                << GetVariableName(ir_arith->GetOperand(1)) << ";\n";
     }
 
+    void Visit(std::shared_ptr<CompareInstruction> ir_compare) override {
+        std::string op;
+        switch (ir_compare->operation) {
+            case galois::ir::CompareInstruction::Equal:
+                op = "Equal";
+                break;
+            case CompareInstruction::NotEqual:
+                op = "NotEqual";
+                break;
+            case CompareInstruction::Less:
+                op = "Less";
+                break;
+            case CompareInstruction::LessEqual:
+                op = "LessEqual";
+                break;
+            case CompareInstruction::Greater:
+                op = "Greater";
+                break;
+            case CompareInstruction::GreaterEqual:
+                op = "GreaterEqual";
+                break;
+        }
+        output << GetVariableName(ir_compare) << " = " << op << " "
+               << GetVariableName(ir_compare->GetOperand(0)) << ", "
+               << GetVariableName(ir_compare->GetOperand(1)) << ";\n";
+    }
+
     void Visit(std::shared_ptr<ConstantFloat> ir_constant_float) override {
         output << GetVariableName(ir_constant_float) << " = "
                << TypeToString(ir_constant_float->type) << " " << ir_constant_float->value << ";\n";

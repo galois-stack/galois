@@ -70,4 +70,26 @@ class ConstantFloat : public ConstantRealNumber {
     bool is_negative = false;
 };
 
+class ConstantBool : public Constant {
+   protected:
+    ConstantBool() = default;
+
+   public:
+    static std::shared_ptr<ConstantBool> Create(std::shared_ptr<TensorType> type, bool value) {
+        GALOIS_ASSERT(type);
+        std::shared_ptr<ConstantBool> self(new ConstantBool);
+        self->type = type;
+        self->value = value;
+        self->tag = "ConstantBool";
+        return self;
+    }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<ConstantBool>(this->shared_from_this()));
+    }
+
+   public:
+    bool value;
+};
+
 }  // namespace galois::ir

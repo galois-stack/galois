@@ -234,6 +234,44 @@ class ArithmeticInstruction : public Instruction {
     Operation operation;
 };
 
+class CompareInstruction : public Instruction {
+   public:
+    enum Operation {
+        Equal,      // ==
+        NotEqual,   // !=
+        Less,       // <
+        LessEqual,  // <=
+        Greater,    // >
+        GreaterEqual, // >=
+    };
+
+    static std::shared_ptr<CompareInstruction> Create(Operation op,
+                                                      std::shared_ptr<Tensor> ir_operand0,
+                                                      std::shared_ptr<Tensor> ir_operand1) {
+        GALOIS_ASSERT(ir_operand0->type == ir_operand1->type);
+        std::shared_ptr<CompareInstruction> self(new CompareInstruction);
+        self->operation = op;
+        self->OperandResize(2);
+        self->SetOperand(0, ir_operand0);
+        self->SetOperand(1, ir_operand1);
+        if (ir_operand0->type->IsScalar()) {
+            self->type = ir::bool_;
+        } else {
+            // For tensors, return tensor of booleans with same shape
+            self->type = ir::TensorType::Create(ir::bool_, ir_operand0->type->shape);
+        }
+        self->tag = "CompareInstruction";
+        return self;
+    }
+
+    void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
+        interpreter->Visit(Cast<CompareInstruction>(this->shared_from_this()));
+    }
+
+   public:
+    Operation operation;
+};
+
 class Prefetch : public Instruction {
    public:
     static std::shared_ptr<Prefetch> Create(std::shared_ptr<ir::Accessor> ir_address, int64_t rw,

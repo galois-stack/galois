@@ -93,6 +93,20 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_arithmetic_instruction] = ir_new;
     }
 
+    void Visit(std::shared_ptr<CompareInstruction> ir_compare_instruction) override {
+        if (tensor_dict.count(ir_compare_instruction)) {
+            return;
+        }
+
+        ir_compare_instruction->GetOperand(0)->ApplyVisitor(this->shared_from_this());
+        ir_compare_instruction->GetOperand(1)->ApplyVisitor(this->shared_from_this());
+        auto ir_new =
+            CompareInstruction::Create(ir_compare_instruction->operation,
+                                      tensor_dict[ir_compare_instruction->GetOperand(0)],
+                                      tensor_dict[ir_compare_instruction->GetOperand(1)]);
+        tensor_dict[ir_compare_instruction] = ir_new;
+    }
+
     void Visit(std::shared_ptr<view::BitCast> ir_bit_cast) override {
         if (tensor_dict.count(ir_bit_cast)) {
             return;

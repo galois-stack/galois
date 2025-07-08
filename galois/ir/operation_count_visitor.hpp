@@ -46,6 +46,10 @@ class OperationCounter : public ir::Visitor {
         operation_count_stack.top() += ir_arithmetic_instruction->type->NormalizeSize();
     }
 
+    void Visit(std::shared_ptr<ir::CompareInstruction> ir_compare_instruction) override {
+        operation_count_stack.top() += ir_compare_instruction->type->NormalizeSize();
+    }
+
     void Visit(std::shared_ptr<ir::Call> ir_call) override {
         this->operation_count_stack.push(0);
         ir_call->Operator()->ApplyVisitor(this->shared_from_this());

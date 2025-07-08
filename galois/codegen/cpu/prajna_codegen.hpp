@@ -56,6 +56,11 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 return ir_type->pir_type;
             }
 
+            if (auto ir_bool_type = Cast<ir::BoolType>(ir_type)) {
+                ir_type->pir_type = pir::BoolType::Create();
+                return ir_type->pir_type;
+            }
+
             GALOIS_TODO;
         }
 
@@ -247,6 +252,73 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ir_arithmetic_instruction->GetOperand(1)->pir_value);
     }
 
+    void Visit(std::shared_ptr<ir::CompareInstruction> ir_compare_instruction) override {
+        auto ir_operand_type = ir_compare_instruction->GetOperand(0)->type->DataType();
+
+        pir::CompareInstruction::Operation pir_compare_operation = pir::CompareInstruction::Operation::None;
+
+        // Handle different comparison operations
+        if (ir_compare_instruction->operation == ir::CompareInstruction::Equal) {
+            if (Is<ir::FloatType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::FCMP_OEQ;
+            } else if (Is<ir::IntType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::ICMP_EQ;
+            }
+        } else if (ir_compare_instruction->operation == ir::CompareInstruction::NotEqual) {
+            if (Is<ir::FloatType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::FCMP_UNE;
+            } else if (Is<ir::IntType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::ICMP_NE;
+            }
+        } else if (ir_compare_instruction->operation == ir::CompareInstruction::Less) {
+            if (Is<ir::FloatType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::FCMP_OLT;
+            } else if (auto ir_int_type = Cast<ir::IntType>(ir_operand_type)) {
+                if (ir_int_type->is_signed) {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_SLT;
+                } else {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_ULT;
+                }
+            }
+        } else if (ir_compare_instruction->operation == ir::CompareInstruction::LessEqual) {
+            if (Is<ir::FloatType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::FCMP_OLE;
+            } else if (auto ir_int_type = Cast<ir::IntType>(ir_operand_type)) {
+                if (ir_int_type->is_signed) {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_SLE;
+                } else {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_ULE;
+                }
+            }
+        } else if (ir_compare_instruction->operation == ir::CompareInstruction::Greater) {
+            if (Is<ir::FloatType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::FCMP_OGT;
+            } else if (auto ir_int_type = Cast<ir::IntType>(ir_operand_type)) {
+                if (ir_int_type->is_signed) {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_SGT;
+                } else {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_UGT;
+                }
+            }
+        } else if (ir_compare_instruction->operation == ir::CompareInstruction::GreaterEqual) {
+            if (Is<ir::FloatType>(ir_operand_type)) {
+                pir_compare_operation = pir::CompareInstruction::Operation::FCMP_OGE;
+            } else if (auto ir_int_type = Cast<ir::IntType>(ir_operand_type)) {
+                if (ir_int_type->is_signed) {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_SGE;
+                } else {
+                    pir_compare_operation = pir::CompareInstruction::Operation::ICMP_UGE;
+                }
+            }
+        }
+
+        GALOIS_ASSERT(pir_compare_operation != pir::CompareInstruction::Operation::None);
+
+        ir_compare_instruction->pir_value = pir_builder->Create<pir::CompareInstruction>(
+            pir_compare_operation, ir_compare_instruction->GetOperand(0)->pir_value,
+            ir_compare_instruction->GetOperand(1)->pir_value);
+    }
+
     void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) override {
         this->EmitType(ir_constant_int->type);
         ir_constant_int->pir_value = pir_builder->Create<pir::ConstantInt>(
@@ -262,6 +334,12 @@ class PrajnaCodegen : public galois::ir::Visitor {
         return;
 
         GALOIS_UNREACHABLE;
+    }
+
+    void Visit(std::shared_ptr<ir::ConstantBool> ir_constant_bool) override {
+        this->EmitType(ir_constant_bool->type);
+        ir_constant_bool->pir_value = pir_builder->Create<pir::ConstantBool>(ir_constant_bool->value);
+        return;
     }
 
     std::shared_ptr<pir::Value> GetPrajnaPointerFromTensor(std::shared_ptr<ir::Tensor> ir_tensor) {
