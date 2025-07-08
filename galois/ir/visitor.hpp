@@ -8,10 +8,12 @@ class Constant;
 class ConstantRealNumber;
 class ConstantInt;
 class ConstantFloat;
+class ConstantBool;
 class Block;
 class Grid;
 class Instruction;
 class ArithmeticInstruction;
+class CompareInstruction;
 class Operator;
 class Input;
 class Alloca;
@@ -48,6 +50,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::ConstantRealNumber> ir_constant_real_number) {}
     virtual void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) {}
     virtual void Visit(std::shared_ptr<ir::ConstantFloat> ir_constant_float) {}
+    virtual void Visit(std::shared_ptr<ir::ConstantBool> ir_constant_bool) {}
     virtual void Visit(std::shared_ptr<ir::Tensor> ir_tensor) {}
     virtual void Visit(std::shared_ptr<ir::Input> ir_input) {}
     virtual void Visit(std::shared_ptr<ir::Block> ir_block) {}
@@ -57,6 +60,7 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::GridIndex> ir_grid_index) {}
     virtual void Visit(std::shared_ptr<ir::Instruction> ir_instruction) {}
     virtual void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) {}
+    virtual void Visit(std::shared_ptr<ir::CompareInstruction> ir_compare_instruction) {}
     virtual void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) {}
     virtual void Visit(std::shared_ptr<ir::view::Broadcast> ir_broad_cast) {}
     virtual void Visit(std::shared_ptr<ir::Alloca> ir_alloca) {}

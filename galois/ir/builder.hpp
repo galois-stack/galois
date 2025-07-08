@@ -133,6 +133,8 @@ class Builder : public std::enable_shared_from_this<Builder> {
             return this->Create<ir::ConstantFloat>(ir_type, v);
         } else if (auto ir_int_type = Cast<IntType>(ir_type)) {
             return this->Create<ir::ConstantInt>(ir_type, static_cast<int64_t>(v));
+        } else if (auto ir_bool_type = Cast<BoolType>(ir_type)) {
+            return this->Create<ir::ConstantBool>(ir_type, v != 0.0);
         } else {
             GALOIS_ASSERT(false);
         }
@@ -166,6 +168,43 @@ class Builder : public std::enable_shared_from_this<Builder> {
                                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
         return this->Create<ir::ArithmeticInstruction>(ir::ArithmeticInstruction::Div, ir_tensor1,
                                                        ir_tensor2);
+    }
+
+    // Compare operations
+    std::shared_ptr<ir::CompareInstruction> Equal(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                                  std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::CompareInstruction>(ir::CompareInstruction::Equal, ir_tensor1,
+                                                   ir_tensor2);
+    }
+
+    std::shared_ptr<ir::CompareInstruction> NotEqual(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                                     std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::CompareInstruction>(ir::CompareInstruction::NotEqual, ir_tensor1,
+                                                   ir_tensor2);
+    }
+
+    std::shared_ptr<ir::CompareInstruction> Less(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                                 std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::CompareInstruction>(ir::CompareInstruction::Less, ir_tensor1,
+                                                   ir_tensor2);
+    }
+
+    std::shared_ptr<ir::CompareInstruction> LessEqual(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                                      std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::CompareInstruction>(ir::CompareInstruction::LessEqual, ir_tensor1,
+                                                   ir_tensor2);
+    }
+
+    std::shared_ptr<ir::CompareInstruction> Greater(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                                    std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::CompareInstruction>(ir::CompareInstruction::Greater, ir_tensor1,
+                                                   ir_tensor2);
+    }
+
+    std::shared_ptr<ir::CompareInstruction> GreaterEqual(std::shared_ptr<ir::Tensor> ir_tensor1,
+                                                         std::shared_ptr<ir::Tensor> ir_tensor2) {
+        return this->Create<ir::CompareInstruction>(ir::CompareInstruction::GreaterEqual, ir_tensor1,
+                                                   ir_tensor2);
     }
 
     std::shared_ptr<ir::Indexing> Indexing(std::shared_ptr<ir::Tensor> ir_tensor,

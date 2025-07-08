@@ -21,7 +21,7 @@ std::shared_ptr<TensorType> u8(IntType::Create(8, false));
 std::shared_ptr<TensorType> u16(IntType::Create(16, false));
 std::shared_ptr<TensorType> u32(IntType::Create(32, false));
 std::shared_ptr<TensorType> u64(IntType::Create(64, false));
-
+std::shared_ptr<TensorType> bool_(BoolType::Create());
 std::shared_ptr<TensorType> void_(VoidType::Create());
 
 }  // namespace galois::ir
