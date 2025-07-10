@@ -62,8 +62,8 @@ public:
                  std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_output_type = this->InferType(ir::GetTensorTypes(ir_inputs));
         auto ir_output = ir_builder->Alloca(ir_output_type);
-        auto zero = ir_builder->GetZero(ir_output->type->DataType());
-        ir_builder->ExpressCreator<op::FillCreator>({ir_output, zero});
+        ir_builder->ExpressCreator<op::FillCreator>({ir_output, 
+                    ir_builder->GetZero(ir_output->type->DataType())});
         this->ExpressInline(ir_inputs, ir_output, ir_builder);
         ir_builder->Return(ir_output);
     }
