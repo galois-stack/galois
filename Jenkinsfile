@@ -43,6 +43,16 @@ pipeline{
                                 sh 'git --version'
                             }
                         }
+                        stage('clean') {
+                            when { allOf {
+                                anyOf { branch 'main'; branch 'dev' }
+                                triggeredBy "TimerTrigger"
+                            } }
+                            steps {
+                                sh 'git submodule deinit  --force --all'
+                                sh 'git clean -xdf .'
+                            }
+                        }
                         stage('build') {
                             steps {
                                 sh './scripts/clone_submodules.sh -f --jobs=4 --depth=50'
@@ -82,6 +92,16 @@ pipeline{
                                 sh 'pwd'
                                 sh 'git --version'
                                 sh 'git config --global --list'
+                            }
+                        }
+                        stage('clean') {
+                            when { allOf {
+                                anyOf { branch 'main'; branch 'dev' }
+                                triggeredBy "TimerTrigger"
+                            } }
+                            steps {
+                                sh 'git submodule deinit  --force --all'
+                                sh 'git clean -xdf .'
                             }
                         }
                         stage('format') {
