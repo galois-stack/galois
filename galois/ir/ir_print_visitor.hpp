@@ -144,6 +144,13 @@ class IRPrinter : public ir::Visitor {
                << GetVariableName(ir_compare->GetOperand(1)) << ";\n";
     }
 
+    void Visit(std::shared_ptr<SelectInstruction> ir_select) override {
+        output << GetVariableName(ir_select) << " = Select "
+               << GetVariableName(ir_select->Condition()) << ", "
+               << GetVariableName(ir_select->TrueValue()) << ", "
+               << GetVariableName(ir_select->FalseValue()) << ";\n";
+    }
+
     void Visit(std::shared_ptr<ConstantFloat> ir_constant_float) override {
         output << GetVariableName(ir_constant_float) << " = "
                << TypeToString(ir_constant_float->type) << " " << ir_constant_float->value << ";\n";

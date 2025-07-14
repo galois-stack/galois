@@ -107,6 +107,21 @@ class CloneVisitor : public Visitor {
         tensor_dict[ir_compare_instruction] = ir_new;
     }
 
+    void Visit(std::shared_ptr<SelectInstruction> ir_select_instruction) override {
+        if (tensor_dict.count(ir_select_instruction)) {
+            return;
+        }
+
+        ir_select_instruction->Condition()->ApplyVisitor(this->shared_from_this());
+        ir_select_instruction->TrueValue()->ApplyVisitor(this->shared_from_this());
+        ir_select_instruction->FalseValue()->ApplyVisitor(this->shared_from_this());
+        auto ir_new = SelectInstruction::Create(
+            tensor_dict[ir_select_instruction->Condition()],
+            tensor_dict[ir_select_instruction->TrueValue()],
+            tensor_dict[ir_select_instruction->FalseValue()]);
+        tensor_dict[ir_select_instruction] = ir_new;
+    }
+
     void Visit(std::shared_ptr<view::BitCast> ir_bit_cast) override {
         if (tensor_dict.count(ir_bit_cast)) {
             return;
