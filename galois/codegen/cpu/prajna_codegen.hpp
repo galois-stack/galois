@@ -319,6 +319,13 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ir_compare_instruction->GetOperand(1)->pir_value);
     }
 
+    void Visit(std::shared_ptr<ir::SelectInstruction> ir_select_instruction) override {
+        ir_select_instruction->pir_value = pir_builder->Create<pir::Select>(
+            ir_select_instruction->Condition()->pir_value,
+            ir_select_instruction->TrueValue()->pir_value,
+            ir_select_instruction->FalseValue()->pir_value);
+    }
+
     void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) override {
         this->EmitType(ir_constant_int->type);
         ir_constant_int->pir_value = pir_builder->Create<pir::ConstantInt>(

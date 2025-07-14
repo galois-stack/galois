@@ -12,6 +12,7 @@
 #include "galois/op/normalize.hpp"
 #include "galois/op/pack.hpp"
 #include "galois/op/padding.hpp"
+#include "galois/op/select.hpp"
 #include "galois/op/sigmoid.hpp"
 #include "galois/op/slice.hpp"
 #include "galois/op/softmax.hpp"

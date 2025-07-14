@@ -207,6 +207,13 @@ class Builder : public std::enable_shared_from_this<Builder> {
                                                    ir_tensor2);
     }
 
+    // Select operation
+    std::shared_ptr<ir::SelectInstruction> Select(std::shared_ptr<ir::Tensor> ir_condition,
+                                                  std::shared_ptr<ir::Tensor> ir_true_value,
+                                                  std::shared_ptr<ir::Tensor> ir_false_value) {
+        return this->Create<ir::SelectInstruction>(ir_condition, ir_true_value, ir_false_value);
+    }
+
     std::shared_ptr<ir::Indexing> Indexing(std::shared_ptr<ir::Tensor> ir_tensor,
                                            std::vector<std::shared_ptr<ir::Tensor>> ir_indices) {
         return this->Create<ir::Indexing>(ir_tensor, ir_indices);

@@ -49,6 +49,10 @@ class IncreaseVisitor : public ir::Visitor {
         this->IncreaseReferenceCount(ir_call);
     }
 
+    void Visit(std::shared_ptr<ir::SelectInstruction> ir_select_instruction) override {
+        this->IncreaseViewInstruction(ir_select_instruction);
+    }
+
     void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {
         this->IncreaseViewInstruction(ir_viewer);
     }
@@ -159,6 +163,10 @@ class DecreaseVisitor : public ir::Visitor {
         if (this->IsFree(ir_call) && !Is<ir::VoidType>(ir_call->type)) {
             FreeTensor(ir_call);
         }
+    }
+
+    void Visit(std::shared_ptr<ir::SelectInstruction> ir_select_instruction) override {
+        this->DecreaseViewInstruction(ir_select_instruction);
     }
 
     void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {
