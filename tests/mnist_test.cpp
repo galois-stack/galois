@@ -1,4 +1,5 @@
 #include "galois/op/fill.hpp"
+#include "galois/op/relu.hpp"
 #include "mnist_helper.hpp"
 #include "tests/galois_test.hpp"
 
@@ -37,8 +38,7 @@ TEST(GaloisTests, TestMnistLinear) {
         ir_builder->Create<ir::io::LoadBinary>(ir_weights_type2, "tests/models/mnist/weight2.bin");
     // First layer: fully connected + relu
     auto ir_full1 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_input, ir_weight1});
-    auto ir_relu1 =
-        ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_full1}, "relu", false);
+    auto ir_relu1 = ir_builder->ExpressCreator<op::ReluCreator>({ir_full1});
     // Second layer: fully connected + softmax
     auto ir_full2 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_relu1, ir_weight2});
     auto ir_softmax = ir_builder->ExpressCreator<op::SoftmaxCreator>({ir_full2});  // softmax
@@ -91,18 +91,18 @@ TEST(GaloisTests, TestMnistCNN) {
  
     // Conv1 + ReLU: [28,28,1] -> [12,12,32] (kernel=5, stride=2, (28-5)/2+1=12)
     auto ir_conv1 = ir_builder->ExpressCreator<op::ConvolutionNDCreator<2>>({ir_input, ir_conv1_weights}, std::array<int, 2>{2, 2});
-    auto ir_relu1 = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_conv1}, "relu", false);
+    auto ir_relu1 = ir_builder->ExpressCreator<op::ReluCreator>({ir_conv1});
         
     // Conv2 + ReLU: [12,12,32] -> [4,4,64] (kernel=5, stride=2, (12-5)/2+1=4)
     auto ir_conv2 = ir_builder->ExpressCreator<op::ConvolutionNDCreator<2>>({ir_relu1, ir_conv2_weights}, std::array<int, 2>{2, 2});
-    auto ir_relu2 = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_conv2}, "relu", false);
+    auto ir_relu2 = ir_builder->ExpressCreator<op::ReluCreator>({ir_conv2});
         
     // Flatten: [64, 4, 4] -> [1, 1024] 
     auto ir_flatten = ir_builder->Create<ir::view::BitCast>(ir_relu2, ir::f32->Tile(1, 4*4*64));
         
     // FC1 + ReLU
     auto ir_fc1 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_flatten, ir_fc1_weights});
-    auto ir_relu3 = ir_builder->ExpressCreator<op::UnaryInstrinsicCreator>({ir_fc1}, "relu", false);
+    auto ir_relu3 = ir_builder->ExpressCreator<op::ReluCreator>({ir_fc1});
         
     // FC2 + Softmax
     auto ir_fc2 = ir_builder->ExpressCreator<op::MatrixMultiplyCreator>({ir_relu3, ir_fc2_weights});
