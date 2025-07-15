@@ -44,10 +44,12 @@ pipeline{
                             }
                         }
                         stage('clean') {
-                            when { allOf {
-                                anyOf { branch 'main'; branch 'dev' }
-                                triggeredBy "TimerTrigger"
-                            } }
+                            when {
+                                anyOf {
+                                    branch 'main'
+                                    branch 'dev'
+                                }
+                            }
                             steps {
                                 sh 'git submodule deinit  --force --all'
                                 sh 'git clean -xdf .'
@@ -95,10 +97,12 @@ pipeline{
                             }
                         }
                         stage('clean') {
-                            when { allOf {
-                                anyOf { branch 'main'; branch 'dev' }
-                                triggeredBy "TimerTrigger"
-                            } }
+                            when {
+                                anyOf {
+                                    branch 'main'
+                                    branch 'dev'
+                                }
+                            }
                             steps {
                                 sh 'git submodule deinit  --force --all'
                                 sh 'git clean -xdf .'
