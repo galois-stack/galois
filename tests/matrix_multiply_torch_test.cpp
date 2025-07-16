@@ -3,7 +3,6 @@
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/optimization/gemm_optimizer.hpp"
 #include "tests/galois_test.hpp"
-#include "error_calculation.h"
 
 TEST(GaloisTests, TestMatrixMultiplyKernel) {
     auto native_cpu_info = optimization::NativeCpuInfo::Create();
