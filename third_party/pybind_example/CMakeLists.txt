@@ -37,7 +37,7 @@ file(GLOB_RECURSE PYBIND_EXAMPLE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 add_library(pybind_example STATIC ${PYBIND_EXAMPLE_SOURCES})
 
 target_link_libraries(pybind_example
-    PRIVATE pybind11::pybind11
+    PUBLIC pybind11::pybind11
     PRIVATE ${TORCH_LIBRARIES}
     PRIVATE Python3::Python
 )
