@@ -3,4 +3,6 @@ set -e
 
 build_dir=build_$1
 
-./$build_dir/bin/galois_test $@
+# ./$build_dir/bin/galois_test $@
+
+gdb ./$build_dir/bin/galois_test $@
