@@ -2,8 +2,18 @@
 #include "pybind_example.h"
 #include <fmt/core.h>
 
+void init_python() {
+    static bool initialized = false;
+    if (!initialized) {
+        pybind11::initialize_interpreter();
+        initialized = true;
+    }
+}
+
 void calculate_error(void* mem_a, void* mem_b, void* mem_c, int normalize_m, int normalize_k, int normalize_n) {
-    pybind11::scoped_interpreter guard{};
+    init_python();
+
+    // pybind11::scoped_interpreter guard{};
 
     // 使用pybind11thon的Numpybind11和pybind11Torch进行误差计算
     pybind11::module_ torch = pybind11::module_::import("torch");

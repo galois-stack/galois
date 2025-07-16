@@ -3,18 +3,16 @@ project(pybind_example LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(PYBIND11_EXAMPLE_BASE_DIR "/home/wanrui/miniconda3/envs/torch-1.13/")
+set(PYBIND11_EXAMPLE_BASE_DIR "/home/wanrui/miniconda3/envs/torch-2.5/")
 
-# list(APPEND CMAKE_PREFIX_PATH
-#     $ENV{CONDA_PREFIX}/lib/python3.10/site-packages/pybind11/share/cmake/pybind11
-#     $ENV{CONDA_PREFIX}/lib/python3.10/site-packages/torch/share/cmake/Torch
-# )
+set(pybind11_DIR ${PYBIND11_EXAMPLE_BASE_DIR}/lib/python3.12/site-packages/pybind11/share/cmake/pybind11)
+set(Torch_DIR ${PYBIND11_EXAMPLE_BASE_DIR}/lib/python3.12/site-packages/torch/share/cmake/Torch)
 
-set(pybind11_DIR ${PYBIND11_EXAMPLE_BASE_DIR}/lib/python3.10/site-packages/pybind11/share/cmake/pybind11)
-set(Torch_DIR ${PYBIND11_EXAMPLE_BASE_DIR}/lib/python3.10/site-packages/torch/share/cmake/Torch)
-
-set(Python3_EXECUTABLE ${PYBIND11_EXAMPLE_BASE_DIR}/bin/python3.10)
+# set(Python3_EXECUTABLE ${PYBIND11_EXAMPLE_BASE_DIR}/bin/python3.12)
+set(Python3_EXECUTABLE /usr/bin/python3)
 find_package(Python3 COMPONENTS Development REQUIRED)
+message(STATUS "Python version (example): ${Python3_VERSION}")
+message(STATUS "Python interpreter path (example): ${Python3_EXECUTABLE}")
 
 find_package(pybind11 CONFIG REQUIRED)
 if(pybind11_FOUND)
@@ -39,7 +37,7 @@ add_library(pybind_example STATIC ${PYBIND_EXAMPLE_SOURCES})
 target_link_libraries(pybind_example
     PUBLIC pybind11::pybind11
     PRIVATE ${TORCH_LIBRARIES}
-    PRIVATE Python3::Python
+    PUBLIC Python3::Python
 )
 
 target_include_directories(pybind_example

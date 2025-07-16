@@ -7,6 +7,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # 用于智能提示
 set(CMAKE_CXX_STANDARD 23) # c++20目前系统库还不支持, 没有必要
 set(CXX_STANDARD_REQUIRED ON)
 
+# set(PYBIND11_EXAMPLE_BASE_DIR "/home/wanrui/miniconda3/envs/torch-2.5/")
+# set(Python3_EXECUTABLE ${PYBIND11_EXAMPLE_BASE_DIR}/bin/python3.12)
+set(Python3_EXECUTABLE /usr/bin/python3)
+find_package(Python3 COMPONENTS Development REQUIRED)
+message(STATUS "Python version: ${Python3_VERSION}")
+message(STATUS "Python interpreter path: ${Python3_EXECUTABLE}")
+
 if (${CMAKE_BUILD_TYPE} STREQUAL "debug")
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
