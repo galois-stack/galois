@@ -3,9 +3,9 @@
 #include <chrono>
 
 #include "benchmark/benchmark.h"
-#include "pybind_example.h"
 #include "galois/galois.hpp"
 #include "gtest/gtest.h"
+#include "pybind_example.h"
 
 using namespace galois;
 using namespace galois::ir;

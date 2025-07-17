@@ -1,12 +1,14 @@
 #ifndef PYBIND_EXAMPLE_H
 #define PYBIND_EXAMPLE_H
 
-#include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+
 #include <memory>
 
 // 定义一个函数来计算误差
-void calculate_error(void* mem_a, void* mem_b, void* mem_c, int normalize_m, int normalize_k, int normalize_n);
+void calculate_error(void* mem_a, void* mem_b, void* mem_c, int normalize_m, int normalize_k,
+                     int normalize_n);
 
-#endif // PYBIND_EXAMPLE_H
+#endif  // PYBIND_EXAMPLE_H

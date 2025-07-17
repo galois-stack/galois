@@ -34,9 +34,9 @@ TEST(GaloisTests, TestMatrixMultiply_Compare) {
         galois::auto_aligned_alloc(normalize_m * normalize_n * ir::f32->bytes),
         [](void *p) { free(p); });
 
-    float* a_data = static_cast<float*>(sp_aligned256_mem_a.get());
-    float* b_data = static_cast<float*>(sp_aligned256_mem_b.get());
-    float* c_data_torch = static_cast<float*>(sp_aligned256_mem_c_torch.get());
+    float *a_data = static_cast<float *>(sp_aligned256_mem_a.get());
+    float *b_data = static_cast<float *>(sp_aligned256_mem_b.get());
+    float *c_data_torch = static_cast<float *>(sp_aligned256_mem_c_torch.get());
 
     for (int i = 0; i < normalize_m * normalize_k; ++i) {
         a_data[i] = static_cast<float>(rand()) / RAND_MAX * 10.0f;
@@ -53,23 +53,22 @@ TEST(GaloisTests, TestMatrixMultiply_Compare) {
     // }
     std::fill(c_data_torch, c_data_torch + normalize_m * normalize_n, 0.0f);
 
-    auto c_data = mat_mul_fun(
-            static_cast<float*>(sp_aligned256_mem_a.get()),
-            static_cast<float*>(sp_aligned256_mem_b.get())
-        );
+    auto c_data = mat_mul_fun(static_cast<float *>(sp_aligned256_mem_a.get()),
+                              static_cast<float *>(sp_aligned256_mem_b.get()));
 
-    calculate_error(sp_aligned256_mem_a.get(), sp_aligned256_mem_b.get(), sp_aligned256_mem_c_torch.get(), normalize_m, normalize_k, normalize_n);
+    calculate_error(sp_aligned256_mem_a.get(), sp_aligned256_mem_b.get(),
+                    sp_aligned256_mem_c_torch.get(), normalize_m, normalize_k, normalize_n);
 
     int length = normalize_m * normalize_n;
     int error_num = 0;
     for (int i = 0; i < length; i++) {
-        if(error_num >= 10){
-            GALOIS_ASSERT(error_num==0);
+        if (error_num >= 10) {
+            GALOIS_ASSERT(error_num == 0);
         }
         float result = c_data[i];
         float result_torch = c_data_torch[i];
         fmt::print("Index:{:2d} Galois:{:.6f} Pytorch:{:.6f} \n", i, result, result_torch);
-        if (std::abs(result - result_torch) > 1e-5f){
+        if (std::abs(result - result_torch) > 1e-5f) {
             error_num++;
         }
     }
