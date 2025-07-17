@@ -23,4 +23,4 @@ fi
 CONDA_ENV="$CONDA_PREFIX"
 export LD_LIBRARY_PATH="${CONDA_ENV}/lib:${LD_LIBRARY_PATH}"
 
-gdb ./$build_dir/bin/galois_test "$@"
+./$build_dir/bin/galois_test "$@"
