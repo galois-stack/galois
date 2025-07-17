@@ -24,9 +24,9 @@ void calculate_error(void* mem_a, void* mem_b, void* mem_c, int normalize_m, int
     pybind11::array_t<float> arr_c_custom({normalize_m, normalize_n}, static_cast<float*>(mem_c));
     
     // 转换为pybind11Torch张量
-    pybind11::object tensor_a = torch.attr("from_numpybind11")(arr_a);
-    pybind11::object tensor_b = torch.attr("from_numpybind11")(arr_b);
-    pybind11::object tensor_c_custom = torch.attr("from_numpybind11")(arr_c_custom);
+    pybind11::object tensor_a = torch.attr("from_numpy")(arr_a);
+    pybind11::object tensor_b = torch.attr("from_numpy")(arr_b);
+    pybind11::object tensor_c_custom = torch.attr("from_numpy")(arr_c_custom);
     
     // 执行矩阵乘法
     pybind11::object tensor_c = tensor_a.attr("matmul")(tensor_b);
@@ -35,4 +35,8 @@ void calculate_error(void* mem_a, void* mem_b, void* mem_c, int normalize_m, int
     pybind11::object abs_error = tensor_c.attr("sub")(tensor_c_custom).attr("abs")();
     float max_error = abs_error.attr("max")().attr("item")().cast<float>();
     float mean_error = abs_error.attr("mean")().attr("item")().cast<float>();
+
+    // 使用 printf 打印结果
+    printf("Maximum error: %.6f\n", max_error);
+    printf("Average Error: %.6f\n", mean_error);
 }
