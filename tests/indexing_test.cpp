@@ -11,8 +11,8 @@ TEST(GaloisTests, TestIndexing2DArray) {
     auto [ir_operator, _] = ir_builder->CreateOperator(ir_operator_type, "indexing_test");
 
     // Create indexing with constant indices [1, 2]
-    auto ir_index0 = ir_builder->GetInt64Constant(1);
-    auto ir_index1 = ir_builder->GetInt64Constant(2);
+    auto ir_index0 = ir_builder->GetConstant<int64_t>(1);
+    auto ir_index1 = ir_builder->GetConstant<int64_t>(2);
     auto ir_input = ir_operator->inputs[0];
     auto ir_indexing = ir_builder->Create<ir::Indexing>(
         ir_input, std::vector<std::shared_ptr<ir::Tensor>>{ir_index0, ir_index1});
