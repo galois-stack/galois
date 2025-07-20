@@ -100,7 +100,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         std::unique_ptr<ScopeExit> thread_guard;
         if (ir_grid->enable_multi_thread) {
-            auto pir_thread_num = pir_builder->GetInt32Constant(12);
+            auto pir_thread_num = pir_builder->GetConstant<int32_t>(12);
             auto pir_i32_function_type_i64 = pir::FunctionType::Create(
                 {pir::IntType::Create(32, true)}, pir::IntType::Create(64, true));
             auto pir_thpool_init =
@@ -121,11 +121,10 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_grid->index->ApplyVisitor(this->shared_from_this());
 
         for (int64_t i = 0; i < ir_grid->shape.size(); ++i) {
-            auto pir_first_value = pir_builder->GetInt64Constant(0);
-            auto pir_last_value = pir_builder->GetInt64Constant(ir_grid->shape[i]);
+            auto pir_first_value = pir_builder->GetConstant<int64_t>(0);
+            auto pir_last_value = pir_builder->GetConstant<int64_t>(ir_grid->shape[i]);
             auto ir_loop_block = pir::Block::Create();
-            auto pir_scalar_index =
-                pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
+            auto pir_scalar_index = pir_builder->Create<pir::LocalVariable>(pir::i64);
             pir_scalar_index->fullname = "idx";
             auto ir_for = pir_builder->Create<pir::For>(pir_scalar_index, pir_first_value,
                                                         pir_last_value, ir_loop_block);
@@ -135,8 +134,9 @@ class PrajnaCodegen : public galois::ir::Visitor {
             pir_builder->PushBlock(ir_loop_block);
 
             pir_builder->Create<pir::WriteVariableLiked>(
-                pir_scalar_index, pir_builder->Create<pir::IndexArray>(
-                                      ir_grid->index->pir_value, pir_builder->GetInt64Constant(i)));
+                pir_scalar_index,
+                pir_builder->Create<pir::IndexArray>(ir_grid->index->pir_value,
+                                                     pir_builder->GetConstant<int64_t>(i)));
         }
 
         ir_grid->block->ApplyVisitor(this->shared_from_this());
@@ -255,7 +255,8 @@ class PrajnaCodegen : public galois::ir::Visitor {
     void Visit(std::shared_ptr<ir::CompareInstruction> ir_compare_instruction) override {
         auto ir_operand_type = ir_compare_instruction->GetOperand(0)->type->DataType();
 
-        pir::CompareInstruction::Operation pir_compare_operation = pir::CompareInstruction::Operation::None;
+        pir::CompareInstruction::Operation pir_compare_operation =
+            pir::CompareInstruction::Operation::None;
 
         // Handle different comparison operations
         if (ir_compare_instruction->operation == ir::CompareInstruction::Equal) {
@@ -320,10 +321,10 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::SelectInstruction> ir_select_instruction) override {
-        ir_select_instruction->pir_value = pir_builder->Create<pir::Select>(
-            ir_select_instruction->Condition()->pir_value,
-            ir_select_instruction->TrueValue()->pir_value,
-            ir_select_instruction->FalseValue()->pir_value);
+        ir_select_instruction->pir_value =
+            pir_builder->Create<pir::Select>(ir_select_instruction->Condition()->pir_value,
+                                             ir_select_instruction->TrueValue()->pir_value,
+                                             ir_select_instruction->FalseValue()->pir_value);
     }
 
     void Visit(std::shared_ptr<ir::ConstantInt> ir_constant_int) override {
@@ -345,7 +346,8 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
     void Visit(std::shared_ptr<ir::ConstantBool> ir_constant_bool) override {
         this->EmitType(ir_constant_bool->type);
-        ir_constant_bool->pir_value = pir_builder->Create<pir::ConstantBool>(ir_constant_bool->value);
+        ir_constant_bool->pir_value =
+            pir_builder->Create<pir::ConstantBool>(ir_constant_bool->value);
         return;
     }
 
@@ -358,17 +360,16 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Accessor> ir_accessor) override {
-        auto pir_linear_index =
-            pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
-        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetInt64Constant(0),
+        auto pir_linear_index = pir_builder->Create<pir::LocalVariable>(pir::i64);
+        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetConstant<int64_t>(0),
                                                      pir_linear_index);
 
         // Add shift vector offset
         auto s_product_b = ir_accessor->Tensor()->type->stride * ir_accessor->shift_vector;
         pir_builder->Create<pir::WriteVariableLiked>(
-            pir_builder->Create<pir::BinaryOperator>(pir::BinaryOperator::Operation::Add,
-                                                     pir_linear_index,
-                                                     pir_builder->GetInt64Constant(s_product_b)),
+            pir_builder->Create<pir::BinaryOperator>(
+                pir::BinaryOperator::Operation::Add, pir_linear_index,
+                pir_builder->GetConstant<int64_t>(s_product_b)),
             pir_linear_index);
 
         // transform is valid
@@ -376,7 +377,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             auto s_product_a = ir_accessor->Tensor()->type->stride * ir_accessor->transform_matrix;
             RowVectorXprajna pir_s_product_a(s_product_a.size());
             std::transform(RANGE(s_product_a), pir_s_product_a.begin(), [=](int64_t value) {
-                return pir_builder->Create<pir::ConstantInt>(pir_builder->GetInt64Type(), value);
+                return pir_builder->Create<pir::ConstantInt>(pir::i64, value);
             });
 
             auto pir_index = grid_stack.top()->index->pir_value;
@@ -385,7 +386,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                     continue;
                 }
                 auto pir_scalar_index = pir_builder->Create<pir::IndexArray>(
-                    pir_index, pir_builder->GetInt64Constant(i));
+                    pir_index, pir_builder->GetConstant<int64_t>(i));
                 auto pir_mul_tmp = pir_builder->Create<pir::BinaryOperator>(
                     pir::BinaryOperator::Operation::Mul, pir_s_product_a[i], pir_scalar_index);
                 auto pir_sum_tmp = pir_builder->Create<pir::BinaryOperator>(
@@ -421,13 +422,12 @@ class PrajnaCodegen : public galois::ir::Visitor {
             ir_indexing->Index(i)->ApplyVisitor(this->shared_from_this());
         }
 
-        auto pir_linear_index =
-            pir_builder->Create<pir::LocalVariable>(pir_builder->GetInt64Type());
-        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetInt64Constant(0),
+        auto pir_linear_index = pir_builder->Create<pir::LocalVariable>(pir::i64);
+        pir_builder->Create<pir::WriteVariableLiked>(pir_builder->GetConstant<int64_t>(0),
                                                      pir_linear_index);
         for (int64_t i = 0; i < ir_indexing->IndexSize(); ++i) {
             auto current_stride =
-                pir_builder->GetInt64Constant(ir_indexing->Tensor()->type->stride[i]);
+                pir_builder->GetConstant<int64_t>(ir_indexing->Tensor()->type->stride[i]);
             auto current_index = ir_indexing->Index(i)->pir_value;
             auto current_mul = pir_builder->Create<pir::BinaryOperator>(
                 pir::BinaryOperator::Operation::Mul, current_stride, current_index);
@@ -466,7 +466,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         auto pir_address = pir_builder->GetAddressOf(ir_prefetch->Address()->pir_value);
 
         static std::shared_ptr<pir::Function> pir_prefetch_function = nullptr;
-        auto pir_i32_type = pir_builder->GetInt32Type();
+        auto pir_i32_type = pir::i32;
         auto pir_i32_pointer_type = pir::PointerType::Create(pir_i32_type);
         if (!pir_prefetch_function) {
             auto pir_llvm_prefetch_function_type = pir::FunctionType::Create(
@@ -488,9 +488,9 @@ class PrajnaCodegen : public galois::ir::Visitor {
         specifies whether the prefetch is performed on the data (1) or
         instruction (0) cache. The ``rw``, ``locality`` and ``cache type``
         arguments must be constant integers.*/
-        pir_arguments.push_back(pir_builder->GetInt32Constant(ir_prefetch->rw));
-        pir_arguments.push_back(pir_builder->GetInt32Constant(ir_prefetch->locality));
-        pir_arguments.push_back(pir_builder->GetInt32Constant(ir_prefetch->cache_type));
+        pir_arguments.push_back(pir_builder->GetConstant<int32_t>(ir_prefetch->rw));
+        pir_arguments.push_back(pir_builder->GetConstant<int32_t>(ir_prefetch->locality));
+        pir_arguments.push_back(pir_builder->GetConstant<int32_t>(ir_prefetch->cache_type));
         pir_builder->Call(pir_prefetch_function, pir_arguments);
     }
 
@@ -501,7 +501,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         GALOIS_ASSERT(ir_vector_broadcast->type->shape.size() == 1);
         for (int64_t i = 0; i < ir_vector_broadcast->type->shape[0]; ++i) {
             prajna_constant_lane_id_list.push_back(
-                pir_builder->GetInt32Constant(ir_vector_broadcast->lane_id));
+                pir_builder->GetConstant<int32_t>(ir_vector_broadcast->lane_id));
         }
         auto pir_constant_vector_lane_id_mask = pir_builder->Create<pir::ConstantVector>(
             prajna::Cast<pir::VectorType>(ir_vector_broadcast->type->pir_type),
@@ -526,7 +526,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         if (ir_alloca->memory_type == ir::MemoryType::Heap) {
             std::list<std::shared_ptr<pir::Value>> pir_arguments = {
-                pir_builder->GetInt64Constant(ir_tensor_type->bytes)};
+                pir_builder->GetConstant<int64_t>(ir_tensor_type->bytes)};
             auto pir_function_type =
                 pir::FunctionType::Create({pir::IntType::Create(64, true)},
                                           pir::PointerType::Create(pir::IntType::Create(8, false)));
@@ -549,7 +549,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 alignment = 64;
             }
             auto pir_tensor_pointer = pir_builder->Create<pir::Alloca>(
-                ir_alloca->type->pir_type, pir_builder->GetInt64Constant(1), alignment);
+                ir_alloca->type->pir_type, pir_builder->GetConstant<int64_t>(1), alignment);
             ir_alloca->pir_value = pir_builder->Create<pir::DeferencePointer>(pir_tensor_pointer);
             return;
         } else {
@@ -773,7 +773,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_load_binary->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::CastInstruction>(
                 pir::CastInstruction::Operation::IntToPtr,
-                pir_builder->GetInt64Constant(reinterpret_cast<int64_t>(p_data)),
+                pir_builder->GetConstant<int64_t>(reinterpret_cast<int64_t>(p_data)),
                 pir::PointerType::Create(ir_load_binary->type->pir_type)));
     }
 
@@ -783,7 +783,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                       pir::PointerType::Create(pir::IntType::Create(8, false)));
         auto pir_malloc = pir_builder->GetIntrinsic("malloc", pir_function_type);
         return pir_builder->Create<pir::BitCast>(
-            pir_builder->Call(pir_malloc, pir_builder->GetInt64Constant(pir_type->bytes)),
+            pir_builder->Call(pir_malloc, pir_builder->GetConstant<int64_t>(pir_type->bytes)),
             pir::PointerType::Create(pir_type));
     }
 

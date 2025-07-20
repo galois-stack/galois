@@ -237,12 +237,12 @@ class ArithmeticInstruction : public Instruction {
 class CompareInstruction : public Instruction {
    public:
     enum Operation {
-        Equal,      // ==
-        NotEqual,   // !=
-        Less,       // <
-        LessEqual,  // <=
-        Greater,    // >
-        GreaterEqual, // >=
+        Equal,         // ==
+        NotEqual,      // !=
+        Less,          // <
+        LessEqual,     // <=
+        Greater,       // >
+        GreaterEqual,  // >=
     };
 
     static std::shared_ptr<CompareInstruction> Create(Operation op,
@@ -281,7 +281,7 @@ class SelectInstruction : public Instruction {
         GALOIS_ASSERT(ir_true_value);
         GALOIS_ASSERT(ir_false_value);
         GALOIS_ASSERT(ir_true_value->type == ir_false_value->type);
-        
+
         // Condition must be boolean tensor with same shape as values (or broadcastable)
         if (ir_condition->type->IsScalar()) {
             GALOIS_ASSERT(ir_condition->type->DataType() == ir::bool_);
@@ -294,7 +294,7 @@ class SelectInstruction : public Instruction {
                               ir_true_value->type->shape[i] == 1);
             }
         }
-        
+
         std::shared_ptr<SelectInstruction> self(new SelectInstruction);
         self->OperandResize(3);
         self->Condition(ir_condition);

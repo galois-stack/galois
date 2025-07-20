@@ -24,8 +24,7 @@ class SigmoidCreator : public UnaryCreator {
         if (ir_input->type->IsScalar()) {
             // sigmoid(x) = 1 / (1 + exp(-x))
             auto one = ir_builder->GetConstant(ir_input->type, 1.0);
-            auto neg_x = ir_builder->Sub(ir_builder->GetConstant(ir_input->type, 0.0), 
-                                        ir_input);
+            auto neg_x = ir_builder->Sub(ir_builder->GetConstant(ir_input->type, 0.0), ir_input);
             auto exp_neg_x = ir_builder->Create<ir::UnaryIntrinsic>("exp", neg_x);
             auto denom = ir_builder->Add(one, exp_neg_x);
             auto result = ir_builder->Div(one, denom);
