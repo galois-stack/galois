@@ -14,24 +14,23 @@ class SelectCreator : public Creator {
         return self;
     }
 
-    std::shared_ptr<ir::TensorType> InferTypeImpl(
-        std::shared_ptr<ir::TensorType> ir_condition_type,
-        std::shared_ptr<ir::TensorType> ir_true_type,
-        std::shared_ptr<ir::TensorType> ir_false_type) {
-        
+    std::shared_ptr<ir::TensorType> InferTypeImpl(std::shared_ptr<ir::TensorType> ir_condition_type,
+                                                  std::shared_ptr<ir::TensorType> ir_true_type,
+                                                  std::shared_ptr<ir::TensorType> ir_false_type) {
         GALOIS_ASSERT(ir_condition_type->DataType() == ir::bool_);
-        
+
         GALOIS_ASSERT(ir_true_type->IsMatch(ir_false_type));
-        
+
         // Handle scalar case
-        if (ir_condition_type->IsScalar() && ir_true_type->IsScalar() && ir_false_type->IsScalar()) {
+        if (ir_condition_type->IsScalar() && ir_true_type->IsScalar() &&
+            ir_false_type->IsScalar()) {
             return ir_true_type;
         }
-        
+
         if (!ir_condition_type->IsScalar()) {
             GALOIS_ASSERT(ir_condition_type->shape == ir_true_type->shape);
         }
-        
+
         return ir::TensorType::Create(ir_true_type->value_type, ir_true_type->shape);
     }
 
@@ -41,9 +40,8 @@ class SelectCreator : public Creator {
                        std::shared_ptr<ir::Tensor> ir_false_value,
                        std::shared_ptr<ir::Tensor> ir_output,
                        std::shared_ptr<ir::Builder> ir_builder) {
-        
         // Handle scalar case
-        if (ir_condition->type->IsScalar() && ir_true_value->type->IsScalar() && 
+        if (ir_condition->type->IsScalar() && ir_true_value->type->IsScalar() &&
             ir_false_value->type->IsScalar()) {
             auto ir_select = ir_builder->Select(ir_condition, ir_true_value, ir_false_value);
             ir_builder->Write(ir_select, ir_output);
@@ -56,8 +54,9 @@ class SelectCreator : public Creator {
         auto ir_accessor_condition = ir_builder->CreateIdentityAccessor(ir_condition);
         auto ir_accessor_true = ir_builder->CreateIdentityAccessor(ir_true_value);
         auto ir_accessor_false = ir_builder->CreateIdentityAccessor(ir_false_value);
-        
-        auto ir_select = ir_builder->Select(ir_accessor_condition, ir_accessor_true, ir_accessor_false);
+
+        auto ir_select =
+            ir_builder->Select(ir_accessor_condition, ir_accessor_true, ir_accessor_false);
         ir_builder->Write(ir_select, ir_accessor_out);
     }
 
@@ -70,7 +69,8 @@ class SelectCreator : public Creator {
     void Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                  std::shared_ptr<ir::Builder> ir_builder) override {
         GALOIS_ASSERT(ir_inputs.size() == 3);
-        auto ir_output_type = this->InferTypeImpl(ir_inputs[0]->type, ir_inputs[1]->type, ir_inputs[2]->type);
+        auto ir_output_type =
+            this->InferTypeImpl(ir_inputs[0]->type, ir_inputs[1]->type, ir_inputs[2]->type);
         auto ir_output = ir_builder->Alloca(ir_output_type);
         ir_builder->ExpressCreator<op::FillCreator>(
             {ir_output, ir_builder->GetZero(ir_output_type->DataType())});

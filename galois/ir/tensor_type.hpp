@@ -293,7 +293,7 @@ class BoolType : public TensorType {
         self->value_type = nullptr;
         self->shape.resize(0);
         self->stride.resize(0);
-        
+
         self->bytes = 1;
         self->name = "bool";
         self->fullname = "bool";

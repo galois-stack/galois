@@ -100,10 +100,9 @@ class CloneVisitor : public Visitor {
 
         ir_compare_instruction->GetOperand(0)->ApplyVisitor(this->shared_from_this());
         ir_compare_instruction->GetOperand(1)->ApplyVisitor(this->shared_from_this());
-        auto ir_new =
-            CompareInstruction::Create(ir_compare_instruction->operation,
-                                      tensor_dict[ir_compare_instruction->GetOperand(0)],
-                                      tensor_dict[ir_compare_instruction->GetOperand(1)]);
+        auto ir_new = CompareInstruction::Create(
+            ir_compare_instruction->operation, tensor_dict[ir_compare_instruction->GetOperand(0)],
+            tensor_dict[ir_compare_instruction->GetOperand(1)]);
         tensor_dict[ir_compare_instruction] = ir_new;
     }
 
@@ -115,10 +114,9 @@ class CloneVisitor : public Visitor {
         ir_select_instruction->Condition()->ApplyVisitor(this->shared_from_this());
         ir_select_instruction->TrueValue()->ApplyVisitor(this->shared_from_this());
         ir_select_instruction->FalseValue()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = SelectInstruction::Create(
-            tensor_dict[ir_select_instruction->Condition()],
-            tensor_dict[ir_select_instruction->TrueValue()],
-            tensor_dict[ir_select_instruction->FalseValue()]);
+        auto ir_new = SelectInstruction::Create(tensor_dict[ir_select_instruction->Condition()],
+                                                tensor_dict[ir_select_instruction->TrueValue()],
+                                                tensor_dict[ir_select_instruction->FalseValue()]);
         tensor_dict[ir_select_instruction] = ir_new;
     }
 

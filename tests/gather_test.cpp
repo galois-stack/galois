@@ -1,19 +1,20 @@
 #include "galois/op/gather.hpp"
+
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestGather1D) {
-    auto ir_tensor_type = ir::f32->Tile(8);  // 1D array with 8 elements
+    auto ir_tensor_type = ir::f32->Tile(8);          // 1D array with 8 elements
     auto ir_index_type = ir::i64->Tile(1)->Tile(4);  // [1, 4] - 1D coordinates, 4 sample points
-    auto ir_output_type = ir::f32->Tile(4);  // [4] output points
+    auto ir_output_type = ir::f32->Tile(4);          // [4] output points
 
     auto ir_builder = ir::Builder::Create();
     auto ir_operator_type =
         ir::OperatorType::Create({ir_tensor_type, ir_index_type}, ir_output_type);
     auto [ir_operator, _] = ir_builder->CreateOperator(ir_operator_type, "gather1d_test");
-    
+
     auto ir_input = ir_operator->inputs[0];
     auto ir_indices = ir_operator->inputs[1];
-    
+
     auto gather_creator = galois::op::GatherCreator::Create();
     gather_creator->Express({ir_input, ir_indices}, ir_builder);
 
@@ -30,24 +31,24 @@ TEST(GaloisTests, TestGather1D) {
     auto result = gather_fun(input_vec.data(), index_vec.data());
 
     EXPECT_EQ(result[0], 3.0f);  // input[2] = 3
-    EXPECT_EQ(result[1], 1.0f);  // input[0] = 1  
+    EXPECT_EQ(result[1], 1.0f);  // input[0] = 1
     EXPECT_EQ(result[2], 8.0f);  // input[7] = 8
     EXPECT_EQ(result[3], 5.0f);  // input[4] = 5
 }
 
 TEST(GaloisTests, TestGather2D) {
-    auto ir_tensor_type = ir::f32->Tile(3, 4);  // 3x4 matrix
+    auto ir_tensor_type = ir::f32->Tile(3, 4);       // 3x4 matrix
     auto ir_index_type = ir::i64->Tile(2)->Tile(3);  // [2, 3] nested structure
-    auto ir_output_type = ir::f32->Tile(3);  // [3] shape
+    auto ir_output_type = ir::f32->Tile(3);          // [3] shape
 
     auto ir_builder = ir::Builder::Create();
     auto ir_operator_type =
         ir::OperatorType::Create({ir_tensor_type, ir_index_type}, ir_output_type);
     auto [ir_operator, _] = ir_builder->CreateOperator(ir_operator_type, "gather_test");
-    
+
     auto ir_input = ir_operator->inputs[0];
     auto ir_indices = ir_operator->inputs[1];
-    
+
     auto gather_creator = galois::op::GatherCreator::Create();
     gather_creator->Express({ir_input, ir_indices}, ir_builder);
 
@@ -75,18 +76,18 @@ TEST(GaloisTests, TestGather2D) {
 }
 
 TEST(GaloisTests, TestGather3D) {
-    auto ir_tensor_type = ir::f32->Tile(2, 3, 4);  // 2x3x4 tensor
+    auto ir_tensor_type = ir::f32->Tile(2, 3, 4);    // 2x3x4 tensor
     auto ir_index_type = ir::i64->Tile(3)->Tile(4);  // [3, 4] - 3D coordinates, 4 sample points
-    auto ir_output_type = ir::f32->Tile(4);  // [4] output points
+    auto ir_output_type = ir::f32->Tile(4);          // [4] output points
 
     auto ir_builder = ir::Builder::Create();
     auto ir_operator_type =
         ir::OperatorType::Create({ir_tensor_type, ir_index_type}, ir_output_type);
     auto [ir_operator, _] = ir_builder->CreateOperator(ir_operator_type, "gather3d_test");
-    
+
     auto ir_input = ir_operator->inputs[0];
     auto ir_indices = ir_operator->inputs[1];
-    
+
     auto gather_creator = galois::op::GatherCreator::Create();
     gather_creator->Express({ir_input, ir_indices}, ir_builder);
 
@@ -108,24 +109,24 @@ TEST(GaloisTests, TestGather3D) {
     auto result = gather_fun(input_vec.data(), index_vec.data());
 
     EXPECT_EQ(result[0], 1.0f);   // input[0][0][0] = 1
-    EXPECT_EQ(result[1], 7.0f);   // input[0][1][2] = 7  
+    EXPECT_EQ(result[1], 7.0f);   // input[0][1][2] = 7
     EXPECT_EQ(result[2], 16.0f);  // input[1][0][3] = 16
     EXPECT_EQ(result[3], 22.0f);  // input[1][2][1] = 22
 }
 
 TEST(GaloisTests, TestGather4D) {
     auto ir_tensor_type = ir::f32->Tile(2, 2, 2, 3);  // 2x2x2x3 tensor
-    auto ir_index_type = ir::i64->Tile(4)->Tile(3);  // [4, 3] - 4D coordinates, 3 sample points
-    auto ir_output_type = ir::f32->Tile(3);  // [3] output points
+    auto ir_index_type = ir::i64->Tile(4)->Tile(3);   // [4, 3] - 4D coordinates, 3 sample points
+    auto ir_output_type = ir::f32->Tile(3);           // [3] output points
 
     auto ir_builder = ir::Builder::Create();
     auto ir_operator_type =
         ir::OperatorType::Create({ir_tensor_type, ir_index_type}, ir_output_type);
     auto [ir_operator, _] = ir_builder->CreateOperator(ir_operator_type, "gather4d_test");
-    
+
     auto ir_input = ir_operator->inputs[0];
     auto ir_indices = ir_operator->inputs[1];
-    
+
     auto gather_creator = galois::op::GatherCreator::Create();
     gather_creator->Express({ir_input, ir_indices}, ir_builder);
 
@@ -151,18 +152,18 @@ TEST(GaloisTests, TestGather4D) {
 }
 
 TEST(GaloisTests, TestGatherLargeIndices) {
-    auto ir_tensor_type = ir::f32->Tile(5, 5);  // 5x5 matrix
+    auto ir_tensor_type = ir::f32->Tile(5, 5);        // 5x5 matrix
     auto ir_index_type = ir::i64->Tile(2)->Tile(10);  // [2, 10] - 2D coordinates, 10 sample points
-    auto ir_output_type = ir::f32->Tile(10);  // [10] output points
+    auto ir_output_type = ir::f32->Tile(10);          // [10] output points
 
     auto ir_builder = ir::Builder::Create();
     auto ir_operator_type =
         ir::OperatorType::Create({ir_tensor_type, ir_index_type}, ir_output_type);
     auto [ir_operator, _] = ir_builder->CreateOperator(ir_operator_type, "gather_large_test");
-    
+
     auto ir_input = ir_operator->inputs[0];
     auto ir_indices = ir_operator->inputs[1];
-    
+
     auto gather_creator = galois::op::GatherCreator::Create();
     gather_creator->Express({ir_input, ir_indices}, ir_builder);
 

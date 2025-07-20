@@ -1,6 +1,7 @@
+#include "galois/op/relu.hpp"
+
 #include "galois/ir/ir.hpp"
 #include "galois/jit/engine.hpp"
-#include "galois/op/relu.hpp"
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestBasedReLU) {
@@ -15,7 +16,7 @@ TEST(GaloisTests, TestBasedReLU) {
 
     std::vector<float> float_vec(length);
     for (int i = 0; i < length; ++i) {
-        float_vec[i] = static_cast<float>(i - 64); // Mix of positive, negative, and zero
+        float_vec[i] = static_cast<float>(i - 64);  // Mix of positive, negative, and zero
     }
 
     auto output_vec = model_fun(float_vec.data());
@@ -42,7 +43,7 @@ TEST(GaloisTests, TestReLUScalar) {
     auto result1 = *model_fun(&input1);
     GALOIS_ASSERT(result1 == 3.14f);
 
-    // Test negative value  
+    // Test negative value
     float input2 = -2.71f;
     auto result2 = *model_fun(&input2);
     GALOIS_ASSERT(result2 == 0.0f);

@@ -1,7 +1,8 @@
+#include "galois/op/compare.hpp"
+
 #include <cstdint>
 #include <vector>
 
-#include "galois/op/compare.hpp"
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestCompareEqual) {
