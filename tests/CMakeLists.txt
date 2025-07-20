@@ -34,6 +34,7 @@ add_executable(galois_test
     gather_test.cpp
     compare_test.cpp
     select_test.cpp
+    operator_fusion_test.cpp
 )
 
 target_link_libraries(galois_test galois_config_target galois_ir prajna_core gtest benchmark thpool cpuinfo libz3)
