@@ -491,4 +491,24 @@ inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
 //     }
 // }
 
+template <typename Tensor_>
+inline std::vector<std::shared_ptr<Tensor_>> ExtractAllFromBlock(std::shared_ptr<ir::Block> block) {
+    std::vector<std::shared_ptr<Tensor_>> result;
+    if (!block) return result;
+
+    for (auto& tensor : *block) {
+        // if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
+        //     result.push_back(target);
+        // }
+        if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
+            result.push_back(target);
+        }
+        if (auto sub_op = std::dynamic_pointer_cast<ir::Operator>(tensor)) {
+            auto sub_results = ExtractAllFromBlock<Tensor_>(sub_op->block);
+            result.insert(result.end(), sub_results.begin(), sub_results.end());
+        }
+    }
+    return result;
+}
+
 }  // namespace galois::transform
