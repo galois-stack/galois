@@ -6,6 +6,41 @@
 
 #include "tests/galois_test.hpp"
 
+float calculate_mean(float *matrix, int rows, int cols) {
+    float sum = 0.0;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            sum += *(matrix + i * cols + j);
+        }
+    }
+    return sum / (rows * cols);
+}
+
+float calculate_variance(float *matrix, int rows, int cols, float mean) {
+    float sum_squared_diff = 0.0;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            float diff = *(matrix + i * cols + j) - mean;
+            sum_squared_diff += diff * diff;
+        }
+    }
+    return sum_squared_diff / (rows * cols);
+}
+
+void normalize_matrix(float *matrix, float *output, int rows, int cols, float *gama, float *beta) {
+    float mean = calculate_mean(matrix, rows, cols);
+    float variance = calculate_variance(matrix, rows, cols, mean);
+    float epsilon = 1e-5;
+    float std_dev = std::sqrt(variance + epsilon);
+
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            *(output + i * cols + j) =
+                ((*(matrix + i * cols + j) - mean) / std_dev) * (*gama) + (*beta);
+        }
+    }
+}
+
 TEST(GaloisTests, TestOperatorFusion) {
     // constexpr int64_t length = 8;
     // auto ir_input_type = ir::f32->Tile(length);
@@ -44,15 +79,15 @@ TEST(GaloisTests, TestOperatorFusion) {
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::NormalizeCreator>(
         {ir_input_type, ir_gama_type, ir_beta_type});
 
-    auto all_grids = galois::transform::ExtractAllFromBlock<ir::Grid>(ir_operator->block);
-    auto all_operators = galois::transform::ExtractAllFromBlock<ir::Operator>(ir_operator->block);
-    std::cout << "Total grids size in operator: " << all_grids.size() << std::endl;
-    std::cout << "Total sub-operators size in operator: " << all_operators.size() << std::endl;
-    std::cout << "All operator names:" << std::endl;
-    for (const auto& op : all_operators) {
-        // std::cout << "- " << op->name << std::endl;
-        std::cout << "- " << op->fullname << std::endl;
-    }
+    // auto all_grids = galois::transform::ExtractAllFromBlock<ir::Grid>(ir_operator->block);
+    // auto all_operators = galois::transform::ExtractAllFromBlock<ir::Operator>(ir_operator->block);
+    // std::cout << "Total grids size in operator: " << all_grids.size() << std::endl;
+    // std::cout << "Total sub-operators size in operator: " << all_operators.size() << std::endl;
+    // std::cout << "All operator names:" << std::endl;
+    // for (const auto& op : all_operators) {
+    //     // std::cout << "- " << op->name << std::endl;
+    //     std::cout << "- " << op->fullname << std::endl;
+    // }
 
     auto jit_engine = jit::Engine::Create();
     auto normalize_fun =
@@ -64,4 +99,13 @@ TEST(GaloisTests, TestOperatorFusion) {
     std::vector<float> output(length);
 
     float *result = normalize_fun(input.data(), &gama, &beta);
+    normalize_matrix(input.data(), output.data(), rows, cols, &gama, &beta);
+
+    for (int i = 0; i < length; ++i) {
+        EXPECT_NEAR(result[i], output[i], 1e-5)
+            << "Mismatch at index " << i << ": input=" << input[i];
+        output[i] = result[i];
+    }
+
+    free(result);
 }
