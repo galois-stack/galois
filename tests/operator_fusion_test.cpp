@@ -79,6 +79,15 @@ TEST(GaloisTests, TestOperatorFusion) {
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::NormalizeCreator>(
         {ir_input_type, ir_gama_type, ir_beta_type});
 
+    galois::framework::ComputingGraph graph = galois::framework::BuildComputingGraph(ir_operator);
+    galois::framework::PrintComputingGraph(graph);
+    
+    // auto graph = BuildGraphFromOperator(ir_operator);
+
+    // ComputingGraph fused_graph = FuseOperators(graph);
+
+    // std::shared_ptr<ir::Operator> ir_operator_fused = RebuildOperatorFromGraph(graph, ir_builder);
+
     // auto all_grids = galois::transform::ExtractAllFromBlock<ir::Grid>(ir_operator->block);
     // auto all_operators = galois::transform::ExtractAllFromBlock<ir::Operator>(ir_operator->block);
     // std::cout << "Total grids size in operator: " << all_grids.size() << std::endl;

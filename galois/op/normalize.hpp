@@ -1,6 +1,8 @@
 #pragma once
 
 #include "galois/ir/ir.hpp"
+#include "galois/op/shape.hpp"
+#include "galois/op/reduce_prod.hpp"
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/creator.hpp"
 #include "galois/op/sum.hpp"
@@ -28,27 +30,17 @@ class NormalizeCreator : public op::Creator {
                  std::shared_ptr<ir::Builder> ir_builder) override {
         auto ir_output_type = this->InferType(ir::GetTensorTypes(ir_inputs));
         auto ir_output = ir_builder->Alloca(ir_output_type);
-        this->_Express(ir_inputs, ir_output, ir_builder);
+        this->ExpressInline(ir_inputs, ir_output, ir_builder);
         ir_builder->Return(ir_output);
     }
 
-    void _Express(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
+    void ExpressInline(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs,
                   std::shared_ptr<ir::Tensor> ir_output, std::shared_ptr<ir::Builder> ir_builder) {
-        Eigen::VectorXi64 lanes_a(1);
-        lanes_a[0] = ir_inputs[0]->type->shape[0];
-
-        float total_size = 1.0f;
-        for (int64_t i = 0; i < ir_inputs[0]->type->shape.size(); ++i) {
-            total_size *= ir_inputs[0]->type->shape[i];
-        }
+        auto total_shape = ir_builder->ExpressCreator<op::ShapeCreator>({ir_inputs[0]});
+        auto total_size = ir_builder->ExpressCreator<op::ReduceProdCreator>({total_shape});
 
         auto ir_total_size = ir_builder->Alloca(ir_inputs[0]->type);
-        auto ir_total_size_sub = ir_builder->Alloca(ir_inputs[0]->type);
-        ir_builder->ExpressCreator<op::FillCreator>(
-            {ir_total_size, ir_builder->GetConstant(ir_inputs[0]->type->DataType(), total_size)});
-        ir_builder->ExpressCreator<op::FillCreator>(
-            {ir_total_size_sub,
-             ir_builder->GetConstant(ir_inputs[0]->type->DataType(), total_size - 1.0f)});
+        ir_builder->ExpressCreator<op::FillCreator>({ir_total_size, total_size});
 
         auto ir_sum = ir_builder->ExpressCreator<op::SumCreator>({ir_inputs[0]});
         auto ir_sum_broadcast =
