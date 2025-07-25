@@ -79,14 +79,13 @@ TEST(GaloisTests, TestOperatorFusion) {
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::NormalizeCreator>(
         {ir_input_type, ir_gama_type, ir_beta_type});
 
-    auto ir_print_visitor = ir::IRPrinter::Create();
-    auto ir_operator_print = ir_print_visitor->Print(ir_operator);
-    std::cout << ir_operator_print << "\n\n";
+    // auto ir_print_visitor = ir::IRPrinter::Create();
+    // auto ir_operator_print = ir_print_visitor->Print(ir_operator);
+    // std::cout << ir_operator_print << "\n\n";
 
     auto ir_graph = galois::framework::BuildComputingGraph::Create();
-    auto ir_graph_print = ir_graph->Print(ir_operator);
-    std::cout << ir_graph_print << "\n\n";
-
+    ir_graph->Traverse(ir_operator);
+    ir_graph->PrintAllNodes();
     
     // auto graph = BuildGraphFromOperator(ir_operator);
 
