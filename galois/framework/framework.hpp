@@ -5,7 +5,7 @@
 
 namespace galois::framework {
 
-class Operation {};
+// class Operation {};
 
 /// @brief Manage the Operators
 // class ComputingGraph {};
