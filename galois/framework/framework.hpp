@@ -175,7 +175,26 @@ class BuildComputingGraph : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
-        output << "Level " << operator_level << " operator " << ir_operator->name << "(";
+        bool has_return = false;
+        std::shared_ptr<ir::Return> return_inst;
+
+        if (ir_operator->block) {
+            for (auto& tensor : *ir_operator->block) {
+                return_inst = std::dynamic_pointer_cast<ir::Return>(tensor);
+                if (return_inst) {
+                    has_return = true;
+                    break;
+                }
+            }
+        }
+
+        if (!has_return) {
+            output << "Level " << operator_level << " operator " << ir_operator->name << "(";
+        } else {
+            output << "Level " << operator_level << " " << GetVariableName(return_inst) << " = "
+                   << ir_operator->name << "(";
+        }
+
         for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
             if (i > 0) {
                 output << ", ";
