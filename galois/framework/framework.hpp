@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <sstream>
+#include <string>
+
 #include "galois/ir/ir.hpp"
 #include "galois/ir/ir_print_visitor.hpp"
 
@@ -11,129 +15,239 @@ namespace galois::framework {
 // class ComputingGraph {};
 
 // 计算图节点类型
-enum class NodeType {
-  kOperator,
-  kTensor
-};
+enum class NodeType { kOperator, kTensor };
 
-// 计算图节点结构（增加变量名字段）
+// 计算图节点结构（简化，只保留算子信息）
 struct GraphNode {
     std::shared_ptr<ir::Operator> op;  // 算子
-    std::vector<std::shared_ptr<ir::Tensor>> inputs;  // 输入张量
-    std::shared_ptr<ir::Tensor> output;  // 输出张量
-    std::unordered_map<std::shared_ptr<ir::Tensor>, std::string> tensor_names;  // 张量→变量名映射
 };
 
-// 计算图边
 struct GraphEdge {
-  std::string from_node_id;
-  std::string to_node_id;
+    std::string from_node_id;
+    std::string to_node_id;
 };
 
 // 计算图
 struct ComputingGraph {
-  std::unordered_map<std::string, GraphNode> nodes;
-  std::vector<GraphEdge> edges;
+    std::unordered_map<std::string, GraphNode> nodes;  // 存储算子节点
+    std::vector<GraphEdge> edges;
 };
 
-class VarNamer {
-private:
-    // 记录张量节点到变量索引的映射（基础映射）
-    std::unordered_map<const ir::Tensor*, int> tensor_to_index_;
-    // 记录变量名到张量节点的映射（用于检测重新赋值）
-    std::unordered_map<std::string, const ir::Tensor*> varname_to_tensor_;
-    int next_index_ = 0;
+// class BuildComputingGraph : public ir::Visitor {
+//    protected:
+//     BuildComputingGraph() = default;
 
-public:
-    // 为张量生成变量名（需传入变量标识符，如"ir_pow"）
-    std::string GetName(const std::string& var_identifier, const std::shared_ptr<ir::Tensor>& tensor) {
-        const ir::Tensor* tensor_ptr = tensor.get();
-        
-        // 情况1：该变量名之前绑定过其他张量（重新赋值）
-        if (varname_to_tensor_.count(var_identifier) && 
-            varname_to_tensor_[var_identifier] != tensor_ptr) {
-            // 旧张量解绑，新张量分配新索引
-            tensor_to_index_.erase(varname_to_tensor_[var_identifier]);
-            next_index_++; // 强制索引+1，确保重新赋值后索引递增
-        }
-        
-        // 情况2：首次出现的张量，分配新索引
-        if (!tensor_to_index_.count(tensor_ptr)) {
-            tensor_to_index_[tensor_ptr] = next_index_++;
-        }
-        
-        // 更新变量名与张量的绑定关系
-        varname_to_tensor_[var_identifier] = tensor_ptr;
-        
-        // 生成变量名（如"mat0", "mat1"）
-        return "mat" + std::to_string(tensor_to_index_[tensor_ptr]);
+//    public:
+//     static std::shared_ptr<BuildComputingGraph> Create() {
+//         auto self = std::shared_ptr<BuildComputingGraph>(new BuildComputingGraph);
+//         return self;
+//     }
+
+//     std::string Print(std::shared_ptr<ir::Tensor> tensor) {
+//         var_counter = 0;
+//         var_name_dict.clear();  // 清空变量名映射
+//         output.str("");         // 清空输出
+//         tensor->ApplyVisitor(this->shared_from_this());
+//         return output.str();
+//     }
+
+//     void Dump(std::shared_ptr<ir::Tensor> tensor) {
+//         auto str = this->Print(tensor);
+//         std::cout << str;
+//     }
+
+//     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
+//         output << "operator " << ir_operator->name << "(";
+//         for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
+//             if (i > 0) {
+//                 output << ", ";
+//             }
+//             output << ir_operator->inputs[i]->type->name << " "
+//                    << GetVariableName(ir_operator->inputs[i]);
+//         }
+
+//         output << ")->" << ir_operator->GetOperatorType()->output_type->name << "\n";
+//         ir_operator->block->ApplyVisitor(this->shared_from_this());
+//     }
+
+//     void Visit(std::shared_ptr<ir::Block> ir_block) override {
+//         this->Indent();
+//         output << "{\n";
+//         ++indent_level;
+//         for (auto& tensor : *ir_block) {
+//             this->Indent();
+//             tensor->ApplyVisitor(this->shared_from_this());
+//         }
+//         --indent_level;
+//         this->Indent();
+//         output << "}\n";
+//     }
+
+//     void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override {
+//         output << GetVariableName(ir_alloca) << " = Alloca " << ir_alloca->type->name << ";\n";
+//     }
+
+//     void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arith) override {
+//         std::string op;
+//         switch (ir_arith->operation) {
+//             case galois::ir::ArithmeticInstruction::Add:
+//                 op = "Add";
+//                 break;
+//             case ir::ArithmeticInstruction::Sub:
+//                 op = "Sub";
+//                 break;
+//             case ir::ArithmeticInstruction::Mul:
+//                 op = "Mul";
+//                 break;
+//             case ir::ArithmeticInstruction::Div:
+//                 op = "Div";
+//                 break;
+//         }
+//         output << GetVariableName(ir_arith) << " = " << op << " "
+//                << GetVariableName(ir_arith->GetOperand(0)) << ", "
+//                << GetVariableName(ir_arith->GetOperand(1)) << ";\n";
+//     }
+
+//     void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
+//         output << GetVariableName(ir_unary_intrinsic) << " = " <<
+//         ir_unary_intrinsic->intrinsic_name
+//                << " " << TypeToString(ir_unary_intrinsic->type) << " "
+//                << GetVariableName(ir_unary_intrinsic->Operand()) << ";\n";
+//     }
+
+//     void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override {
+//         output << "Prefetch " << GetVariableName(ir_prefetch->Address()) << ", " <<
+//         ir_prefetch->rw
+//                << ", " << ir_prefetch->locality << ", " << ir_prefetch->cache_type << ";\n";
+//     }
+
+//    private:
+//     std::ostringstream output;
+//     int indent_level = 0;  // 缩进级别
+//     int var_counter = 0;   // 寄存器计数器
+//     std::unordered_map<std::shared_ptr<ir::Tensor>, std::string> var_name_dict;
+
+//     void Indent() {
+//         output << std::string(indent_level * 2, ' ');  // 每级缩进2个空格
+//     }
+//     std::string TypeToString(std::shared_ptr<ir::TensorType> type) {
+//         if (!type) return "void";
+//         return type->name;
+//     }
+//     // 获取变量名
+//     std::string GetVariableName(std::shared_ptr<ir::Tensor> tensor) {
+//         if (var_name_dict.find(tensor) != var_name_dict.end()) {
+//             return var_name_dict[tensor];
+//         }
+//         std::string name;
+//         if (!tensor->name.empty()) {
+//             return "%" + tensor->name;
+//         } else {
+//             name = "%" + std::to_string(var_counter++);
+//         }
+//         var_name_dict[tensor] = name;
+//         return name;
+//     }
+// };
+
+class BuildComputingGraph : public ir::Visitor {
+   protected:
+    BuildComputingGraph() = default;
+
+   public:
+    static std::shared_ptr<BuildComputingGraph> Create() {
+        auto self = std::shared_ptr<BuildComputingGraph>(new BuildComputingGraph);
+        return self;
     }
 
-    // 重置状态（用于新计算图的生成）
-    void Reset() {
-        tensor_to_index_.clear();
-        varname_to_tensor_.clear();
-        next_index_ = 0;
+    std::string Print(std::shared_ptr<ir::Tensor> tensor) {
+        var_counter = 0;
+        var_name_dict.clear();  // 清空变量名映射
+        output.str("");         // 清空输出
+        operator_level = 0;     // 重置层级计数器
+        tensor->ApplyVisitor(this->shared_from_this());
+        return output.str();
+    }
+
+    void Dump(std::shared_ptr<ir::Tensor> tensor) {
+        auto str = this->Print(tensor);
+        std::cout << str;
+    }
+
+    void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
+        output << "Level " << operator_level << " operator " << ir_operator->name << "(";
+        for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
+            if (i > 0) {
+                output << ", ";
+            }
+            output << GetVariableName(ir_operator->inputs[i]);
+        }
+
+        output << ")" << "\n";
+
+        if (operator_level == 0) {
+            operator_level++;
+            ir_operator->block->ApplyVisitor(this->shared_from_this());
+        }
+    }
+
+    void Visit(std::shared_ptr<ir::Block> ir_block) override {
+        for (auto& tensor : *ir_block) {
+            tensor->ApplyVisitor(this->shared_from_this());
+        }
+    }
+
+    void Visit(std::shared_ptr<ir::Alloca> ir_alloca) override {
+        output << "Level " << operator_level << " " << GetVariableName(ir_alloca) << " = Alloca "
+               << ";\n";
+    }
+
+    void Visit(std::shared_ptr<ir::view::Broadcast> ir_broadcast) override {
+        output << "Level " << operator_level << " " << GetVariableName(ir_broadcast)
+               << " = Broadcast " << GetVariableName(ir_broadcast->Tensor()) << ";\n";
+    }
+
+    void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
+        output << GetVariableName(ir_unary_intrinsic) << " = " << ir_unary_intrinsic->intrinsic_name
+               << " " << TypeToString(ir_unary_intrinsic->type) << " "
+               << GetVariableName(ir_unary_intrinsic->Operand()) << ";\n";
+    }
+
+    void Visit(std::shared_ptr<ir::Prefetch> ir_prefetch) override {
+        output << "Prefetch " << GetVariableName(ir_prefetch->Address()) << ", " << ir_prefetch->rw
+               << ", " << ir_prefetch->locality << ", " << ir_prefetch->cache_type << ";\n";
+    }
+
+   private:
+    std::ostringstream output;
+    int indent_level = 0;    // 缩进级别
+    int var_counter = 0;     // 寄存器计数器
+    int operator_level = 0;  // 新增：operator层级计数器
+    std::unordered_map<std::shared_ptr<ir::Tensor>, std::string> var_name_dict;
+
+    void Indent() {
+        output << std::string(indent_level * 2, ' ');  // 每级缩进2个空格
+    }
+
+    std::string TypeToString(std::shared_ptr<ir::TensorType> type) {
+        if (!type) return "void";
+        return type->name;
+    }
+
+    // 获取变量名
+    std::string GetVariableName(std::shared_ptr<ir::Tensor> tensor) {
+        if (var_name_dict.find(tensor) != var_name_dict.end()) {
+            return var_name_dict[tensor];
+        }
+        std::string name;
+        if (!tensor->name.empty()) {
+            return "%" + tensor->name;
+        } else {
+            name = "%" + std::to_string(var_counter++);
+        }
+        var_name_dict[tensor] = name;
+        return name;
     }
 };
-
-
-// 访问者类（用于遍历IR节点并生成变量名）
-class GraphBuilderVisitor : public ir::Visitor {
-private:
-    VarNamer var_namer_;
-    ComputingGraph& graph_;  // 正在构建的计算图
-    // 记录当前遍历的变量标识符（如"ir_pow"，需从IR节点元信息中获取）
-    std::string current_var_identifier_;
-
-public:
-    GraphBuilderVisitor(ComputingGraph& graph) : graph_(graph) {}
-
-    // 访问张量节点时生成变量名
-    void Visit(ir::Tensor* tensor) override {
-        if (!current_var_identifier_.empty()) {
-            // 生成变量名并关联到计算图
-            std::string var_name = var_namer_.GetName(
-                current_var_identifier_, 
-                std::shared_ptr<ir::Tensor>(tensor)  // 假设已有智能指针管理
-            );
-            // 将变量名存入当前图节点的tensor_names中
-            graph_.current_node()->tensor_names[std::shared_ptr<ir::Tensor>(tensor)] = var_name;
-        }
-    }
-
-    // 访问算子节点时，遍历其输入输出张量
-    void Visit(ir::Operator* op) override {
-        // 创建新的计算图节点
-        auto node = std::make_unique<GraphNode>();
-        node->op = std::shared_ptr<ir::Operator>(op);
-        
-        // 遍历输入张量
-        for (size_t i = 0; i < op->inputs().size(); ++i) {
-            auto input_tensor = op->inputs()[i];
-            node->inputs.push_back(input_tensor);
-            // 假设输入张量的变量标识符可通过某种方式获取（如op->input_names()[i]）
-            current_var_identifier_ = op->input_names()[i];  // 例如"ir_inputs[0]"
-            input_tensor->Accept(this);  // 触发张量的Visit，生成变量名
-        }
-        
-        // 处理输出张量
-        auto output_tensor = op->output();
-        node->output = output_tensor;
-        current_var_identifier_ = op->output_name();  // 例如"ir_pow"
-        output_tensor->Accept(this);  // 生成输出张量的变量名
-        
-        // 将节点加入计算图
-        graph_.nodes().push_back(std::move(node));
-    }
-};
-
-// 构建计算图的入口函数
-ComputingGraph BuildComputingGraph(std::shared_ptr<ir::Operator> root_op) {
-    ComputingGraph graph;
-    GraphBuilderVisitor visitor(graph);
-    root_op->Accept(&visitor);  // 触发遍历，同时生成变量名
-    return graph;
-}
 
 }  // namespace galois::framework

@@ -83,7 +83,10 @@ TEST(GaloisTests, TestOperatorFusion) {
     auto ir_operator_print = ir_print_visitor->Print(ir_operator);
     std::cout << ir_operator_print << "\n\n";
 
-    galois::framework::ComputingGraph graph = galois::framework::BuildComputingGraph(ir_operator);
+    auto ir_graph = galois::framework::BuildComputingGraph::Create();
+    auto ir_graph_print = ir_graph->Print(ir_operator);
+    std::cout << ir_graph_print << "\n\n";
+
     
     // auto graph = BuildGraphFromOperator(ir_operator);
 
