@@ -84,6 +84,7 @@ TEST(GaloisTests, TestOperatorFusion) {
     // std::cout << ir_operator_print << "\n\n";
 
     auto ir_graph = galois::framework::BuildComputingGraph::Create();
+    ir_graph->SetFusionFile("/home/wanrui/workspace/1-LLM/1-galois/galois_v12/galois/galois/op/normalize.hpp");
     ir_graph->Traverse(ir_operator);
     ir_graph->PrintAllNodes();
     
