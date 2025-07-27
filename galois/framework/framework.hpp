@@ -71,9 +71,10 @@ class BuildComputingGraph : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Operator> ir_operator) override {
         bool has_return = false;
+        bool has_fill = false;
         std::shared_ptr<ir::Return> return_inst;
-        std::string output_var;
         std::vector<std::string> input_vars;
+        std::string output_vars;
 
         if (operator_level == 1) {
             if (ir_operator->block) {
@@ -86,15 +87,22 @@ class BuildComputingGraph : public ir::Visitor {
                 }
             }
 
-            for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
-                input_vars.push_back(GetVariableName(ir_operator->inputs[i]));
+            if (ir_operator->name.find("Fill") != std::string::npos) {
+                input_vars.push_back(GetVariableName(ir_operator->inputs[1]));
+                output_vars = GetVariableName(ir_operator->inputs[0]);
+                has_fill = true;
+            } else {
+                for (size_t i = 0; i < ir_operator->inputs.size(); ++i) {
+                    input_vars.push_back(GetVariableName(ir_operator->inputs[i]));
+                }
             }
+
 
             GraphNode node;
             node.op_name = ir_operator->name;
             node.tensor_input_name = input_vars;
-            node.tensor_output_name = has_return ? output_var : "";  // 无返回值则输出为空
-
+            node.tensor_output_name = has_return ? GetVariableNoneName(ir_operator) : 
+                                has_fill ? output_vars : std::string();
             computing_graph->nodes[node_counter] = node;
             node_counter++;
         }
@@ -408,6 +416,13 @@ class BuildComputingGraph : public ir::Visitor {
         } else {
             name = "%" + std::to_string(var_counter++);
         }
+        var_name_dict[tensor] = name;
+        return name;
+    }
+
+    std::string GetVariableNoneName(std::shared_ptr<ir::Tensor> tensor) {
+        std::string name;
+        name = "%" + std::to_string(var_counter++);
         var_name_dict[tensor] = name;
         return name;
     }
