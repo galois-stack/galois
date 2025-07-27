@@ -172,8 +172,8 @@ class BuildComputingGraph : public ir::Visitor {
 
    private:
     int indent_level = 0;   // 缩进级别
-    int var_counter = 0;    // 寄存器计数器
-    int var_counter_2 = 0;  // 寄存器计数器
+    int var_counter = 0;
+    int var_counter_2 = 0;
     int node_counter = 0;
     int operator_level = 0;  // 新增：operator层级计数器
     std::string fusion_file_path;
@@ -282,8 +282,8 @@ class BuildComputingGraph : public ir::Visitor {
             // 提取匹配结果
             const auto& var_match = best_match->first;
             const auto& pattern = best_match->second;
-            std::cout << ">>> 最终选择匹配: 位置=" << var_match.position()
-                      << ", 内容: " << var_match.str() << std::endl;
+            // std::cout << ">>> 最终选择匹配: 位置=" << var_match.position()
+            //           << ", 内容: " << var_match.str() << std::endl;
 
             // 根据匹配的模式类型进行处理
             if (pattern == &alloca_pattern) {
@@ -340,7 +340,6 @@ class BuildComputingGraph : public ir::Visitor {
                 fusion_var_map[left_num] = left_var;
             }
 
-            // 更新 search_start
             search_start = var_match.suffix().first;
         }
 
@@ -366,10 +365,8 @@ class BuildComputingGraph : public ir::Visitor {
 
     // 验证是否为有效变量（排除数字、字符串等字面量）
     bool IsValidVariable(const std::string& var) {
-        // 变量名规则：以字母或下划线开头，可包含字母、数字、下划线、[]、->
         if (var.empty()) return false;
-        if (!isalpha(var[0]) && var[0] != '_') return false;  // 首字符必须是字母或下划线
-        // 后续字符允许字母、数字、下划线、[]、->
+        if (!isalpha(var[0]) && var[0] != '_') return false;
         return var.find_first_not_of(
                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_[]->") ==
                std::string::npos;
@@ -389,13 +386,10 @@ class BuildComputingGraph : public ir::Visitor {
         std::cout << "Fusion Variable Mapping:" << std::endl;
         std::cout << "-------------------------" << std::endl;
 
-        // 将映射条目复制到vector中以便排序
         std::vector<std::pair<std::string, std::string>> sorted_pairs(fusion_var_map.begin(),
                                                                       fusion_var_map.end());
 
-        // 自定义排序：按变量编号排序
         auto comparator = [](const auto& a, const auto& b) {
-            // 提取数字部分比较（去掉%号）
             int num_a = std::stoi(a.first.substr(1));
             int num_b = std::stoi(b.first.substr(1));
             return num_a < num_b;
@@ -403,43 +397,84 @@ class BuildComputingGraph : public ir::Visitor {
 
         std::sort(sorted_pairs.begin(), sorted_pairs.end(), comparator);
 
-        // 打印排序后的结果
         for (const auto& pair : sorted_pairs) {
             std::cout << "Original variable: " << pair.first
                       << " -> Mapped variable: " << pair.second << std::endl;
         }
     }
 
+    // std::string GetVariableName(std::shared_ptr<ir::Tensor> tensor) {
+    //     if (var_name_dict.find(tensor) != var_name_dict.end()) {
+    //         return var_name_dict[tensor];
+    //     }
+
+    //     std::string name;
+
+    //     if (fusion_var_map_loaded && !tensor->name.empty()) {
+    //         auto it = fusion_var_map.find(tensor->name);
+    //         if (it != fusion_var_map.end()) {
+    //             name = it->second;
+    //             var_name_dict[tensor] = name;
+    //             return name;
+    //         }
+    //     }
+
+    //     if (!tensor->name.empty()) {
+    //         return "%" + tensor->name;
+    //     } else {
+    //         name = "%" + std::to_string(var_counter++);
+    //     }
+    //     var_name_dict[tensor] = name;
+    //     return name;
+    // }
     std::string GetVariableName(std::shared_ptr<ir::Tensor> tensor) {
         if (var_name_dict.find(tensor) != var_name_dict.end()) {
-            return var_name_dict[tensor];
+            std::string original_num = var_name_dict[tensor];
+            if (fusion_var_map_loaded) {
+                auto it = fusion_var_map.find(original_num);
+                if (it != fusion_var_map.end() && !it->second.empty()) {
+                    return it->second;
+                }
+            }
+            return original_num;
         }
 
-        std::string name;
+        std::string original_num;
+        if (!tensor->name.empty()) {
+            original_num = "%" + tensor->name;
+        } else {
+            original_num = "%" + std::to_string(var_counter++);
+        }
+        var_name_dict[tensor] = original_num;
 
-        if (fusion_var_map_loaded && !tensor->name.empty()) {
-            auto it = fusion_var_map.find(tensor->name);
-            if (it != fusion_var_map.end()) {
-                name = it->second;
-                var_name_dict[tensor] = name;
-                return name;
+        if (fusion_var_map_loaded) {
+            auto it = fusion_var_map.find(original_num);
+            if (it != fusion_var_map.end() && !it->second.empty()) {
+                return it->second;
             }
         }
 
-        if (!tensor->name.empty()) {
-            return "%" + tensor->name;
-        } else {
-            name = "%" + std::to_string(var_counter++);
-        }
-        var_name_dict[tensor] = name;
-        return name;
+        return original_num;
     }
 
+    // std::string GetVariableNoneName(std::shared_ptr<ir::Tensor> tensor) {
+    //     std::string name;
+    //     name = "%" + std::to_string(var_counter++);
+    //     var_name_dict[tensor] = name;
+    //     return name;
+    // }
     std::string GetVariableNoneName(std::shared_ptr<ir::Tensor> tensor) {
-        std::string name;
-        name = "%" + std::to_string(var_counter++);
-        var_name_dict[tensor] = name;
-        return name;
+        std::string original_num = "%" + std::to_string(var_counter++);
+        var_name_dict[tensor] = original_num;
+
+        if (fusion_var_map_loaded) {
+            auto it = fusion_var_map.find(original_num);
+            if (it != fusion_var_map.end() && !it->second.empty()) {
+                return it->second;
+            }
+        }
+
+        return original_num;
     }
 };
 
