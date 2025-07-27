@@ -233,7 +233,7 @@ class BuildComputingGraph : public ir::Visitor {
 
         // 3. Broadcast模式：auto 左变量 = ir_builder->Create<...>(右变量, ...)
         std::regex broadcast_pattern(
-            R"((\w+)\s*=\s*[\s\S]*?ir_builder->Create<ir::view::Broadcast>\s*\(\s*([\w\[\]]+)\s*,)",
+            R"((\w+)\s*=\s*ir_builder->Create<ir::view::Broadcast>\s*\(\s*([\w\[\]]+)\s*,[^;]+;)",
             std::regex::icase
         );
         
@@ -245,86 +245,96 @@ class BuildComputingGraph : public ir::Visitor {
         fusion_var_map.clear();
 
         while (search_start != all_funcs_str.cend()) {
-            // 模式1：匹配Alloca（只提取左边变量）
-            if (std::regex_search(search_start, all_funcs_str.cend(), var_match, alloca_pattern)) {
-                std::cout << "var_match: " << var_match.str() << std::endl;
-                std::cout << "search_start 位置: " << (search_start - all_funcs_str.cbegin()) << std::endl;
-                if (var_match.size() ) {
-                    std::string left_var = var_match[1].str(); // 等号左边变量
-                    left_num = "%" + std::to_string(var_counter_2++);
-                    fusion_var_map[left_num] = left_var;
-                    search_start = var_match.suffix().first;
-                    std::cout << "search_start 位置: " << (search_start - all_funcs_str.cbegin()) << std::endl;
-                    continue; // 处理完后直接进入下一次循环，重新检查三种模式
-                }
+            // 存储所有可能的匹配结果
+            std::vector<std::pair<std::smatch, std::regex*>> matches;
+
+            // 尝试匹配所有 3 个模式
+            std::smatch var_match_alloca, var_match_expr, var_match_broadcast;
+            if (std::regex_search(search_start, all_funcs_str.cend(), var_match_alloca, alloca_pattern)) {
+                std::cout << "[Alloca] 匹配位置: " << var_match_alloca.position() 
+                        << ", 内容: " << var_match_alloca.str() << std::endl;
+                matches.emplace_back(var_match_alloca, &alloca_pattern);
+            }
+            if (std::regex_search(search_start, all_funcs_str.cend(), var_match_expr, expr_creator_pattern)) {
+                std::cout << "[ExpressCreator] 匹配位置: " << var_match_expr.position() 
+                        << ", 内容: " << var_match_expr.str() << std::endl;
+                matches.emplace_back(var_match_expr, &expr_creator_pattern);
+            }
+            if (std::regex_search(search_start, all_funcs_str.cend(), var_match_broadcast, broadcast_pattern)) {
+                std::cout << "[Broadcast] 匹配位置: " << var_match_broadcast.position() 
+                        << ", 内容: " << var_match_broadcast.str() << std::endl;
+                matches.emplace_back(var_match_broadcast, &broadcast_pattern);
             }
 
-            // 模式2：匹配ExpressCreator（提取左边变量 + 右边所有变量）
-            else if (std::regex_search(search_start, all_funcs_str.cend(), var_match, expr_creator_pattern)) {
-                std::cout << "var_match: " << var_match.str() << std::endl;
-                std::cout << "search_start 位置: " << (search_start - all_funcs_str.cbegin()) << std::endl;
-                if (var_match.size()) {
-                    std::string op_type_full = var_match[1].str();
-                    std::string op_type = op_type_full;
-                    size_t creator_pos = op_type.find("Creator");
-                    if (creator_pos != std::string::npos) {
-                        op_type = op_type.substr(0, creator_pos); // 简化为Shape、Fill等
-                    }
-                    std::cout << "op_type_full: " << op_type_full << std::endl;
-                    std::cout << "op_type: " << op_type << std::endl;
-
-                    std::string input_vars_str = var_match[2].str();
-                    std::vector<std::string> input_vars = split_vars(input_vars_str); // 分割变量
-
-                    std::vector<std::string> valid_inputs;
-                    if (op_type == "Shape" || op_type == "Sum" || op_type == "ReduceProd" || op_type == "UnaryInstrinsic") {
-                        // 1个输入算子
-                        if (!input_vars.empty() && IsValidVariable(input_vars[0])) {
-                            valid_inputs.push_back(input_vars[0]);
-                        }
-                    } else if (op_type == "Fill" || op_type == "Div" || op_type == "Mul" || op_type == "Add" || op_type == "Sub") {
-                        // 2个输入算子
-                        for (size_t i = 0; i < input_vars.size() && i < 2; ++i) {
-                            if (IsValidVariable(input_vars[i])) {
-                                valid_inputs.push_back(input_vars[i]);
-                            }
-                        }
-                    }
-
-                    for (const auto& var : valid_inputs) {
-                        right_num = "%" + std::to_string(var_counter_2++);
-                        fusion_var_map[right_num] = var; 
-                    }
-
-                    search_start = var_match.suffix().first;
-                    // // 调试：输出下一次搜索的起始位置内容（前50个字符）
-                    // std::string remaining(all_funcs_str.begin() + (search_start - all_funcs_str.cbegin()), 
-                    //                     all_funcs_str.begin() + (search_start - all_funcs_str.cbegin()) + 50);
-                    // std::cout << "下一次搜索起始内容: " << remaining << std::endl;
-                    std::cout << "search_start 位置: " << (search_start - all_funcs_str.cbegin()) << std::endl;
-                    continue; // 处理完后直接进入下一次循环，重新检查三种模式
-                }
-            }
-
-            // 模式3：匹配Broadcast（提取左边变量 + 右边变量）
-            else if (std::regex_search(search_start, all_funcs_str.cend(), var_match, broadcast_pattern)) {
-                std::cout << "var_match: " << var_match.str() << std::endl;
-                if (var_match.size()) {
-                    std::string left_var = var_match[1].str(); // 等号左边变量
-                    std::string right_var = var_match[2].str(); // 等号右边变量
-                    left_num = "%" + std::to_string(var_counter_2++);
-                    right_num = "%" + std::to_string(var_counter_2++);
-                    fusion_var_map[left_num] = left_var;
-                    fusion_var_map[right_num] = right_var;
-                    search_start = var_match.suffix().first;
-                    continue; // 处理完后直接进入下一次循环，重新检查三种模式
-                }
-            }
-
-            // 若均不匹配，移动搜索位置（避免死循环）
-            else{
+            // 如果没有匹配到任何模式，移动 search_start
+            if (matches.empty()) {
                 ++search_start;
+                continue;
             }
+
+            // 找到匹配位置最小的那个（即最早出现的匹配）
+            auto best_match = std::min_element(
+                matches.begin(), matches.end(),
+                [&](const auto& a, const auto& b) {
+                    return a.first.position() < b.first.position();
+                }
+            );
+
+            // 提取匹配结果
+            const auto& var_match = best_match->first;
+            const auto& pattern = best_match->second;
+            std::cout << ">>> 最终选择匹配: 位置=" << var_match.position() 
+                        << ", 内容: " << var_match.str() << std::endl;
+
+            // 根据匹配的模式类型进行处理
+            if (pattern == &alloca_pattern) {
+                // 模式1：Alloca（只提取左边变量）
+                std::string left_var = var_match[1].str();
+                left_num = "%" + std::to_string(var_counter_2++);
+                fusion_var_map[left_num] = left_var;
+            }
+            else if (pattern == &expr_creator_pattern) {
+                // 模式2：ExpressCreator（提取左边变量 + 右边变量）
+                std::string op_type_full = var_match[1].str();
+                std::string op_type = op_type_full.substr(0, op_type_full.find("Creator"));
+
+                std::string input_vars_str = var_match[2].str();
+                std::vector<std::string> input_vars = split_vars(input_vars_str);
+
+                // 根据算子类型过滤有效变量
+                std::vector<std::string> valid_inputs;
+                if (op_type == "Shape" || op_type == "Sum" || op_type == "ReduceProd" || op_type == "UnaryInstrinsic") {
+                    if (!input_vars.empty() && IsValidVariable(input_vars[0])) {
+                        valid_inputs.push_back(input_vars[0]);
+                    }
+                }
+                else if (op_type == "Fill" || op_type == "Div" || op_type == "Mul" || op_type == "Add" || op_type == "Sub") {
+                    for (size_t i = 0; i < input_vars.size() && i < 2; ++i) {
+                        // if (IsValidVariable(input_vars[i])) {
+                        //     valid_inputs.push_back(input_vars[i]);
+                        // }
+                        valid_inputs.push_back(input_vars[i]);
+                    }
+                }
+
+                // 分配编号
+                for (const auto& var : valid_inputs) {
+                    right_num = "%" + std::to_string(var_counter_2++);
+                    fusion_var_map[right_num] = var;
+                }
+            }
+            else if (pattern == &broadcast_pattern) {
+                // 模式3：Broadcast（提取左边变量 + 右边变量）
+                std::string left_var = var_match[1].str();
+                std::string right_var = var_match[2].str();
+                left_num = "%" + std::to_string(var_counter_2++);
+                right_num = "%" + std::to_string(var_counter_2++);
+                fusion_var_map[left_num] = left_var;
+                fusion_var_map[right_num] = right_var;
+            }
+
+            // 更新 search_start
+            search_start = var_match.suffix().first;
         }
 
         fusion_var_map_loaded = true;
