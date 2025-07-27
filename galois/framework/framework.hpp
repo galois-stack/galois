@@ -403,30 +403,6 @@ class BuildComputingGraph : public ir::Visitor {
         }
     }
 
-    // std::string GetVariableName(std::shared_ptr<ir::Tensor> tensor) {
-    //     if (var_name_dict.find(tensor) != var_name_dict.end()) {
-    //         return var_name_dict[tensor];
-    //     }
-
-    //     std::string name;
-
-    //     if (fusion_var_map_loaded && !tensor->name.empty()) {
-    //         auto it = fusion_var_map.find(tensor->name);
-    //         if (it != fusion_var_map.end()) {
-    //             name = it->second;
-    //             var_name_dict[tensor] = name;
-    //             return name;
-    //         }
-    //     }
-
-    //     if (!tensor->name.empty()) {
-    //         return "%" + tensor->name;
-    //     } else {
-    //         name = "%" + std::to_string(var_counter++);
-    //     }
-    //     var_name_dict[tensor] = name;
-    //     return name;
-    // }
     std::string GetVariableName(std::shared_ptr<ir::Tensor> tensor) {
         if (var_name_dict.find(tensor) != var_name_dict.end()) {
             std::string original_num = var_name_dict[tensor];
@@ -457,12 +433,6 @@ class BuildComputingGraph : public ir::Visitor {
         return original_num;
     }
 
-    // std::string GetVariableNoneName(std::shared_ptr<ir::Tensor> tensor) {
-    //     std::string name;
-    //     name = "%" + std::to_string(var_counter++);
-    //     var_name_dict[tensor] = name;
-    //     return name;
-    // }
     std::string GetVariableNoneName(std::shared_ptr<ir::Tensor> tensor) {
         std::string original_num = "%" + std::to_string(var_counter++);
         var_name_dict[tensor] = original_num;
