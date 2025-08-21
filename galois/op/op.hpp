@@ -11,6 +11,7 @@
 #include "galois/op/matrix_multiply.hpp"
 #include "galois/op/normalize.hpp"
 #include "galois/op/operator_fusion.hpp"
+#include "galois/op/operator_fusion_no_opt.hpp"
 #include "galois/op/pack.hpp"
 #include "galois/op/padding.hpp"
 #include "galois/op/reduce_prod.hpp"
