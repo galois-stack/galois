@@ -49,7 +49,7 @@ TEST(GaloisTests, TestOperatorFusion_v2) {
     auto ir_print_visitor = ir::IRPrinter::Create();
     auto output = ir_print_visitor->Print(ir_operator);
     std::cout << output << "\n\n";
-    
+
     auto jit_engine = jit::Engine::Create();
     auto operatorfusion_fun =
         jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator);
@@ -78,6 +78,18 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
     auto ir_builder = ir::Builder::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::OperatorFusionNoOptCreator>(
         {ir_input_type, ir_input_type, ir_input_type});
+
+    auto ir_print_visitor = ir::IRPrinter::Create();
+    std::cout << "Original IR:\n";
+    std::cout << ir_print_visitor->Print(ir_operator) << "\n\n";
+
+    auto ir_graph = galois::framework::BuildComputingGraph::Create();
+    ir_graph->Traverse(ir_operator);
+    ir_graph->PrintAllNodes();
+
+    // auto ir_operator2 = galois::transform::FuseOperators(ir_operator);
+    // std::cout << "Fused IR:\n";
+    // std::cout << ir_print_visitor->Print(ir_operator2) << "\n\n";
 
     auto jit_engine = jit::Engine::Create();
     auto operatorfusion_fun =
