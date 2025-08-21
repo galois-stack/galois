@@ -1,5 +1,10 @@
 # add_executable(galois_test main.cpp matrix_multiply.cpp)
-add_executable(galois_test main.cpp operator_fusion_test)
+add_executable(galois_test main.cpp operator_fusion_test.cpp)
+# add_executable(galois_test 
+#     main.cpp 
+#     reference_count_test.cpp
+#     ir_print_test.cpp
+# )
 # add_executable(galois_test
 #     main.cpp
 #     gemm_test.cpp
