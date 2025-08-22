@@ -87,13 +87,13 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
     ir_graph->Traverse(ir_operator);
     ir_graph->PrintAllNodes();
 
-    // auto ir_operator2 = galois::transform::FuseOperators(ir_operator);
-    // std::cout << "Fused IR:\n";
-    // std::cout << ir_print_visitor->Print(ir_operator2) << "\n\n";
+    auto ir_operator2 = ir_graph->OperatorFusionOpt(ir_operator);
+    std::cout << "Fused IR:\n";
+    std::cout << ir_print_visitor->Print(ir_operator2) << "\n\n";
 
     auto jit_engine = jit::Engine::Create();
     auto operatorfusion_fun =
-        jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator);
+        jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator2);
 
     std::array<float, length> input1 = {3.1415f, 2.7182f, 1.1415f, 0.7182f,
                                         4.1415f, 5.7182f, 6.1415f, 7.7182f};

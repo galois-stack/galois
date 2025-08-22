@@ -6,6 +6,7 @@
 
 #include "galois/ir/ir.hpp"
 #include "galois/ir/ir_print_visitor.hpp"
+#include "galois/op/op.hpp"
 
 namespace galois::framework {
 
@@ -188,6 +189,23 @@ class BuildComputingGraph : public ir::Visitor {
             
             std::cout << "-------------------------" << std::endl;
         }
+    }
+
+    std::shared_ptr<ir::Operator> OperatorFusionOpt(std::shared_ptr<ir::Operator> ir_operator) {
+        ir_operator->block->clear();
+
+        auto ir_builder = ir::Builder::Create();
+        std::vector<std::string> operations = {"add", "sub"};
+
+        auto sp_creator = op::OperatorFusionCreator::Create(operations);
+        auto [ir_operator_fused, scope] = ir_builder->CreateOperator(
+            ir_operator->GetOperatorType(), ir_operator->name + "_fused");
+        std::vector<std::shared_ptr<ir::Tensor>> ir_inputs;
+        std::transform(RANGE(ir_operator_fused->inputs), std::back_inserter(ir_inputs),
+                       [](std::shared_ptr<ir::Tensor> ir_input) { return ir_input; });
+        sp_creator->Express(ir_inputs, ir_builder);
+
+        return ir_operator_fused;
     }
 
    private:
