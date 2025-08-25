@@ -511,4 +511,60 @@ inline std::vector<std::shared_ptr<Tensor_>> ExtractAllFromBlock(std::shared_ptr
     return result;
 }
 
+template <typename Tensor_>
+struct TreeNode {
+    std::shared_ptr<Tensor_> value;  // 当前节点的Tensor_实例
+    std::vector<TreeNode<Tensor_>> children;  // 子节点（来自value->block中的Tensor_）
+};
+
+template <typename Tensor_>
+inline std::vector<TreeNode<Tensor_>> ExtractHierarchicalFromBlock(std::shared_ptr<ir::Block> block) {
+    std::vector<TreeNode<Tensor_>> current_level;
+    if (!block) return current_level;  // 空block直接返回空
+
+    // 遍历block中直接包含的所有tensor
+    for (auto& tensor : *block) {
+        // 1. 若当前tensor是目标类型Tensor_，创建节点
+        if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
+            TreeNode<Tensor_> node;
+            node.value = target;
+
+            // 2. 检查该Tensor_是否包含block（如Operator有block成员），若有则递归提取子节点
+            // 这里以Operator为例，若Tensor_是其他含block的类型，可类似扩展
+            if constexpr (std::is_same_v<Tensor_, ir::Operator>) {
+                // 提取Operator->block中的Tensor_作为子节点
+                node.children = ExtractHierarchicalFromBlock<Tensor_>(target->block);
+            }
+            // 若有其他含block的Tensor_类型（如自定义类型），可在此添加判断
+            // 例如：else if constexpr (std::is_same_v<Tensor_, ir::CustomType>) { ... }
+
+            current_level.push_back(node);
+        }
+
+        // 3. 处理其他可能包含block的非Tensor_类型（如Grid），避免遗漏嵌套的Tensor_
+        // （若Grid中可能包含Tensor_，则递归处理其block）
+        if (auto grid = std::dynamic_pointer_cast<ir::Grid>(tensor)) {
+            auto grid_children = ExtractHierarchicalFromBlock<Tensor_>(grid->block);
+            // 将Grid的block中提取的节点加入当前层级（因为Grid是block的直接子节点）
+            current_level.insert(current_level.end(), grid_children.begin(), grid_children.end());
+        }
+    }
+
+    return current_level;
+}
+
+template <typename Tensor_>
+void PrintHierarchy(const std::vector<TreeNode<Tensor_>>& nodes, int depth = 0) {
+    std::string indent(depth * 2, ' ');  // 每层缩进2个空格
+    for (const auto& node : nodes) {
+        if (!node.value) continue;
+        // 打印当前节点信息（以Operator为例）
+        std::cout << indent << "Level " << depth << ": Operator '" << node.value->name << "'\n";
+        // 递归打印子节点
+        if (!node.children.empty()) {
+            PrintHierarchy(node.children, depth + 1);
+        }
+    }
+}
+
 }  // namespace galois::transform
