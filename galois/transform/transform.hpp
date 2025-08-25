@@ -6,6 +6,7 @@
 #include "galois/helper.hpp"
 #include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/op/op.hpp"
 #include "galois/transform/common.hpp"
 #include "galois/transform/each.hpp"
 
@@ -638,6 +639,23 @@ inline void ModifyOperators(std::shared_ptr<ir::Operator> root_op) {
 
     GALOIS_ASSERT(last_write_instr, "未在block中找到Write指令");
     last_write_instr->SetOperand(0, replacement_tensor);
-    }
+}
 
+
+inline std::shared_ptr<ir::Operator> OperatorFusionOpt(std::shared_ptr<ir::Operator> ir_operator) {
+    ir_operator->block->clear();
+
+    auto ir_builder = ir::Builder::Create();
+    std::vector<std::string> operations = {"add", "sub"};
+
+    auto sp_creator = op::OperatorFusionCreator::Create(operations);
+    auto [ir_operator_fused, scope] = ir_builder->CreateOperator(
+        ir_operator->GetOperatorType(), ir_operator->name + "_fused");
+    std::vector<std::shared_ptr<ir::Tensor>> ir_inputs;
+    std::transform(RANGE(ir_operator_fused->inputs), std::back_inserter(ir_inputs),
+                    [](std::shared_ptr<ir::Tensor> ir_input) { return ir_input; });
+    sp_creator->Express(ir_inputs, ir_builder);
+
+    return ir_operator_fused;
+}
 }  // namespace galois::transform

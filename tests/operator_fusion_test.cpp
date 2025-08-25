@@ -1,6 +1,7 @@
 #include "galois/op/operator_fusion.hpp"
 #include "galois/op/operator_fusion_no_opt.hpp"
 #include "galois/transform/transform.hpp"
+#include "galois/ir/ir_print_visitor.hpp"
 
 #include <boost/scope/scope_exit.hpp>
 #include <cmath>
@@ -50,14 +51,10 @@ TEST(GaloisTests, TestOperatorFusion_v2) {
     std::cout << "Original IR:\n";
     std::cout << ir_print_visitor->Print(ir_operator) << "\n\n";
 
-    auto ir_graph = galois::framework::BuildComputingGraph::Create();
-    ir_graph->Traverse(ir_operator);
-    // ir_graph->PrintAllNodes();
-
     auto op_hierarchy = galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
     galois::transform::PrintHierarchy(op_hierarchy);
 
-    auto ir_operator2 = ir_graph->OperatorFusionOpt(ir_operator);
+    auto ir_operator2 = galois::transform::OperatorFusionOpt(ir_operator);
     std::cout << "Fused IR:\n";
     std::cout << ir_print_visitor->Print(ir_operator2) << "\n\n";
 
@@ -93,10 +90,6 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
     auto ir_print_visitor = ir::IRPrinter::Create();
     std::cout << "Original IR:\n";
     std::cout << ir_print_visitor->Print(ir_operator) << "\n\n";
-
-    auto ir_graph = galois::framework::BuildComputingGraph::Create();
-    ir_graph->Traverse(ir_operator);
-    // ir_graph->PrintAllNodes();
 
     auto op_hierarchy = galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
     galois::transform::PrintHierarchy(op_hierarchy);
