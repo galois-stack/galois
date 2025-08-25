@@ -567,4 +567,77 @@ void PrintHierarchy(const std::vector<TreeNode<Tensor_>>& nodes, int depth = 0) 
     }
 }
 
+inline void ReplaceTensorReference(
+    std::shared_ptr<ir::Block> block,
+    std::shared_ptr<ir::Tensor> old_tensor,
+    std::shared_ptr<ir::Tensor> new_tensor) {
+    for (auto& tensor : *block) {
+        if (auto instr = Cast<ir::Instruction>(tensor)) {
+            for (int64_t i = 0; i < instr->OperandSize(); ++i) {
+                if (instr->GetOperand(i) == old_tensor) {
+                    instr->SetOperand(i, new_tensor); // 替换操作数引用
+                }
+            }
+        }
+    }
+}
+
+// 辅助函数：从父算子中查找指定名称的子算子
+template <typename Tensor_>
+inline std::shared_ptr<Tensor_> FindOperatorByName(
+    std::shared_ptr<ir::Operator> parent_op,
+    const std::string& name) {
+    auto ops = ExtractAllFromBlock<Tensor_>(parent_op->block);
+    for (auto op : ops) {
+        if (op->name == name) {
+            return op;
+        }
+    }
+    return nullptr;
+}
+
+// 辅助函数：查找指定名称的Call指令
+inline std::shared_ptr<ir::Call> FindCallByName(
+    std::shared_ptr<ir::Block> block,
+    const std::string& target_name) {
+    std::shared_ptr<ir::Call> result;
+    Each<ir::Call>(block, [&](std::shared_ptr<ir::Call> call) {
+        if (call->Operator()->name == target_name) {
+            result = call;
+        }
+    });
+    return result;
+}
+
+inline void ModifyOperators(std::shared_ptr<ir::Operator> root_op) {
+    auto add1_op = FindOperatorByName<ir::Operator>(root_op, "Add1");
+    auto sub3_op = FindOperatorByName<ir::Operator>(root_op, "Sub3");
+    auto call_add1 = FindCallByName(root_op->block, "Add1");
+    auto call_sub3 = FindCallByName(root_op->block, "Sub3");
+
+    GALOIS_ASSERT(add1_op && sub3_op && call_sub3 && call_add1, 
+                 "目标算子或调用未找到");
+
+    auto& block_l1 = root_op->block;
+    block_l1->erase(std::remove_if(block_l1->begin(), block_l1->end(),
+        [&](const std::shared_ptr<ir::Tensor>& t) { return t == sub3_op; }),
+        block_l1->end());
+    block_l1->erase(std::remove_if(block_l1->begin(), block_l1->end(),
+        [&](const std::shared_ptr<ir::Tensor>& t) { return t == call_sub3; }),
+        block_l1->end());
+    
+    std::shared_ptr<ir::Tensor> replacement_tensor = call_add1;
+    GALOIS_ASSERT(replacement_tensor, "call_add1的输出张量为空");
+
+    std::shared_ptr<ir::Write> last_write_instr = nullptr;
+    for (auto& tensor : *root_op->block) {
+        if (auto write_instr = Cast<ir::Write>(tensor)) {
+            last_write_instr = write_instr;
+        }
+    }
+
+    GALOIS_ASSERT(last_write_instr, "未在block中找到Write指令");
+    last_write_instr->SetOperand(0, replacement_tensor);
+    }
+
 }  // namespace galois::transform
