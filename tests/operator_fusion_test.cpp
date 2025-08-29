@@ -110,7 +110,7 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
 
     std::vector<float> real_result(length);
     for (size_t i = 0; i < length; ++i) {
-        real_result[i] = (input1[i] + input2[i]);
+        real_result[i] = (input1[i] + input2[i]) - input3[i] ;
     }
 
     float *result = operatorfusion_fun(input1.data(), input2.data(), input3.data());
