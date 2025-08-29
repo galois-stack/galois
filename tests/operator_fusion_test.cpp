@@ -1,11 +1,11 @@
 #include "galois/op/operator_fusion.hpp"
-#include "galois/op/operator_fusion_no_opt.hpp"
-#include "galois/transform/transform.hpp"
-#include "galois/ir/ir_print_visitor.hpp"
 
 #include <boost/scope/scope_exit.hpp>
 #include <cmath>
 
+#include "galois/ir/ir_print_visitor.hpp"
+#include "galois/op/operator_fusion_no_opt.hpp"
+#include "galois/transform/transform.hpp"
 #include "tests/galois_test.hpp"
 
 TEST(GaloisTests, TestOperatorFusion_v1) {
@@ -51,7 +51,8 @@ TEST(GaloisTests, TestOperatorFusion_v2) {
     std::cout << "Original IR:\n";
     std::cout << ir_print_visitor->Print(ir_operator) << "\n\n";
 
-    auto op_hierarchy = galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
+    auto op_hierarchy =
+        galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
     galois::transform::PrintHierarchy(op_hierarchy);
 
     auto ir_operator2 = galois::transform::OperatorFusionOpt(ir_operator);
@@ -91,7 +92,8 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
     std::cout << "Original IR:\n";
     std::cout << ir_print_visitor->Print(ir_operator) << "\n\n";
 
-    auto op_hierarchy = galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
+    auto op_hierarchy =
+        galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
     galois::transform::PrintHierarchy(op_hierarchy);
 
     galois::transform::ModifyOperators(ir_operator);
@@ -110,7 +112,7 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
 
     std::vector<float> real_result(length);
     for (size_t i = 0; i < length; ++i) {
-        real_result[i] = (input1[i] + input2[i]) - input3[i] ;
+        real_result[i] = (input1[i] + input2[i]) - input3[i];
     }
 
     float *result = operatorfusion_fun(input1.data(), input2.data(), input3.data());
