@@ -6,6 +6,7 @@
 #include "galois/helper.hpp"
 #include "galois/ir/builder.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/ir/ir_print_visitor.hpp"
 #include "galois/op/op.hpp"
 #include "galois/transform/common.hpp"
 #include "galois/transform/each.hpp"
@@ -492,6 +493,13 @@ inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
 //     }
 // }
 
+inline bool IsElementWiseOperator(const std::shared_ptr<ir::Operator>& op) {
+    const std::vector<std::string> elemWiseKeywords = {"Add", "Sub", "Mul", "Div"};
+    return std::any_of(
+        elemWiseKeywords.begin(), elemWiseKeywords.end(),
+        [&](const std::string& kw) { return op->name.find(kw) != std::string::npos; });
+}
+
 template <typename Tensor_>
 inline std::vector<std::shared_ptr<Tensor_>> ExtractAllFromBlock(std::shared_ptr<ir::Block> block) {
     std::vector<std::shared_ptr<Tensor_>> result;
@@ -514,39 +522,30 @@ inline std::vector<std::shared_ptr<Tensor_>> ExtractAllFromBlock(std::shared_ptr
 
 template <typename Tensor_>
 struct TreeNode {
-    std::shared_ptr<Tensor_> value;  // 当前节点的Tensor_实例
-    std::vector<TreeNode<Tensor_>> children;  // 子节点（来自value->block中的Tensor_）
+    std::shared_ptr<Tensor_> value;
+    std::vector<TreeNode<Tensor_>> children;
 };
 
 template <typename Tensor_>
-inline std::vector<TreeNode<Tensor_>> ExtractHierarchicalFromBlock(std::shared_ptr<ir::Block> block) {
+inline std::vector<TreeNode<Tensor_>> ExtractHierarchicalFromBlock(
+    std::shared_ptr<ir::Block> block) {
     std::vector<TreeNode<Tensor_>> current_level;
-    if (!block) return current_level;  // 空block直接返回空
+    if (!block) return current_level;
 
-    // 遍历block中直接包含的所有tensor
     for (auto& tensor : *block) {
-        // 1. 若当前tensor是目标类型Tensor_，创建节点
         if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
             TreeNode<Tensor_> node;
             node.value = target;
 
-            // 2. 检查该Tensor_是否包含block（如Operator有block成员），若有则递归提取子节点
-            // 这里以Operator为例，若Tensor_是其他含block的类型，可类似扩展
             if constexpr (std::is_same_v<Tensor_, ir::Operator>) {
-                // 提取Operator->block中的Tensor_作为子节点
                 node.children = ExtractHierarchicalFromBlock<Tensor_>(target->block);
             }
-            // 若有其他含block的Tensor_类型（如自定义类型），可在此添加判断
-            // 例如：else if constexpr (std::is_same_v<Tensor_, ir::CustomType>) { ... }
 
             current_level.push_back(node);
         }
 
-        // 3. 处理其他可能包含block的非Tensor_类型（如Grid），避免遗漏嵌套的Tensor_
-        // （若Grid中可能包含Tensor_，则递归处理其block）
         if (auto grid = std::dynamic_pointer_cast<ir::Grid>(tensor)) {
             auto grid_children = ExtractHierarchicalFromBlock<Tensor_>(grid->block);
-            // 将Grid的block中提取的节点加入当前层级（因为Grid是block的直接子节点）
             current_level.insert(current_level.end(), grid_children.begin(), grid_children.end());
         }
     }
@@ -556,38 +555,33 @@ inline std::vector<TreeNode<Tensor_>> ExtractHierarchicalFromBlock(std::shared_p
 
 template <typename Tensor_>
 void PrintHierarchy(const std::vector<TreeNode<Tensor_>>& nodes, int depth = 0) {
-    std::string indent(depth * 2, ' ');  // 每层缩进2个空格
+    std::string indent(depth * 2, ' ');
     for (const auto& node : nodes) {
         if (!node.value) continue;
-        // 打印当前节点信息（以Operator为例）
         std::cout << indent << "Level " << depth << ": Operator '" << node.value->name << "'\n";
-        // 递归打印子节点
         if (!node.children.empty()) {
             PrintHierarchy(node.children, depth + 1);
         }
     }
 }
 
-inline void ReplaceTensorReference(
-    std::shared_ptr<ir::Block> block,
-    std::shared_ptr<ir::Tensor> old_tensor,
-    std::shared_ptr<ir::Tensor> new_tensor) {
+inline void ReplaceTensorReference(std::shared_ptr<ir::Block> block,
+                                   std::shared_ptr<ir::Tensor> old_tensor,
+                                   std::shared_ptr<ir::Tensor> new_tensor) {
     for (auto& tensor : *block) {
         if (auto instr = Cast<ir::Instruction>(tensor)) {
             for (int64_t i = 0; i < instr->OperandSize(); ++i) {
                 if (instr->GetOperand(i) == old_tensor) {
-                    instr->SetOperand(i, new_tensor); // 替换操作数引用
+                    instr->SetOperand(i, new_tensor);
                 }
             }
         }
     }
 }
 
-// 辅助函数：从父算子中查找指定名称的子算子
 template <typename Tensor_>
-inline std::shared_ptr<Tensor_> FindOperatorByName(
-    std::shared_ptr<ir::Operator> parent_op,
-    const std::string& name) {
+inline std::shared_ptr<Tensor_> FindOperatorByName(std::shared_ptr<ir::Operator> parent_op,
+                                                   const std::string& name) {
     auto ops = ExtractAllFromBlock<Tensor_>(parent_op->block);
     for (auto op : ops) {
         if (op->name == name) {
@@ -597,10 +591,8 @@ inline std::shared_ptr<Tensor_> FindOperatorByName(
     return nullptr;
 }
 
-// 辅助函数：查找指定名称的Call指令
-inline std::shared_ptr<ir::Call> FindCallByName(
-    std::shared_ptr<ir::Block> block,
-    const std::string& target_name) {
+inline std::shared_ptr<ir::Call> FindCallByName(std::shared_ptr<ir::Block> block,
+                                                const std::string& target_name) {
     std::shared_ptr<ir::Call> result;
     Each<ir::Call>(block, [&](std::shared_ptr<ir::Call> call) {
         if (call->Operator()->name == target_name) {
@@ -610,37 +602,157 @@ inline std::shared_ptr<ir::Call> FindCallByName(
     return result;
 }
 
+inline std::list<std::shared_ptr<ir::Tensor>>::iterator FindInBlock(
+    std::shared_ptr<ir::Block> block, std::shared_ptr<ir::Tensor> tensor) {
+    for (auto it = block->begin(); it != block->end(); ++it) {
+        if (*it == tensor) {  // 比较指针是否指向同一个Tensor
+            return it;
+        }
+    }
+    return block->end();  // 未找到返回end()
+}
+
+template <typename Tensor_>
+inline void FindInstrRecursive(std::shared_ptr<ir::Tensor> tensor,
+                               std::shared_ptr<Tensor_>& single_instr,
+                               std::list<std::shared_ptr<ir::Tensor>>::iterator& single_it,
+                               std::shared_ptr<ir::Block> current_block) {
+    if (auto target = Cast<Tensor_>(tensor)) {
+        if constexpr (std::is_same_v<Tensor_, ir::ArithmeticInstruction>) {
+            if (target->operation == ir::ArithmeticInstruction::Add) {
+                single_instr = target;
+                auto it = FindInBlock(current_block, tensor);
+                if (it != current_block->end()) {
+                    single_it = std::next(it);
+                }
+            }
+        } else {
+            single_instr = target;
+            auto it = FindInBlock(current_block, tensor);
+            if (it != current_block->end()) {
+                single_it = std::next(it);
+            }
+        }
+    }
+}
+
+template <typename Tensor_>
+inline void FindInstrRecursiveInner(std::shared_ptr<ir::Tensor> tensor,
+                                    std::shared_ptr<Tensor_>& single_instr,
+                                    std::list<std::shared_ptr<ir::Tensor>>::iterator& single_it,
+                                    std::shared_ptr<ir::Block> current_block) {
+    if (auto block = Cast<ir::Block>(tensor)) {
+        for (auto& sub_tensor : *block) {
+            FindInstrRecursive<Tensor_>(sub_tensor, single_instr, single_it, block);
+        }
+    } else if (auto grid = Cast<ir::Grid>(tensor)) {
+        for (auto& sub_tensor : *grid->block) {
+            FindInstrRecursive<Tensor_>(sub_tensor, single_instr, single_it, grid->block);
+        }
+    }
+}
+
 inline void ModifyOperators(std::shared_ptr<ir::Operator> root_op) {
+    auto ir_printer = ir::IRPrinter::Create();
+    auto ir_builder = ir::Builder::Create();
     auto add1_op = FindOperatorByName<ir::Operator>(root_op, "Add1");
     auto sub3_op = FindOperatorByName<ir::Operator>(root_op, "Sub3");
     auto call_add1 = FindCallByName(root_op->block, "Add1");
     auto call_sub3 = FindCallByName(root_op->block, "Sub3");
 
-    GALOIS_ASSERT(add1_op && sub3_op && call_sub3 && call_add1, 
-                 "目标算子或调用未找到");
+    GALOIS_ASSERT(add1_op && sub3_op && call_add1 && call_sub3, "目标算子或调用未找到");
 
-    auto& block_l1 = root_op->block;
-    block_l1->erase(std::remove_if(block_l1->begin(), block_l1->end(),
-        [&](const std::shared_ptr<ir::Tensor>& t) { return t == sub3_op; }),
-        block_l1->end());
-    block_l1->erase(std::remove_if(block_l1->begin(), block_l1->end(),
-        [&](const std::shared_ptr<ir::Tensor>& t) { return t == call_sub3; }),
-        block_l1->end());
-    
-    std::shared_ptr<ir::Tensor> replacement_tensor = call_add1;
-    GALOIS_ASSERT(replacement_tensor, "call_add1的输出张量为空");
+    auto orig_op_type = add1_op->GetOperatorType();
+    std::vector<std::shared_ptr<ir::TensorType>> new_input_types = orig_op_type->ir_input_types;
+    new_input_types.push_back(sub3_op->GetOperatorType()->ir_input_types[1]);
 
-    std::shared_ptr<ir::Write> last_write_instr = nullptr;
+    auto new_op_type = ir::OperatorType::Create(new_input_types, orig_op_type->output_type);
+    add1_op->type = new_op_type;
+
+    add1_op->inputs.push_back(ir::Input::Create(sub3_op->GetOperatorType()->ir_input_types[1]));
+
+    auto& add1_block = add1_op->block;
+
+    auto accessor_it = add1_block->end();
+    auto add_it = add1_block->end();
+    auto write_it_inner = add1_block->end();
+    auto write_it = add1_block->end();
+    auto grid_it = add1_block->end();
+    std::shared_ptr<ir::Accessor> accessor_instr;
+    std::shared_ptr<ir::ArithmeticInstruction> add_instr;
+    std::shared_ptr<ir::Write> write_instr_inner;
+    std::shared_ptr<ir::Write> write_instr;
+    std::shared_ptr<ir::Grid> grid_instr;
+
+    for (auto& tensor : *add1_block) {
+        FindInstrRecursiveInner(tensor, accessor_instr, accessor_it, add1_block);
+        FindInstrRecursiveInner(tensor, add_instr, add_it, add1_block);
+        FindInstrRecursiveInner(tensor, write_instr_inner, write_it_inner, add1_block);
+        FindInstrRecursive<ir::Grid>(tensor, grid_instr, grid_it, add1_block);
+    }
     for (auto& tensor : *root_op->block) {
-        if (auto write_instr = Cast<ir::Write>(tensor)) {
-            last_write_instr = write_instr;
-        }
+        FindInstrRecursive<ir::Write>(tensor, write_instr, write_it, root_op->block);
     }
 
-    GALOIS_ASSERT(last_write_instr, "未在block中找到Write指令");
-    last_write_instr->SetOperand(0, replacement_tensor);
-}
+    GALOIS_ASSERT(accessor_instr, "accessor_instr内部结构不符合预期");
+    GALOIS_ASSERT(add_instr, "add_instr内部结构不符合预期");
+    GALOIS_ASSERT(write_instr_inner, "write_instr_inner内部结构不符合预期");
+    GALOIS_ASSERT(grid_instr, "grid_instr内部结构不符合预期");
+    GALOIS_ASSERT(write_instr, "write_instr内部结构不符合预期");
 
+    ir_builder->grid_stack.push(grid_instr);
+    ir_builder->block_stack.push(grid_instr->block);
+    ir_builder->iterator_stack.push(accessor_it);
+    auto input2_accessor = ir_builder->CreateIdentityAccessor(add1_op->inputs[2]);
+    ir_builder->grid_stack.pop();
+    ir_builder->block_stack.pop();
+    ir_builder->iterator_stack.pop();
+
+    auto sub_instr = ir::ArithmeticInstruction::Create(ir::ArithmeticInstruction::Sub, add_instr,
+                                                       input2_accessor);
+
+    ir_builder->grid_stack.push(grid_instr);
+    ir_builder->block_stack.push(grid_instr->block);
+    ir_builder->iterator_stack.push(std::next(accessor_it));
+    ir_builder->Insert(sub_instr);
+    ir_builder->grid_stack.pop();
+    ir_builder->block_stack.pop();
+    ir_builder->iterator_stack.pop();
+
+    write_instr_inner->SetOperand(0, sub_instr);
+
+    std::vector<std::shared_ptr<ir::Tensor>> new_call_inputs;
+    for (int64_t i = 0; i < call_add1->InputSize(); ++i) {
+        new_call_inputs.push_back(call_add1->Input(i));
+    }
+    new_call_inputs.push_back(call_sub3->Input(1));
+
+    auto call_all = ir::Call::Create(add1_op, new_call_inputs);
+    auto call_add1_it = std::find(root_op->block->begin(), root_op->block->end(), call_add1);
+
+    ir_builder->block_stack.push(root_op->block);
+    ir_builder->iterator_stack.push(std::next(call_add1_it));
+    ir_builder->Insert(call_all);
+    ir_builder->block_stack.pop();
+    ir_builder->iterator_stack.pop();
+
+    auto& block_l1 = root_op->block;
+    block_l1->erase(
+        std::remove_if(block_l1->begin(), block_l1->end(),
+                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == call_add1; }),
+        block_l1->end());
+    block_l1->erase(
+        std::remove_if(block_l1->begin(), block_l1->end(),
+                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == sub3_op; }),
+        block_l1->end());
+    block_l1->erase(
+        std::remove_if(block_l1->begin(), block_l1->end(),
+                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == call_sub3; }),
+        block_l1->end());
+
+    GALOIS_ASSERT(write_instr, "未在block中找到Write指令");
+    write_instr->SetOperand(0, call_all);
+}
 
 inline std::shared_ptr<ir::Operator> OperatorFusionOpt(std::shared_ptr<ir::Operator> ir_operator) {
     ir_operator->block->clear();
@@ -649,11 +761,11 @@ inline std::shared_ptr<ir::Operator> OperatorFusionOpt(std::shared_ptr<ir::Opera
     std::vector<std::string> operations = {"add", "sub"};
 
     auto sp_creator = op::OperatorFusionCreator::Create(operations);
-    auto [ir_operator_fused, scope] = ir_builder->CreateOperator(
-        ir_operator->GetOperatorType(), ir_operator->name + "_fused");
+    auto [ir_operator_fused, scope] =
+        ir_builder->CreateOperator(ir_operator->GetOperatorType(), ir_operator->name + "_fused");
     std::vector<std::shared_ptr<ir::Tensor>> ir_inputs;
     std::transform(RANGE(ir_operator_fused->inputs), std::back_inserter(ir_inputs),
-                    [](std::shared_ptr<ir::Tensor> ir_input) { return ir_input; });
+                   [](std::shared_ptr<ir::Tensor> ir_input) { return ir_input; });
     sp_creator->Express(ir_inputs, ir_builder);
 
     return ir_operator_fused;
