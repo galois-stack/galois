@@ -2,6 +2,7 @@
 
 #include <map>
 #include <set>
+#include <unordered_set>
 
 #include "galois/helper.hpp"
 #include "galois/ir/builder.hpp"
@@ -652,13 +653,80 @@ inline void FindInstrRecursiveInner(std::shared_ptr<ir::Tensor> tensor,
     }
 }
 
-inline void ModifyOperators(std::shared_ptr<ir::Operator> root_op) {
+inline void PrintFusibleChains(std::vector<std::vector<std::shared_ptr<ir::Call>>> fusibleChains) {
+    std::cout << "发现 " << fusibleChains.size() << " 条可融合的element-wise操作链：" << std::endl;
+
+    for (size_t i = 0; i < fusibleChains.size(); ++i) {
+        const auto& chain = fusibleChains[i];
+        std::cout << "  链 " << (i + 1) << "（包含 " << chain.size() << " 个操作）：" << std::endl;
+        
+        for (size_t j = 0; j < chain.size(); ++j) {
+            const auto& call = chain[j];
+            // 假设Operator()返回操作符对象，Name()返回操作名称
+            std::cout << "    操作 " << (j + 1) << ": " << call->Operator()->name << std::endl;
+        }
+    }
+}
+
+inline void LoopFusion(std::shared_ptr<ir::Operator> root_op) {
+    if (!root_op || !root_op->block) return;
+
     auto ir_printer = ir::IRPrinter::Create();
     auto ir_builder = ir::Builder::Create();
-    auto add1_op = FindOperatorByName<ir::Operator>(root_op, "Add1");
-    auto sub3_op = FindOperatorByName<ir::Operator>(root_op, "Sub3");
-    auto call_add1 = FindCallByName(root_op->block, "Add1");
-    auto call_sub3 = FindCallByName(root_op->block, "Sub3");
+
+    std::vector<std::shared_ptr<ir::Call>> elemWiseCalls;
+    Each<ir::Call>(root_op->block, [&](std::shared_ptr<ir::Call> call) {
+        if (IsElementWiseOperator(call->Operator())) {
+            elemWiseCalls.push_back(call);
+        }
+    });
+
+    std::unordered_map<std::shared_ptr<ir::Tensor>, std::vector<std::shared_ptr<ir::Call>>> tensorConsumers;
+    
+    for (auto& call : elemWiseCalls) {
+        for (int64_t i = 0; i < call->InputSize(); ++i) {
+            auto input = call->Input(i);
+            tensorConsumers[input].push_back(call);
+        }
+    }
+
+    std::vector<std::vector<std::shared_ptr<ir::Call>>> fusibleChains;
+    std::unordered_set<std::shared_ptr<ir::Call>> processed;
+
+    for (auto& current : elemWiseCalls) {
+        if (processed.count(current)) continue;
+
+        std::vector<std::shared_ptr<ir::Call>> chain;
+        
+        while (current && !processed.count(current)) {
+            processed.insert(current);
+            chain.push_back(current);
+            
+            std::shared_ptr<ir::Call> nextCall = nullptr;
+            auto output = current;
+            if (tensorConsumers.count(output)) {
+                for (auto& consumer : tensorConsumers[output]) {
+                    if (!processed.count(consumer) && IsElementWiseOperator(consumer->Operator())) {
+                        nextCall = consumer;
+                        break;
+                    }
+                }
+            }
+            
+            current = nextCall;
+        }
+        
+        if (chain.size() > 1) {
+            fusibleChains.push_back(chain);
+        }
+    }
+
+    PrintFusibleChains(fusibleChains);
+
+    auto call_add1 = fusibleChains[0][0];
+    auto call_sub3 = fusibleChains[0][1];
+    auto add1_op = call_add1->Operator();
+    auto sub3_op = call_sub3->Operator();
 
     GALOIS_ASSERT(add1_op && sub3_op && call_add1 && call_sub3, "目标算子或调用未找到");
 
