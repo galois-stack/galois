@@ -96,7 +96,7 @@ TEST(GaloisTests, TestOperatorFusion_v3) {
         galois::transform::ExtractHierarchicalFromBlock<ir::Operator>(ir_operator->block);
     galois::transform::PrintHierarchy(op_hierarchy);
 
-    galois::transform::ModifyOperators(ir_operator);
+    galois::transform::LoopFusion(ir_operator);
     auto ir_print_visitor2 = ir::IRPrinter::Create();
     std::cout << "Fused IR:\n";
     std::cout << ir_print_visitor2->Print(ir_operator) << "\n\n";
