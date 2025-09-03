@@ -194,9 +194,9 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_unary_intrinsic)) {
             return;
         }
-        ir_unary_intrinsic->Operand()->ApplyVisitor(this->shared_from_this());
+        ir_unary_intrinsic->Operand->ApplyVisitor(this->shared_from_this());
         auto ir_new = UnaryIntrinsic::Create(ir_unary_intrinsic->intrinsic_name,
-                                             tensor_dict[ir_unary_intrinsic->Operand()]);
+                                             tensor_dict[ir_unary_intrinsic->Operand]);
         tensor_dict[ir_unary_intrinsic] = ir_new;
     }
 

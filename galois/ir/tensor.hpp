@@ -14,6 +14,7 @@
 #include "galois/ir/global_context.h"
 #include "galois/ir/tensor_type.hpp"
 #include "galois/ir/visitor.hpp"
+#include "galois/property.hpp"
 
 namespace galois::ir {
 
@@ -610,12 +611,13 @@ class UnaryIntrinsic : public Instruction {
         interpreter->Visit(Cast<UnaryIntrinsic>(this->shared_from_this()));
     }
 
-    std::shared_ptr<Tensor> Operand() { return this->GetOperand(0); }
-    void Operand(std::shared_ptr<Tensor> ir_oprand) { this->SetOperand(0, ir_oprand); }
-
    public:
     std::string intrinsic_name;
     bool llvm_prefix;
+
+    Property<std::shared_ptr<Tensor>> Operand = {
+        [this]() { return this->GetOperand(0); },
+        [this](std::shared_ptr<Tensor> ir_oprand) { this->SetOperand(0, ir_oprand); }};
 };
 
 class Builder;
