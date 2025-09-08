@@ -114,6 +114,21 @@ class Instruction : virtual public Tensor {
     std::vector<std::shared_ptr<Tensor>> operands;
 };
 
+class OperandProperty : public Property<std::shared_ptr<Tensor>> {
+   public:
+    OperandProperty(std::shared_ptr<galois::ir::Instruction> ir_instruction, int64_t index)
+        : Property<std::shared_ptr<Tensor>>(
+              [ir_instruction, index]() { return ir_instruction->GetOperand(index); },
+              [ir_instruction, index](std::shared_ptr<Tensor> ir_tensor) {
+                  ir_instruction->SetOperand(index, ir_tensor);
+              }) {}
+
+    OperandProperty& operator=(std::shared_ptr<Tensor> ir_tensor) {
+        this->set(ir_tensor);
+        return *this;
+    }
+};
+
 class GridIndex : public Tensor {
    public:
     static std::shared_ptr<GridIndex> Create(int64_t rank) {
@@ -600,7 +615,7 @@ class UnaryIntrinsic : public Instruction {
         std::shared_ptr<UnaryIntrinsic> self(new UnaryIntrinsic);
         self->OperandResize(1);
         self->intrinsic_name = intrinsic_name;
-        self->SetOperand(0, ir_oprand);
+        self->Operand = ir_oprand;
         self->type = ir_oprand->type;
         self->llvm_prefix = llvm_prefix;
         self->tag = "UnaryIntrinsic";
@@ -615,9 +630,7 @@ class UnaryIntrinsic : public Instruction {
     std::string intrinsic_name;
     bool llvm_prefix;
 
-    Property<std::shared_ptr<Tensor>> Operand = {
-        [this]() { return this->GetOperand(0); },
-        [this](std::shared_ptr<Tensor> ir_oprand) { this->SetOperand(0, ir_oprand); }};
+    OperandProperty Operand = OperandProperty(Cast<Instruction>(this->shared_from_this()), 0);
 };
 
 class Builder;
