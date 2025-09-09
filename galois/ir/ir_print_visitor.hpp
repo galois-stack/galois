@@ -173,7 +173,7 @@ class IRPrinter : public ir::Visitor {
     void Visit(std::shared_ptr<UnaryIntrinsic> ir_unary_intrinsic) override {
         output << GetVariableName(ir_unary_intrinsic) << " = " << ir_unary_intrinsic->intrinsic_name
                << " " << TypeToString(ir_unary_intrinsic->type) << " "
-               << GetVariableName(ir_unary_intrinsic->Operand()) << ";\n";
+               << GetVariableName(ir_unary_intrinsic->Operand) << ";\n";
     }
 
     void Visit(std::shared_ptr<Prefetch> ir_prefetch) override {

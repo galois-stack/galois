@@ -14,6 +14,7 @@
 #include "galois/ir/global_context.h"
 #include "galois/ir/tensor_type.hpp"
 #include "galois/ir/visitor.hpp"
+#include "galois/property.hpp"
 
 namespace galois::ir {
 
@@ -111,6 +112,21 @@ class Instruction : virtual public Tensor {
 
    protected:
     std::vector<std::shared_ptr<Tensor>> operands;
+};
+
+class OperandProperty : public Property<std::shared_ptr<Tensor>> {
+   public:
+    OperandProperty(std::shared_ptr<galois::ir::Instruction> ir_instruction, int64_t index)
+        : Property<std::shared_ptr<Tensor>>(
+              [ir_instruction, index]() { return ir_instruction->GetOperand(index); },
+              [ir_instruction, index](std::shared_ptr<Tensor> ir_tensor) {
+                  ir_instruction->SetOperand(index, ir_tensor);
+              }) {}
+
+    OperandProperty& operator=(std::shared_ptr<Tensor> ir_tensor) {
+        this->set(ir_tensor);
+        return *this;
+    }
 };
 
 class GridIndex : public Tensor {
@@ -589,7 +605,7 @@ class Return : public Instruction {
 
 class UnaryIntrinsic : public Instruction {
    protected:
-    UnaryIntrinsic() = default;
+    UnaryIntrinsic() : Operand(nullptr, 0) {}
 
    public:
     static std::shared_ptr<UnaryIntrinsic> Create(std::string intrinsic_name,
@@ -599,7 +615,10 @@ class UnaryIntrinsic : public Instruction {
         std::shared_ptr<UnaryIntrinsic> self(new UnaryIntrinsic);
         self->OperandResize(1);
         self->intrinsic_name = intrinsic_name;
-        self->SetOperand(0, ir_oprand);
+        self->Operand = OperandProperty(
+            Cast<Instruction>(self->shared_from_this()), 0
+        );
+        self->Operand = ir_oprand;
         self->type = ir_oprand->type;
         self->llvm_prefix = llvm_prefix;
         self->tag = "UnaryIntrinsic";
@@ -610,12 +629,11 @@ class UnaryIntrinsic : public Instruction {
         interpreter->Visit(Cast<UnaryIntrinsic>(this->shared_from_this()));
     }
 
-    std::shared_ptr<Tensor> Operand() { return this->GetOperand(0); }
-    void Operand(std::shared_ptr<Tensor> ir_oprand) { this->SetOperand(0, ir_oprand); }
-
    public:
     std::string intrinsic_name;
     bool llvm_prefix;
+
+    OperandProperty Operand;
 };
 
 class Builder;
