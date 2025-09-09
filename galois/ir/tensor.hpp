@@ -150,7 +150,8 @@ class Accessor : public Instruction {
                                             Eigen::VectorXi64 shift_vector) {
         std::shared_ptr<Accessor> self(new Accessor);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
         self->transform_matrix = transform_matrix;
         self->shift_vector = shift_vector;
         self->type = ir_tensor->type->value_type;
@@ -178,9 +179,6 @@ class Accessor : public Instruction {
         return false;
     }
 
-    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Accessor>(this->shared_from_this()));
     }
@@ -188,6 +186,7 @@ class Accessor : public Instruction {
    public:
     Eigen::MatrixXi64 transform_matrix;
     Eigen::VectorXi64 shift_vector;
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Indexing : public Instruction {
@@ -196,7 +195,8 @@ class Indexing : public Instruction {
                                             std::vector<std::shared_ptr<Tensor>> ir_indices) {
         std::shared_ptr<Indexing> self(new Indexing);
         self->OperandResize(1 + ir_indices.size());
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
         for (int64_t i = 0; i < ir_indices.size(); ++i) {
             self->Index(i, ir_indices[i]);
         }
@@ -204,9 +204,6 @@ class Indexing : public Instruction {
         self->tag = "Indexing";
         return self;
     }
-
-    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
 
     int64_t IndexSize() { return this->OperandSize() - 1; }
     std::shared_ptr<ir::Tensor> Index(int64_t i) { return this->GetOperand(1 + i); }
@@ -217,6 +214,9 @@ class Indexing : public Instruction {
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Indexing>(this->shared_from_this()));
     }
+
+   public:
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class ArithmeticInstruction : public Instruction {
@@ -235,8 +235,10 @@ class ArithmeticInstruction : public Instruction {
         std::shared_ptr<ArithmeticInstruction> self(new ArithmeticInstruction);
         self->operation = op;
         self->OperandResize(2);
-        self->SetOperand(0, ir_operand0);
-        self->SetOperand(1, ir_operand1);
+        self->Operand_var0 = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Operand_var1 = OperandProperty(Cast<Instruction>(self->shared_from_this()), 1);
+        self->Operand_var0 = ir_operand0;
+        self->Operand_var1 = ir_operand1;
         self->type = ir_operand0->type;
         self->tag = "ArithmeticInstruction";
         return self;
@@ -248,6 +250,8 @@ class ArithmeticInstruction : public Instruction {
 
    public:
     Operation operation;
+    OperandProperty Operand_var0 = OperandProperty(nullptr, 0);
+    OperandProperty Operand_var1 = OperandProperty(nullptr, 1);
 };
 
 class CompareInstruction : public Instruction {
@@ -268,8 +272,10 @@ class CompareInstruction : public Instruction {
         std::shared_ptr<CompareInstruction> self(new CompareInstruction);
         self->operation = op;
         self->OperandResize(2);
-        self->SetOperand(0, ir_operand0);
-        self->SetOperand(1, ir_operand1);
+        self->Operand_var0 = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Operand_var1 = OperandProperty(Cast<Instruction>(self->shared_from_this()), 1);
+        self->Operand_var0 = ir_operand0;
+        self->Operand_var1 = ir_operand1;
         if (ir_operand0->type->IsScalar()) {
             self->type = ir::bool_;
         } else {
@@ -286,6 +292,8 @@ class CompareInstruction : public Instruction {
 
    public:
     Operation operation;
+    OperandProperty Operand_var0 = OperandProperty(nullptr, 0);
+    OperandProperty Operand_var1 = OperandProperty(nullptr, 1);
 };
 
 class SelectInstruction : public Instruction {
@@ -376,21 +384,20 @@ class VectorBroadcast : public Instruction {
                                                    int64_t lane_id) {
         std::shared_ptr<VectorBroadcast> self(new VectorBroadcast);
         self->OperandResize(1);
-        self->Vector(ir_value);
+        self->Vector = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Vector = ir_value;
         self->lane_id = lane_id;
         self->type = ir_type;
         self->tag = "VectorBroadcast";
         return self;
     }
 
-    std::shared_ptr<Tensor> Vector() { return this->GetOperand(0); }
-    void Vector(std::shared_ptr<Tensor> ir_value) { this->SetOperand(0, ir_value); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<VectorBroadcast>(this->shared_from_this()));
     }
 
     int64_t lane_id;
+    OperandProperty Vector = OperandProperty(nullptr, 0);
 };
 
 class Write : public Instruction {
@@ -400,23 +407,21 @@ class Write : public Instruction {
         std::shared_ptr<Write> self(new Write);
         GALOIS_ASSERT(value->type == accessor->type);
         self->OperandResize(2);
-        self->Tensor(value);
-        self->Variable(accessor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Variable = OperandProperty(Cast<Instruction>(self->shared_from_this()), 1);
+        self->Tensor = value;
+        self->Variable = accessor;
         self->tag = "Write";
         return self;
     }
 
-    std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<class Tensor> value) { this->SetOperand(0, value); }
-
-    std::shared_ptr<class Tensor> Variable() const {
-        return Cast<class Tensor>(this->GetOperand(1));
-    }
-    void Variable(std::shared_ptr<class Tensor> accessor) { this->SetOperand(1, accessor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Write>(this->shared_from_this()));
     }
+
+   public:
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
+    OperandProperty Variable = OperandProperty(nullptr, 1);
 };
 
 class Block : public Tensor, public std::list<std::shared_ptr<Tensor>> {
@@ -568,17 +573,18 @@ class Free : public Instruction {
     static std::shared_ptr<Free> Create(std::shared_ptr<Tensor> ir_tensor) {
         std::shared_ptr<Free> self(new Free);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
         self->tag = "Free";
         return self;
     }
 
-    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Free>(this->shared_from_this()));
     }
+
+   public:
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Return : public Instruction {
@@ -590,22 +596,23 @@ class Return : public Instruction {
         std::shared_ptr<Return> self(new Return);
         self->OperandResize(1);
         self->type = ir_value->type;
-        self->Tensor(ir_value);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_value;
         self->tag = "Return";
         return self;
     }
 
-    std::shared_ptr<Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<class Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Return>(this->shared_from_this()));
     }
+
+   public:
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class UnaryIntrinsic : public Instruction {
    protected:
-    UnaryIntrinsic() : Operand(nullptr, 0) {}
+    UnaryIntrinsic() = default;
 
    public:
     static std::shared_ptr<UnaryIntrinsic> Create(std::string intrinsic_name,
@@ -615,9 +622,7 @@ class UnaryIntrinsic : public Instruction {
         std::shared_ptr<UnaryIntrinsic> self(new UnaryIntrinsic);
         self->OperandResize(1);
         self->intrinsic_name = intrinsic_name;
-        self->Operand = OperandProperty(
-            Cast<Instruction>(self->shared_from_this()), 0
-        );
+        self->Operand = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
         self->Operand = ir_oprand;
         self->type = ir_oprand->type;
         self->llvm_prefix = llvm_prefix;
@@ -632,8 +637,7 @@ class UnaryIntrinsic : public Instruction {
    public:
     std::string intrinsic_name;
     bool llvm_prefix;
-
-    OperandProperty Operand;
+    OperandProperty Operand = OperandProperty(nullptr, 0);
 };
 
 class Builder;

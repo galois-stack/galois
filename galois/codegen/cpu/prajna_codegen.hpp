@@ -200,8 +200,8 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
     void Visit(std::shared_ptr<ir::Write> ir_write_accessor) override {
         pir_builder->Create<pir::WriteVariableLiked>(
-            ir_write_accessor->Tensor()->pir_value,
-            prajna::Cast<pir::VariableLiked>(ir_write_accessor->Variable()->pir_value));
+            ir_write_accessor->Tensor->pir_value,
+            prajna::Cast<pir::VariableLiked>(ir_write_accessor->Variable->pir_value));
     }
 
     void Visit(std::shared_ptr<ir::ArithmeticInstruction> ir_arithmetic_instruction) override {
@@ -365,7 +365,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                                      pir_linear_index);
 
         // Add shift vector offset
-        auto s_product_b = ir_accessor->Tensor()->type->stride * ir_accessor->shift_vector;
+        auto s_product_b = ir_accessor->Tensor->type->stride * ir_accessor->shift_vector;
         pir_builder->Create<pir::WriteVariableLiked>(
             pir_builder->Create<pir::BinaryOperator>(
                 pir::BinaryOperator::Operation::Add, pir_linear_index,
@@ -374,7 +374,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         // transform is valid
         if (ir_accessor->transform_matrix.size()) {
-            auto s_product_a = ir_accessor->Tensor()->type->stride * ir_accessor->transform_matrix;
+            auto s_product_a = ir_accessor->Tensor->type->stride * ir_accessor->transform_matrix;
             RowVectorXprajna pir_s_product_a(s_product_a.size());
             std::transform(RANGE(s_product_a), pir_s_product_a.begin(), [=](int64_t value) {
                 return pir_builder->Create<pir::ConstantInt>(pir::i64, value);
@@ -395,13 +395,13 @@ class PrajnaCodegen : public galois::ir::Visitor {
             }
         }
 
-        auto pir_tensor_value_type = this->EmitType(ir_accessor->Tensor()->type->value_type);
+        auto pir_tensor_value_type = this->EmitType(ir_accessor->Tensor->type->value_type);
 
         auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            this->GetPrajnaPointerFromTensor(ir_accessor->Tensor()),
+            this->GetPrajnaPointerFromTensor(ir_accessor->Tensor),
             pir::PointerType::Create(pir_tensor_value_type));
         ;
-        GALOIS_ASSERT(ir_accessor->Tensor()->type->value_type == ir_accessor->type);
+        GALOIS_ASSERT(ir_accessor->Tensor->type->value_type == ir_accessor->type);
 
         auto pir_tensor_pointer_var =
             pir_builder->Create<pir::LocalVariable>(pir_tensor_pointer->type);
@@ -417,7 +417,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
     void Visit(std::shared_ptr<ir::Indexing> ir_indexing) override {
         // Visit the tensor and index operands first
         this->EmitType(ir_indexing->type);
-        ir_indexing->Tensor()->ApplyVisitor(this->shared_from_this());
+        ir_indexing->Tensor->ApplyVisitor(this->shared_from_this());
         for (int64_t i = 0; i < ir_indexing->IndexSize(); ++i) {
             ir_indexing->Index(i)->ApplyVisitor(this->shared_from_this());
         }
@@ -427,7 +427,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                                                      pir_linear_index);
         for (int64_t i = 0; i < ir_indexing->IndexSize(); ++i) {
             auto current_stride =
-                pir_builder->GetConstant<int64_t>(ir_indexing->Tensor()->type->stride[i]);
+                pir_builder->GetConstant<int64_t>(ir_indexing->Tensor->type->stride[i]);
             auto current_index = ir_indexing->Index(i)->pir_value;
             auto current_mul = pir_builder->Create<pir::BinaryOperator>(
                 pir::BinaryOperator::Operation::Mul, current_stride, current_index);
@@ -436,11 +436,11 @@ class PrajnaCodegen : public galois::ir::Visitor {
             pir_builder->Create<pir::WriteVariableLiked>(current_add, pir_linear_index);
         }
 
-        auto pir_tensor_value_type = this->EmitType(ir_indexing->Tensor()->type->value_type);
+        auto pir_tensor_value_type = this->EmitType(ir_indexing->Tensor->type->value_type);
         auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            this->GetPrajnaPointerFromTensor(ir_indexing->Tensor()),
+            this->GetPrajnaPointerFromTensor(ir_indexing->Tensor),
             pir::PointerType::Create(pir_tensor_value_type));
-        GALOIS_ASSERT(ir_indexing->Tensor()->type->value_type == ir_indexing->type);
+        GALOIS_ASSERT(ir_indexing->Tensor->type->value_type == ir_indexing->type);
         auto pir_tensor_pointer_var =
             pir_builder->Create<pir::LocalVariable>(pir_tensor_pointer->type);
         pir_builder->Create<pir::WriteVariableLiked>(pir_tensor_pointer, pir_tensor_pointer_var);
@@ -508,7 +508,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             prajna_constant_lane_id_list);
 
         ir_vector_broadcast->pir_value = pir_builder->Create<pir::ShuffleVector>(
-            ir_vector_broadcast->Vector()->pir_value, pir_constant_vector_lane_id_mask);
+            ir_vector_broadcast->Vector->pir_value, pir_constant_vector_lane_id_mask);
     }
 
     void Visit(std::shared_ptr<ir::view::BitCast> ir_bit_cast) override {
@@ -567,7 +567,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Return> ir_return) override {
-        auto pir_pointer_value = GetPirValueOfTensor(ir_return->Tensor());
+        auto pir_pointer_value = GetPirValueOfTensor(ir_return->Tensor);
         pir_builder->Create<pir::Return>(pir_pointer_value);
     }
 
@@ -578,7 +578,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                             {pir::PointerType::Create(pir::IntType::Create(8, false))},
                             pir::VoidType::Create())),
             pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_free->Tensor()->pir_value)->Pointer(),
+                prajna::Cast<pir::DeferencePointer>(ir_free->Tensor->pir_value)->Pointer(),
                 pir::PointerType::Create(pir::IntType::Create(8, false))));
     }
 

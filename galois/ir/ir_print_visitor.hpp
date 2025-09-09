@@ -61,7 +61,7 @@ class IRPrinter : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<Free> ir_free) override {
-        output << "Free " << GetVariableName(ir_free->Tensor()) << ";\n";
+        output << "Free " << GetVariableName(ir_free->Tensor) << ";\n";
     }
 
     void Visit(std::shared_ptr<Grid> ir_grid) override {
@@ -79,21 +79,21 @@ class IRPrinter : public ir::Visitor {
 
     void Visit(std::shared_ptr<Accessor> ir_accessor) override {
         output << GetVariableName(ir_accessor) << " = Accessor "
-               << GetVariableName(ir_accessor->Tensor()) << ";\n";
+               << GetVariableName(ir_accessor->Tensor) << ";\n";
     }
 
     void Visit(std::shared_ptr<Indexing> ir_index) override {
-        output << GetVariableName(ir_index) << " = Indexing " << GetVariableName(ir_index->Tensor())
+        output << GetVariableName(ir_index) << " = Indexing " << GetVariableName(ir_index->Tensor)
                << ";\n";
     }
 
     void Visit(std::shared_ptr<Write> ir_write) override {
-        output << "Write " << GetVariableName(ir_write->Tensor()) << ", "
-               << GetVariableName(ir_write->Variable()) << ";\n";
+        output << "Write " << GetVariableName(ir_write->Tensor) << ", "
+               << GetVariableName(ir_write->Variable) << ";\n";
     }
 
     void Visit(std::shared_ptr<Return> ir_return) override {
-        output << "return " << GetVariableName(ir_return->Tensor()) << ";\n";
+        output << "return " << GetVariableName(ir_return->Tensor) << ";\n";
     }
 
     void Visit(std::shared_ptr<ArithmeticInstruction> ir_arith) override {

@@ -43,8 +43,8 @@ class CloneVisitor : public Visitor {
             return;
         }
 
-        ir_accessor->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = Accessor::Create(tensor_dict[ir_accessor->Tensor()],
+        ir_accessor->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = Accessor::Create(tensor_dict[ir_accessor->Tensor],
                                        ir_accessor->transform_matrix, ir_accessor->shift_vector);
         tensor_dict[ir_accessor] = ir_new;
     }
@@ -54,13 +54,13 @@ class CloneVisitor : public Visitor {
             return;
         }
 
-        ir_index->Tensor()->ApplyVisitor(this->shared_from_this());
+        ir_index->Tensor->ApplyVisitor(this->shared_from_this());
         std::vector<std::shared_ptr<Tensor>> ir_indices;
         for (int64_t i = 0; i < ir_index->IndexSize(); ++i) {
             ir_index->Index(i)->ApplyVisitor(this->shared_from_this());
             ir_indices.push_back(tensor_dict[ir_index->Index(i)]);
         }
-        auto ir_new = Indexing::Create(tensor_dict[ir_index->Tensor()], ir_indices);
+        auto ir_new = Indexing::Create(tensor_dict[ir_index->Tensor], ir_indices);
         tensor_dict[ir_index] = ir_new;
     }
 
@@ -141,8 +141,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_free)) {
             return;
         }
-        ir_free->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = Free::Create(tensor_dict[ir_free->Tensor()]);
+        ir_free->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = Free::Create(tensor_dict[ir_free->Tensor]);
         tensor_dict[ir_free] = ir_new;
     }
 
@@ -150,8 +150,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_return)) {
             return;
         }
-        ir_return->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = Return::Create(tensor_dict[ir_return->Tensor()]);
+        ir_return->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = Return::Create(tensor_dict[ir_return->Tensor]);
         tensor_dict[ir_return] = ir_new;
     }
 
@@ -159,10 +159,9 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_write)) {
             return;
         }
-        ir_write->Tensor()->ApplyVisitor(this->shared_from_this());
-        ir_write->Variable()->ApplyVisitor(this->shared_from_this());
-        auto ir_new =
-            Write::Create(tensor_dict[ir_write->Tensor()], tensor_dict[ir_write->Variable()]);
+        ir_write->Tensor->ApplyVisitor(this->shared_from_this());
+        ir_write->Variable->ApplyVisitor(this->shared_from_this());
+        auto ir_new = Write::Create(tensor_dict[ir_write->Tensor], tensor_dict[ir_write->Variable]);
         tensor_dict[ir_write] = ir_new;
     }
 
@@ -170,9 +169,9 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_vector_broadcast)) {
             return;
         }
-        ir_vector_broadcast->Vector()->ApplyVisitor(this->shared_from_this());
+        ir_vector_broadcast->Vector->ApplyVisitor(this->shared_from_this());
         auto ir_new =
-            VectorBroadcast::Create(tensor_dict[ir_vector_broadcast->Vector()],
+            VectorBroadcast::Create(tensor_dict[ir_vector_broadcast->Vector],
                                     ir_vector_broadcast->type, ir_vector_broadcast->lane_id);
         tensor_dict[ir_vector_broadcast] = ir_new;
     }
