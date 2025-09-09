@@ -12,18 +12,18 @@ class BitCast : public Instruction {
         std::shared_ptr<BitCast> self(new BitCast);
         GALOIS_ASSERT(ir_value->type->bytes == ir_type->bytes);
         self->OperandResize(1);
-        self->Tensor(ir_value);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_value;
         self->type = ir_type;
         self->tag = "BitCast";
         return self;
     }
 
-    std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<BitCast>(this->shared_from_this()));
     }
+
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Broadcast : public Instruction {
@@ -32,7 +32,8 @@ class Broadcast : public Instruction {
                                              Eigen::MatrixXi64 output_shape) {
         std::shared_ptr<Broadcast> self(new Broadcast);
         self->OperandResize(1);
-        self->Tensor(ir_value);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_value;
 
         if (ir_value->type->IsScalar()) {
             auto new_stride = Eigen::VectorXi64::Zero(output_shape.size());
@@ -68,12 +69,11 @@ class Broadcast : public Instruction {
         return self;
     }
 
-    std::shared_ptr<Tensor> Tensor() const { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<class Tensor> ir_value) { this->SetOperand(0, ir_value); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Broadcast>(this->shared_from_this()));
     }
+
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Viewer : public Instruction {
@@ -122,15 +122,15 @@ class Slice : public Instruction {
    public:
     static std::shared_ptr<Slice> Create(std::shared_ptr<Accessor> ir_origin,
                                          Eigen::VectorXi64 shape) {
-        GALOIS_ASSERT(ir_origin->Tensor()->type->shape.size() == shape.size());
+        GALOIS_ASSERT(ir_origin->Tensor->type->shape.size() == shape.size());
         std::shared_ptr<Slice> self(new Slice);
         self->OperandResize(1);
         self->Origin(ir_origin);
         self->shape = shape;
 
-        auto stride = ir_origin->Tensor()->type->stride;
-        GALOIS_ASSERT(ir_origin->Tensor()->type->value_type);
-        self->type = ir::TensorType::Create(ir_origin->Tensor()->type->value_type, shape, stride);
+        auto stride = ir_origin->Tensor->type->stride;
+        GALOIS_ASSERT(ir_origin->Tensor->type->value_type);
+        self->type = ir::TensorType::Create(ir_origin->Tensor->type->value_type, shape, stride);
         self->tag = "Slice";
         return self;
     }
@@ -150,7 +150,8 @@ class SqueezeDim : public Instruction {
     static std::shared_ptr<SqueezeDim> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
         std::shared_ptr<SqueezeDim> self(new SqueezeDim);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
 
         auto shape = ir_tensor->type->shape;
         auto stride = ir_tensor->type->stride;
@@ -162,14 +163,13 @@ class SqueezeDim : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<SqueezeDim>(this->shared_from_this()));
     }
 
+   public:
     int64_t dim;
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Squeeze : public Instruction {
@@ -177,7 +177,8 @@ class Squeeze : public Instruction {
     static std::shared_ptr<Squeeze> Create(std::shared_ptr<Tensor> ir_tensor) {
         std::shared_ptr<Squeeze> self(new Squeeze);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
 
         int64_t valid_shape_size = 0;
         Eigen::VectorXi64 shape(ir_tensor->type->shape.size());
@@ -196,12 +197,11 @@ class Squeeze : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Squeeze>(this->shared_from_this()));
     }
+
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class UnsqueezeDim : public Instruction {
@@ -209,7 +209,8 @@ class UnsqueezeDim : public Instruction {
     static std::shared_ptr<UnsqueezeDim> Create(std::shared_ptr<Tensor> ir_tensor, int64_t dim) {
         std::shared_ptr<UnsqueezeDim> self(new UnsqueezeDim);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
 
         auto old_shape = ir_tensor->type->shape;
         auto old_stride = ir_tensor->type->stride;
@@ -233,14 +234,13 @@ class UnsqueezeDim : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<UnsqueezeDim>(this->shared_from_this()));
     }
 
+   public:
     int64_t dim;
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Flatten : public Instruction {
@@ -249,7 +249,8 @@ class Flatten : public Instruction {
         GALOIS_ASSERT(ir_tensor);
         std::shared_ptr<Flatten> self(new Flatten);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
 
         int64_t total_size = 1;
         const auto& shape = ir_tensor->type->shape;
@@ -268,12 +269,11 @@ class Flatten : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Flatten>(this->shared_from_this()));
     }
+
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 class Transpose : public Instruction {
@@ -290,7 +290,8 @@ class Transpose : public Instruction {
 
         std::shared_ptr<Transpose> self(new Transpose);
         self->OperandResize(1);
-        self->Tensor(ir_tensor);
+        self->Tensor = OperandProperty(Cast<Instruction>(self->shared_from_this()), 0);
+        self->Tensor = ir_tensor;
         self->dim0 = dim0;
         self->dim1 = dim1;
 
@@ -305,15 +306,14 @@ class Transpose : public Instruction {
         return self;
     }
 
-    std::shared_ptr<ir::Tensor> Tensor() { return this->GetOperand(0); }
-    void Tensor(std::shared_ptr<ir::Tensor> ir_tensor) { this->SetOperand(0, ir_tensor); }
-
     void ApplyVisitor(std::shared_ptr<Visitor> interpreter) override {
         interpreter->Visit(Cast<Transpose>(this->shared_from_this()));
     }
 
+   public:
     int64_t dim0;
     int64_t dim1;
+    OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
 }  // namespace galois::ir::view

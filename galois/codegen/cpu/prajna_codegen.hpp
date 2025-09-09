@@ -397,9 +397,9 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         auto pir_tensor_value_type = this->EmitType(ir_accessor->Tensor->type->value_type);
 
-        auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            this->GetPrajnaPointerFromTensor(ir_accessor->Tensor),
-            pir::PointerType::Create(pir_tensor_value_type));
+        auto pir_tensor_pointer =
+            pir_builder->Create<pir::BitCast>(this->GetPrajnaPointerFromTensor(ir_accessor->Tensor),
+                                              pir::PointerType::Create(pir_tensor_value_type));
         ;
         GALOIS_ASSERT(ir_accessor->Tensor->type->value_type == ir_accessor->type);
 
@@ -437,9 +437,9 @@ class PrajnaCodegen : public galois::ir::Visitor {
         }
 
         auto pir_tensor_value_type = this->EmitType(ir_indexing->Tensor->type->value_type);
-        auto pir_tensor_pointer = pir_builder->Create<pir::BitCast>(
-            this->GetPrajnaPointerFromTensor(ir_indexing->Tensor),
-            pir::PointerType::Create(pir_tensor_value_type));
+        auto pir_tensor_pointer =
+            pir_builder->Create<pir::BitCast>(this->GetPrajnaPointerFromTensor(ir_indexing->Tensor),
+                                              pir::PointerType::Create(pir_tensor_value_type));
         GALOIS_ASSERT(ir_indexing->Tensor->type->value_type == ir_indexing->type);
         auto pir_tensor_pointer_var =
             pir_builder->Create<pir::LocalVariable>(pir_tensor_pointer->type);
@@ -458,7 +458,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         ir_broad_cast->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_broad_cast->Tensor()->pir_value)->Pointer(),
+                prajna::Cast<pir::DeferencePointer>(ir_broad_cast->Tensor->pir_value)->Pointer(),
                 pir_pointer_type));
     }
 
@@ -516,7 +516,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         ir_bit_cast->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
                 pir_builder->Create<pir::GetAddressOfVariableLiked>(
-                    prajna::Cast<pir::DeferencePointer>(ir_bit_cast->Tensor()->pir_value)),
+                    prajna::Cast<pir::DeferencePointer>(ir_bit_cast->Tensor->pir_value)),
                 pir::PointerType::Create(ir_bit_cast->type->pir_type)));
     }
 
@@ -599,8 +599,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         ir_squeeze_view->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_squeeze_view->Tensor()->pir_value)
-                    ->Pointer(),
+                prajna::Cast<pir::DeferencePointer>(ir_squeeze_view->Tensor->pir_value)->Pointer(),
                 pir_pointer_type));
     }
 
@@ -610,7 +609,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         ir_squeeze_dim_view->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_squeeze_dim_view->Tensor()->pir_value)
+                prajna::Cast<pir::DeferencePointer>(ir_squeeze_dim_view->Tensor->pir_value)
                     ->Pointer(),
                 pir_pointer_type));
     }
@@ -621,7 +620,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         ir_unsqueeze_dim_view->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_unsqueeze_dim_view->Tensor()->pir_value)
+                prajna::Cast<pir::DeferencePointer>(ir_unsqueeze_dim_view->Tensor->pir_value)
                     ->Pointer(),
                 pir_pointer_type));
     }
@@ -632,8 +631,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         ir_flatten_view->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_flatten_view->Tensor()->pir_value)
-                    ->Pointer(),
+                prajna::Cast<pir::DeferencePointer>(ir_flatten_view->Tensor->pir_value)->Pointer(),
                 pir_pointer_type));
     }
 
@@ -643,7 +641,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
 
         ir_transpose_view->pir_value =
             pir_builder->Create<pir::DeferencePointer>(pir_builder->Create<pir::BitCast>(
-                prajna::Cast<pir::DeferencePointer>(ir_transpose_view->Tensor()->pir_value)
+                prajna::Cast<pir::DeferencePointer>(ir_transpose_view->Tensor->pir_value)
                     ->Pointer(),
                 pir_pointer_type));
     }

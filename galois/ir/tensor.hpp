@@ -583,7 +583,6 @@ class Free : public Instruction {
         interpreter->Visit(Cast<Free>(this->shared_from_this()));
     }
 
-   public:
     OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 
@@ -606,7 +605,6 @@ class Return : public Instruction {
         interpreter->Visit(Cast<Return>(this->shared_from_this()));
     }
 
-   public:
     OperandProperty Tensor = OperandProperty(nullptr, 0);
 };
 

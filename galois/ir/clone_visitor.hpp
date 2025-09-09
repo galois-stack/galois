@@ -124,8 +124,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_bit_cast)) {
             return;
         }
-        ir_bit_cast->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = view::BitCast::Create(tensor_dict[ir_bit_cast->Tensor()], ir_bit_cast->type);
+        ir_bit_cast->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = view::BitCast::Create(tensor_dict[ir_bit_cast->Tensor], ir_bit_cast->type);
         tensor_dict[ir_bit_cast] = ir_new;
     }
 
@@ -203,8 +203,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_squeeze_dim_view)) {
             return;
         }
-        ir_squeeze_dim_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = view::SqueezeDim::Create(tensor_dict[ir_squeeze_dim_view->Tensor()],
+        ir_squeeze_dim_view->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = view::SqueezeDim::Create(tensor_dict[ir_squeeze_dim_view->Tensor],
                                                ir_squeeze_dim_view->dim);
         tensor_dict[ir_squeeze_dim_view] = ir_new;
     }
@@ -213,8 +213,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_unsqueeze_dim_view)) {
             return;
         }
-        ir_unsqueeze_dim_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = view::UnsqueezeDim::Create(tensor_dict[ir_unsqueeze_dim_view->Tensor()],
+        ir_unsqueeze_dim_view->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = view::UnsqueezeDim::Create(tensor_dict[ir_unsqueeze_dim_view->Tensor],
                                                  ir_unsqueeze_dim_view->dim);
         tensor_dict[ir_unsqueeze_dim_view] = ir_new;
     }
@@ -230,8 +230,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_squeeze_view)) {
             return;
         }
-        ir_squeeze_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = view::Squeeze::Create(tensor_dict[ir_squeeze_view->Tensor()]);
+        ir_squeeze_view->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = view::Squeeze::Create(tensor_dict[ir_squeeze_view->Tensor]);
         tensor_dict[ir_squeeze_view] = ir_new;
     }
 
@@ -239,8 +239,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_flatten_view)) {
             return;
         }
-        ir_flatten_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = view::Flatten::Create(tensor_dict[ir_flatten_view->Tensor()]);
+        ir_flatten_view->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = view::Flatten::Create(tensor_dict[ir_flatten_view->Tensor]);
         tensor_dict[ir_flatten_view] = ir_new;
     }
 
@@ -248,8 +248,8 @@ class CloneVisitor : public Visitor {
         if (tensor_dict.count(ir_transpose_view)) {
             return;
         }
-        ir_transpose_view->Tensor()->ApplyVisitor(this->shared_from_this());
-        auto ir_new = view::Transpose::Create(tensor_dict[ir_transpose_view->Tensor()],
+        ir_transpose_view->Tensor->ApplyVisitor(this->shared_from_this());
+        auto ir_new = view::Transpose::Create(tensor_dict[ir_transpose_view->Tensor],
                                               ir_transpose_view->dim0, ir_transpose_view->dim1);
         tensor_dict[ir_transpose_view] = ir_new;
     }
