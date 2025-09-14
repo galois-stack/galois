@@ -494,11 +494,98 @@ inline void AsyncInvokeByThreadPool(std::shared_ptr<ir::Block> ir_block) {
 //     }
 // }
 
+inline bool IsIdentityMatrix(const Eigen::MatrixXi64& mat) {
+    if (mat.rows() != mat.cols()) {
+        return false;
+    }
+    for (int i = 0; i < mat.rows(); ++i) {
+        for (int j = 0; j < mat.cols(); ++j) {
+            if (i == j && mat(i, j) != 1) {
+                return false;
+            }
+            if (i != j && mat(i, j) != 0) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+inline bool IsZeroVector(const Eigen::VectorXi64& vec) {
+    for (int i = 0; i < vec.size(); ++i) {
+        if (vec[i] != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+inline bool CheckGridAccessors(std::shared_ptr<ir::Grid> grid) {
+    if (!grid || !grid->block) return false;
+
+    for (auto& tensor : *grid->block) {
+        if (auto accessor = galois::Cast<ir::Accessor>(tensor)) {
+            if (!IsIdentityMatrix(accessor->transform_matrix)) {
+                return false;
+            }
+            if (!IsZeroVector(accessor->shift_vector)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+inline bool CheckGridInstruction(std::shared_ptr<ir::Grid> grid) {
+    if (!grid || !grid->block) return false;
+
+    for (auto& tensor : *grid->block) {
+        auto instruction = galois::Cast<ir::Instruction>(tensor);
+        if (!instruction) {
+            return false;
+        }
+
+        bool is_allowed = galois::Cast<ir::Accessor>(tensor) != nullptr ||
+                          galois::Cast<ir::ArithmeticInstruction>(tensor) != nullptr ||
+                          galois::Cast<ir::CompareInstruction>(tensor) != nullptr ||
+                          galois::Cast<ir::Write>(tensor) != nullptr;
+
+        if (!is_allowed) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// 判断算子是否为ElementWise算子
 inline bool IsElementWiseOperator(const std::shared_ptr<ir::Operator>& op) {
-    const std::vector<std::string> elemWiseKeywords = {"Add", "Sub", "Mul", "Div"};
-    return std::any_of(
-        elemWiseKeywords.begin(), elemWiseKeywords.end(),
-        [&](const std::string& kw) { return op->name.find(kw) != std::string::npos; });
+    if (!op) return false;
+
+    auto op_type = op->GetOperatorType();
+    if (!op_type) return false;
+
+    auto output_type = op_type->output_type;
+    if (!output_type) return false;
+
+    for (auto& input_type : op_type->ir_input_types) {
+        if (!input_type || input_type != output_type) {
+            return false;
+        }
+    }
+
+    std::list<std::shared_ptr<ir::Grid>> grid_list = GetAll<ir::Grid>(op->block);
+
+    for (auto& grid : grid_list) {
+        if (!CheckGridAccessors(grid)) {
+            return false;
+        }
+        if (!CheckGridInstruction(grid)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 template <typename Tensor_>
