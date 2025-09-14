@@ -502,20 +502,20 @@ inline bool IsElementWiseOperator(const std::shared_ptr<ir::Operator>& op) {
 }
 
 template <typename Tensor_>
-struct TreeNode {
+struct PrintNode {
     std::shared_ptr<Tensor_> value;
-    std::vector<TreeNode<Tensor_>> children;
+    std::vector<PrintNode<Tensor_>> children;
 };
 
 template <typename Tensor_>
-inline std::vector<TreeNode<Tensor_>> ExtractHierarchicalFromBlock(
+inline std::vector<PrintNode<Tensor_>> ExtractHierarchicalFromBlock(
     std::shared_ptr<ir::Block> block) {
-    std::vector<TreeNode<Tensor_>> current_level;
+    std::vector<PrintNode<Tensor_>> current_level;
     if (!block) return current_level;
 
     for (auto& tensor : *block) {
         if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
-            TreeNode<Tensor_> node;
+            PrintNode<Tensor_> node;
             node.value = target;
 
             if constexpr (std::is_same_v<Tensor_, ir::Operator>) {
@@ -535,7 +535,7 @@ inline std::vector<TreeNode<Tensor_>> ExtractHierarchicalFromBlock(
 }
 
 template <typename Tensor_>
-void PrintHierarchy(const std::vector<TreeNode<Tensor_>>& nodes, int depth = 0) {
+void PrintHierarchy(const std::vector<PrintNode<Tensor_>>& nodes, int depth = 0) {
     std::string indent(depth * 2, ' ');
     for (const auto& node : nodes) {
         if (!node.value) continue;
@@ -549,11 +549,11 @@ void PrintHierarchy(const std::vector<TreeNode<Tensor_>>& nodes, int depth = 0) 
 inline std::list<std::shared_ptr<ir::Tensor>>::iterator FindInBlock(
     std::shared_ptr<ir::Block> block, std::shared_ptr<ir::Tensor> tensor) {
     for (auto it = block->begin(); it != block->end(); ++it) {
-        if (*it == tensor) {  // 比较指针是否指向同一个Tensor
+        if (*it == tensor) {
             return it;
         }
     }
-    return block->end();  // 未找到返回end()
+    return block->end();
 }
 
 template <typename Tensor_>
@@ -562,36 +562,10 @@ inline void FindInstrRecursive(std::shared_ptr<ir::Tensor> tensor,
                                std::list<std::shared_ptr<ir::Tensor>>::iterator& single_it,
                                std::shared_ptr<ir::Block> current_block) {
     if (auto target = Cast<Tensor_>(tensor)) {
-        if constexpr (std::is_same_v<Tensor_, ir::ArithmeticInstruction>) {
-            if (target->operation == ir::ArithmeticInstruction::Add) {
-                single_instr = target;
-                auto it = FindInBlock(current_block, tensor);
-                if (it != current_block->end()) {
-                    single_it = std::next(it);
-                }
-            }
-        } else {
-            single_instr = target;
-            auto it = FindInBlock(current_block, tensor);
-            if (it != current_block->end()) {
-                single_it = std::next(it);
-            }
-        }
-    }
-}
-
-template <typename Tensor_>
-inline void FindInstrRecursiveInner(std::shared_ptr<ir::Tensor> tensor,
-                                    std::shared_ptr<Tensor_>& single_instr,
-                                    std::list<std::shared_ptr<ir::Tensor>>::iterator& single_it,
-                                    std::shared_ptr<ir::Block> current_block) {
-    if (auto block = Cast<ir::Block>(tensor)) {
-        for (auto& sub_tensor : *block) {
-            FindInstrRecursive<Tensor_>(sub_tensor, single_instr, single_it, block);
-        }
-    } else if (auto grid = Cast<ir::Grid>(tensor)) {
-        for (auto& sub_tensor : *grid->block) {
-            FindInstrRecursive<Tensor_>(sub_tensor, single_instr, single_it, grid->block);
+        single_instr = target;
+        auto it = FindInBlock(current_block, tensor);
+        if (it != current_block->end()) {
+            single_it = std::next(it);
         }
     }
 }
@@ -602,13 +576,121 @@ inline void PrintFusibleChains(std::vector<std::vector<std::shared_ptr<ir::Call>
     for (size_t i = 0; i < fusibleChains.size(); ++i) {
         const auto& chain = fusibleChains[i];
         std::cout << "  链 " << (i + 1) << "（包含 " << chain.size() << " 个操作）：" << std::endl;
-        
+
         for (size_t j = 0; j < chain.size(); ++j) {
             const auto& call = chain[j];
             // 假设Operator()返回操作符对象，Name()返回操作名称
             std::cout << "    操作 " << (j + 1) << ": " << call->Operator()->name << std::endl;
         }
     }
+}
+
+template <typename T>
+inline T& GetListElement(std::list<T>& list, size_t index) {
+    GALOIS_ASSERT(index < list.size(), "List index out of range! Index: " + std::to_string(index) +
+                                           ", List size: " + std::to_string(list.size()));
+
+    auto it = std::next(list.begin(), index);
+    return *it;
+}
+
+inline void Fusion(std::shared_ptr<ir::Operator> current_op, std::shared_ptr<ir::Operator> prev_op,
+                   std::shared_ptr<ir::Call> current_call, std::shared_ptr<ir::Call> prev_call,
+                   std::shared_ptr<ir::Builder> ir_builder, std::shared_ptr<ir::Operator> root_op) {
+    if (!current_op || !prev_op || !current_call || !prev_call) {
+        GALOIS_ASSERT(false, "融合失败：算子或调用指令为空");
+        return;
+    }
+    auto fused_name = prev_op->name + "_" + current_op->name;
+    auto current_op_type = current_op->GetOperatorType();
+    auto prev_op_type = prev_op->GetOperatorType();
+
+    std::vector<std::shared_ptr<ir::TensorType>> new_input_types = prev_op_type->ir_input_types;
+    std::vector<std::shared_ptr<ir::Input>> new_inputs;
+    new_input_types.push_back(current_op_type->ir_input_types[1]);
+    new_inputs.push_back(prev_op->inputs[0]);
+    new_inputs.push_back(current_op->inputs[0]);
+    new_inputs.push_back(current_op->inputs[1]);
+    auto fused_op_type = ir::OperatorType::Create(new_input_types, current_op_type->output_type);
+    current_op->type = fused_op_type;
+    current_op->inputs = new_inputs;
+    current_op->name = fused_name;
+
+    auto& current_block = current_op->block;
+    auto arith_addr = current_block->end();
+    auto grid_addr = current_block->end();
+    auto write_addr = current_block->end();
+    std::list<std::shared_ptr<ir::Accessor>> accessor_instr_list;
+    std::list<std::shared_ptr<ir::ArithmeticInstruction>> arith_instr_list;
+    std::shared_ptr<ir::Grid> grid_instr;
+    std::shared_ptr<ir::Write> write_instr;
+
+    for (auto& tensor : *current_block) {
+        if (auto grid = Cast<ir::Grid>(tensor)) {
+            accessor_instr_list = GetAll<ir::Accessor>(grid->block);
+            arith_instr_list = GetAll<ir::ArithmeticInstruction>(grid->block);
+        }
+        FindInstrRecursive<ir::Grid>(tensor, grid_instr, grid_addr, current_block);
+    }
+    for (auto& tensor : *root_op->block) {
+        FindInstrRecursive<ir::Write>(tensor, write_instr, write_addr, root_op->block);
+    }
+
+    GALOIS_ASSERT(grid_instr, "grid_instr内部结构不符合预期");
+    GALOIS_ASSERT(write_instr, "write_instr内部结构不符合预期");
+
+    ir_builder->grid_stack.push(grid_instr);
+    ir_builder->block_stack.push(grid_instr->block);
+    ir_builder->iterator_stack.push(
+        FindInBlock(grid_instr->block, GetListElement(accessor_instr_list, 2)));
+    auto input_accessor = ir_builder->CreateIdentityAccessor(current_op->inputs[0]);
+    ir_builder->grid_stack.pop();
+    ir_builder->block_stack.pop();
+    ir_builder->iterator_stack.pop();
+
+    auto prev_instr = ir::ArithmeticInstruction::Create(
+        ir::ArithmeticInstruction::Add, input_accessor, GetListElement(accessor_instr_list, 1));
+    GetListElement(arith_instr_list, 0)->SetOperand(0, prev_instr);
+
+    ir_builder->grid_stack.push(grid_instr);
+    ir_builder->block_stack.push(grid_instr->block);
+    ir_builder->iterator_stack.push(
+        std::next(FindInBlock(grid_instr->block, GetListElement(accessor_instr_list, 2))));
+    ir_builder->Insert(prev_instr);
+    ir_builder->grid_stack.pop();
+    ir_builder->block_stack.pop();
+    ir_builder->iterator_stack.pop();
+
+    std::vector<std::shared_ptr<ir::Tensor>> new_call_inputs;
+    for (int64_t i = 0; i < prev_call->InputSize(); ++i) {
+        new_call_inputs.push_back(prev_call->Input(i));
+    }
+    new_call_inputs.push_back(current_call->Input(1));
+
+    auto call_all = ir::Call::Create(current_op, new_call_inputs);
+    auto call_all_addr = std::find(root_op->block->begin(), root_op->block->end(), current_call);
+
+    ir_builder->block_stack.push(root_op->block);
+    ir_builder->iterator_stack.push(std::next(call_all_addr));
+    ir_builder->Insert(call_all);
+    ir_builder->block_stack.pop();
+    ir_builder->iterator_stack.pop();
+
+    auto& block_l1 = root_op->block;
+    block_l1->erase(
+        std::remove_if(block_l1->begin(), block_l1->end(),
+                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == prev_call; }),
+        block_l1->end());
+    block_l1->erase(
+        std::remove_if(block_l1->begin(), block_l1->end(),
+                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == prev_op; }),
+        block_l1->end());
+    block_l1->erase(
+        std::remove_if(block_l1->begin(), block_l1->end(),
+                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == current_call; }),
+        block_l1->end());
+
+    write_instr->SetOperand(0, call_all);
 }
 
 inline void OperatorFusion(std::shared_ptr<ir::Operator> root_op) {
@@ -624,8 +706,9 @@ inline void OperatorFusion(std::shared_ptr<ir::Operator> root_op) {
         }
     });
 
-    std::unordered_map<std::shared_ptr<ir::Tensor>, std::vector<std::shared_ptr<ir::Call>>> tensorConsumers;
-    
+    std::unordered_map<std::shared_ptr<ir::Tensor>, std::vector<std::shared_ptr<ir::Call>>>
+        tensorConsumers;
+
     for (auto& call : elemWiseCalls) {
         for (int64_t i = 0; i < call->InputSize(); ++i) {
             auto input = call->Input(i);
@@ -640,11 +723,11 @@ inline void OperatorFusion(std::shared_ptr<ir::Operator> root_op) {
         if (processed.count(current)) continue;
 
         std::vector<std::shared_ptr<ir::Call>> chain;
-        
+
         while (current && !processed.count(current)) {
             processed.insert(current);
             chain.push_back(current);
-            
+
             std::shared_ptr<ir::Call> nextCall = nullptr;
             auto output = current;
             if (tensorConsumers.count(output)) {
@@ -655,10 +738,10 @@ inline void OperatorFusion(std::shared_ptr<ir::Operator> root_op) {
                     }
                 }
             }
-            
+
             current = nextCall;
         }
-        
+
         if (chain.size() > 1) {
             fusibleChains.push_back(chain);
         }
@@ -666,149 +749,21 @@ inline void OperatorFusion(std::shared_ptr<ir::Operator> root_op) {
 
     PrintFusibleChains(fusibleChains);
 
-    // for (auto& chain : fusibleChains) {
-    //     if (chain.empty()) continue;
-        
-    //     std::string fused_name;
-    //     for (size_t i = 0; i < chain.size(); ++i) {
-    //         fused_name += chain[i]->Operator()->name;
-    //     }
+    for (auto& chain : fusibleChains) {
+        if (chain.empty()) std::cout << " No operators can be fused " << std::endl;
 
-    //     auto firstOp = chain[0]->Operator();
-    //     auto firstOp_type = firstOp->GetOperatorType();
-
-    //     std::vector<std::shared_ptr<ir::TensorType>> fusedOp_input_type = firstOp_type->ir_input_types;
-    //     for (size_t i = 1; i < chain.size(); ++i) {
-    //         fusedOp_input_type.push_back(chain[i]->Operator()->GetOperatorType()->ir_input_types[1]);
-    //     }
-        
-    //     ir_builder->operator_stack.push(root_op);
-    //     ir_builder->block_stack.push(root_op->block);
-    //     ir_builder->iterator_stack.push(root_op->block->end());
-    //     // ir_builder->iterator_stack.push(std::next(FindInBlock(root_op->block, chain[chain.size()-1])));
-    //     auto fusedOp_type = ir::OperatorType::Create(fusedOp_input_type, firstOp_type->output_type);
-    //     auto fusedOp = ir::Operator::Create(fusedOp_type);
-    //     fusedOp->name = fused_name;
-    //     fusedOp->fullname = ir_builder->operator_stack.size()
-    //                                 ? fusedOp->name + ir_builder->operator_stack.top()->fullname
-    //                                 : fusedOp->name;
-        
-    //     ir_builder->operator_stack.push(fusedOp);
-    //     ir_builder->block_stack.push(fusedOp->block);
-    //     ir_builder->iterator_stack.push(fusedOp->block->end());
-    //     auto firstOpBlock = chain[0]->Operator()->block;
-    //     for (auto& tensor : *firstOpBlock) {
-    //         ir_builder->Insert(tensor);
-    //     }
-    //     ir_builder->operator_stack.pop();
-    //     ir_builder->block_stack.pop();
-    //     ir_builder->iterator_stack.pop();
-
-    //     ir_builder->operator_stack.pop();
-    //     ir_builder->block_stack.pop();
-    //     ir_builder->iterator_stack.pop();
-    // }
-
-    auto call_add1 = fusibleChains[0][0];
-    auto call_sub3 = fusibleChains[0][1];
-    auto add1_op = call_add1->Operator();
-    auto sub3_op = call_sub3->Operator();
-
-    GALOIS_ASSERT(add1_op && sub3_op && call_add1 && call_sub3, "目标算子或调用未找到");
-
-    auto orig_op_type = add1_op->GetOperatorType();
-    std::vector<std::shared_ptr<ir::TensorType>> new_input_types = orig_op_type->ir_input_types;
-    new_input_types.push_back(sub3_op->GetOperatorType()->ir_input_types[1]);
-
-    auto new_op_type = ir::OperatorType::Create(new_input_types, orig_op_type->output_type);
-    add1_op->type = new_op_type;
-
-    add1_op->inputs.push_back(ir::Input::Create(sub3_op->GetOperatorType()->ir_input_types[1]));
-
-    auto& add1_block = add1_op->block;
-
-    auto accessor_it = add1_block->end();
-    auto add_it = add1_block->end();
-    auto write_it_inner = add1_block->end();
-    auto write_it = add1_block->end();
-    auto grid_it = add1_block->end();
-    std::shared_ptr<ir::Accessor> accessor_instr;
-    std::shared_ptr<ir::ArithmeticInstruction> add_instr;
-    std::shared_ptr<ir::Write> write_instr_inner;
-    std::shared_ptr<ir::Write> write_instr;
-    std::shared_ptr<ir::Grid> grid_instr;
-
-    for (auto& tensor : *add1_block) {
-        FindInstrRecursiveInner(tensor, accessor_instr, accessor_it, add1_block);
-        FindInstrRecursiveInner(tensor, add_instr, add_it, add1_block);
-        FindInstrRecursiveInner(tensor, write_instr_inner, write_it_inner, add1_block);
-        FindInstrRecursive<ir::Grid>(tensor, grid_instr, grid_it, add1_block);
+        for (size_t i = chain.size() - 1; i >= 1; --i) {
+            auto current_call = chain[chain.size() - 1];
+            auto prev_call = chain[i - 1];
+            auto current_op = current_call->Operator();
+            auto prev_op = prev_call->Operator();
+            Fusion(current_op, prev_op, current_call, prev_call, ir_builder, root_op);
+        }
     }
-    for (auto& tensor : *root_op->block) {
-        FindInstrRecursive<ir::Write>(tensor, write_instr, write_it, root_op->block);
-    }
-
-    GALOIS_ASSERT(accessor_instr, "accessor_instr内部结构不符合预期");
-    GALOIS_ASSERT(add_instr, "add_instr内部结构不符合预期");
-    GALOIS_ASSERT(write_instr_inner, "write_instr_inner内部结构不符合预期");
-    GALOIS_ASSERT(grid_instr, "grid_instr内部结构不符合预期");
-    GALOIS_ASSERT(write_instr, "write_instr内部结构不符合预期");
-
-    ir_builder->grid_stack.push(grid_instr);
-    ir_builder->block_stack.push(grid_instr->block);
-    ir_builder->iterator_stack.push(accessor_it);
-    auto input2_accessor = ir_builder->CreateIdentityAccessor(add1_op->inputs[2]);
-    ir_builder->grid_stack.pop();
-    ir_builder->block_stack.pop();
-    ir_builder->iterator_stack.pop();
-
-    auto sub_instr = ir::ArithmeticInstruction::Create(ir::ArithmeticInstruction::Sub, add_instr,
-                                                       input2_accessor);
-
-    ir_builder->grid_stack.push(grid_instr);
-    ir_builder->block_stack.push(grid_instr->block);
-    ir_builder->iterator_stack.push(std::next(accessor_it));
-    ir_builder->Insert(sub_instr);
-    ir_builder->grid_stack.pop();
-    ir_builder->block_stack.pop();
-    ir_builder->iterator_stack.pop();
-
-    write_instr_inner->SetOperand(0, sub_instr);
-
-    std::vector<std::shared_ptr<ir::Tensor>> new_call_inputs;
-    for (int64_t i = 0; i < call_add1->InputSize(); ++i) {
-        new_call_inputs.push_back(call_add1->Input(i));
-    }
-    new_call_inputs.push_back(call_sub3->Input(1));
-
-    auto call_all = ir::Call::Create(add1_op, new_call_inputs);
-    auto call_add1_it = std::find(root_op->block->begin(), root_op->block->end(), call_add1);
-
-    ir_builder->block_stack.push(root_op->block);
-    ir_builder->iterator_stack.push(std::next(call_add1_it));
-    ir_builder->Insert(call_all);
-    ir_builder->block_stack.pop();
-    ir_builder->iterator_stack.pop();
-
-    auto& block_l1 = root_op->block;
-    block_l1->erase(
-        std::remove_if(block_l1->begin(), block_l1->end(),
-                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == call_add1; }),
-        block_l1->end());
-    block_l1->erase(
-        std::remove_if(block_l1->begin(), block_l1->end(),
-                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == sub3_op; }),
-        block_l1->end());
-    block_l1->erase(
-        std::remove_if(block_l1->begin(), block_l1->end(),
-                       [&](const std::shared_ptr<ir::Tensor>& t) { return t == call_sub3; }),
-        block_l1->end());
-
-    GALOIS_ASSERT(write_instr, "未在block中找到Write指令");
-    write_instr->SetOperand(0, call_all);
 }
 
-inline std::shared_ptr<ir::Operator> OperatorFusionUpper(std::shared_ptr<ir::Operator> ir_operator) {
+inline std::shared_ptr<ir::Operator> OperatorFusionUpper(
+    std::shared_ptr<ir::Operator> ir_operator) {
     ir_operator->block->clear();
 
     auto ir_builder = ir::Builder::Create();
