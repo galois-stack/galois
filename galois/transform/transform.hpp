@@ -502,26 +502,6 @@ inline bool IsElementWiseOperator(const std::shared_ptr<ir::Operator>& op) {
 }
 
 template <typename Tensor_>
-inline std::vector<std::shared_ptr<Tensor_>> ExtractAllFromBlock(std::shared_ptr<ir::Block> block) {
-    std::vector<std::shared_ptr<Tensor_>> result;
-    if (!block) return result;
-
-    for (auto& tensor : *block) {
-        // if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
-        //     result.push_back(target);
-        // }
-        if (auto target = std::dynamic_pointer_cast<Tensor_>(tensor)) {
-            result.push_back(target);
-        }
-        if (auto sub_op = std::dynamic_pointer_cast<ir::Operator>(tensor)) {
-            auto sub_results = ExtractAllFromBlock<Tensor_>(sub_op->block);
-            result.insert(result.end(), sub_results.begin(), sub_results.end());
-        }
-    }
-    return result;
-}
-
-template <typename Tensor_>
 struct TreeNode {
     std::shared_ptr<Tensor_> value;
     std::vector<TreeNode<Tensor_>> children;
@@ -564,43 +544,6 @@ void PrintHierarchy(const std::vector<TreeNode<Tensor_>>& nodes, int depth = 0) 
             PrintHierarchy(node.children, depth + 1);
         }
     }
-}
-
-inline void ReplaceTensorReference(std::shared_ptr<ir::Block> block,
-                                   std::shared_ptr<ir::Tensor> old_tensor,
-                                   std::shared_ptr<ir::Tensor> new_tensor) {
-    for (auto& tensor : *block) {
-        if (auto instr = Cast<ir::Instruction>(tensor)) {
-            for (int64_t i = 0; i < instr->OperandSize(); ++i) {
-                if (instr->GetOperand(i) == old_tensor) {
-                    instr->SetOperand(i, new_tensor);
-                }
-            }
-        }
-    }
-}
-
-template <typename Tensor_>
-inline std::shared_ptr<Tensor_> FindOperatorByName(std::shared_ptr<ir::Operator> parent_op,
-                                                   const std::string& name) {
-    auto ops = ExtractAllFromBlock<Tensor_>(parent_op->block);
-    for (auto op : ops) {
-        if (op->name == name) {
-            return op;
-        }
-    }
-    return nullptr;
-}
-
-inline std::shared_ptr<ir::Call> FindCallByName(std::shared_ptr<ir::Block> block,
-                                                const std::string& target_name) {
-    std::shared_ptr<ir::Call> result;
-    Each<ir::Call>(block, [&](std::shared_ptr<ir::Call> call) {
-        if (call->Operator()->name == target_name) {
-            result = call;
-        }
-    });
-    return result;
 }
 
 inline std::list<std::shared_ptr<ir::Tensor>>::iterator FindInBlock(
