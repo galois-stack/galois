@@ -12,8 +12,21 @@ TEST(GaloisTests, TestOperatorFusion) {
     constexpr int64_t length = 8;
     auto ir_input_type = ir::f32->Tile(length);
     auto ir_builder = ir::Builder::Create();
-    auto ir_operator = ir_builder->CreateOperatorByCreator<op::OperatorFusionNoOptCreator>(
-        {ir_input_type, ir_input_type, ir_input_type});
+
+    auto ir_op_type = ir::OperatorType::Create(
+        {ir_input_type, ir_input_type, ir_input_type},  
+        ir_input_type                                   
+    );
+
+    auto [ir_operator, scope] = ir_builder->CreateOperator(ir_op_type, "ElemWiseCalc");
+    auto ir_input_0 = ir_operator->inputs[0];
+    auto ir_input_1 = ir_operator->inputs[1];
+    auto ir_input_2 = ir_operator->inputs[2];
+    auto ir_output = ir_builder->Alloca(ir_input_type);
+    auto ir_add = ir_builder->ExpressCreator<op::AddCreator>({ir_input_0, ir_input_1});
+    auto ir_sub = ir_builder->ExpressCreator<op::SubCreator>({ir_add, ir_input_2});
+    ir_builder->Write(ir_sub, ir_output);
+    ir_builder->Return(ir_output);
 
     auto ir_print_visitor = ir::IRPrinter::Create();
     std::cout << "Original IR:\n";
