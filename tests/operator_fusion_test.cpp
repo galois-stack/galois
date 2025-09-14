@@ -4,7 +4,6 @@
 #include <cmath>
 
 #include "galois/ir/ir_print_visitor.hpp"
-#include "galois/op/operator_fusion_no_opt.hpp"
 #include "galois/transform/transform.hpp"
 #include "tests/galois_test.hpp"
 
