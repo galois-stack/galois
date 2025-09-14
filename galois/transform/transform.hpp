@@ -668,7 +668,7 @@ inline void PrintFusibleChains(std::vector<std::vector<std::shared_ptr<ir::Call>
     }
 }
 
-inline void LoopFusion(std::shared_ptr<ir::Operator> root_op) {
+inline void OperatorFusion(std::shared_ptr<ir::Operator> root_op) {
     if (!root_op || !root_op->block) return;
 
     auto ir_printer = ir::IRPrinter::Create();
@@ -865,7 +865,7 @@ inline void LoopFusion(std::shared_ptr<ir::Operator> root_op) {
     // write_instr->SetOperand(0, call_all);
 }
 
-inline std::shared_ptr<ir::Operator> OperatorFusionOpt(std::shared_ptr<ir::Operator> ir_operator) {
+inline std::shared_ptr<ir::Operator> OperatorFusionUpper(std::shared_ptr<ir::Operator> ir_operator) {
     ir_operator->block->clear();
 
     auto ir_builder = ir::Builder::Create();
