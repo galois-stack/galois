@@ -13,7 +13,6 @@ TEST(GaloisTests, TestOperationCount) {
         {ir_mat_type_a, ir_mat_type_b});
 
     auto jit_engine = jit::Engine::Create();
-    auto mat_mul_fun = jit_engine->EmitOperatorSymbol<void *(*)(void *, void *)>(ir_operator);
 
     auto normalize_m = ir_mat_type_a->NormalizeShape()[0];
     auto normalize_k = ir_mat_type_a->NormalizeShape()[1];
