@@ -1,6 +1,7 @@
 #pragma once
 
-#include "tensor.hpp"
+#include <memory>
+
 namespace galois::ir {
 
 class Tensor;
