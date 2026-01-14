@@ -36,7 +36,7 @@ class IncreaseVisitor : public ir::Visitor {
     }
 
     void Visit(std::shared_ptr<ir::Free> ir_free) override {
-        (*sp_reference_count_dict)[ir_free->Tensor()] = -1;  // 置为-1， 我们只有0时才会插入free指令
+        (*sp_reference_count_dict)[ir_free->Tensor] = -1;  // 置为-1， 我们只有0时才会插入free指令
     }
 
     void Visit(std::shared_ptr<ir::Return> ir_return) override {
