@@ -1,7 +1,7 @@
 #pragma once
 
 #include "galois/ir/builder.hpp"
-#include "galois/ir/view.hpp"
+#include "galois/ir/view/broadcast.hpp"
 #include "galois/op/arithmetic.hpp"
 #include "galois/op/sum.hpp"
 #include "galois/op/unary_intrinsic.hpp"
