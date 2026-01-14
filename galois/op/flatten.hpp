@@ -2,7 +2,7 @@
 
 #include "galois/ir/builder.hpp"
 #include "galois/ir/tensor.hpp"
-#include "galois/ir/view.hpp"
+#include "galois/ir/view/flatten.hpp"
 
 namespace galois::op {
 
