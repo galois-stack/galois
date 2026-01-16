@@ -3,6 +3,7 @@
 #include "galois/codegen/cpu/prajna_codegen.hpp"
 #include "galois/helper.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/jit/cbindings.hpp"
 #include "galois/transform/reference_count_visitor.hpp"
 #include "prajna/bindings/core.hpp"
 #include "prajna/jit/execution_engine.h"

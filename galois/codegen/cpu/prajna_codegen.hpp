@@ -6,6 +6,7 @@
 
 #include "galois/helper.hpp"
 #include "galois/ir/ir.hpp"
+#include "galois/jit/cbindings.hpp"
 #include "galois/transform/transform.hpp"
 #include "prajna/ir/ir.hpp"
 #include "prajna/lowering/ir_builder.hpp"
