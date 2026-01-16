@@ -125,7 +125,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
             auto pir_last_value = pir_builder->GetConstant<int64_t>(ir_grid->shape[i]);
             auto ir_loop_block = pir::Block::Create();
             auto pir_scalar_index = pir_builder->Create<pir::LocalVariable>(pir::i64);
-            pir_scalar_index->fullname = "idx";
+            pir_scalar_index->Fullname("idx");
             auto ir_for = pir_builder->Create<pir::For>(pir_scalar_index, pir_first_value,
                                                         pir_last_value, ir_loop_block);
             if (!ir_grid->pir_value) {
@@ -473,7 +473,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
                 {pir_i32_pointer_type, pir_i32_type, pir_i32_type, pir_i32_type},
                 pir::VoidType::Create());
             pir_prefetch_function = pir::Function::Create(pir_llvm_prefetch_function_type);
-            pir_prefetch_function->fullname = "llvm.prefetch";
+            pir_prefetch_function->Fullname("llvm.prefetch");
             pir_prefetch_function->parent = pir_builder->module;
             pir_builder->module->functions.push_back(pir_prefetch_function);
         }
@@ -752,7 +752,7 @@ class PrajnaCodegen : public galois::ir::Visitor {
         auto ir_operand = ir_intrinsic->GetOperand(0);
         auto pir_operand_type = ir_operand->type->pir_type;
         auto pir_intrinsic_type = pir::FunctionType::Create({pir_operand_type}, pir_operand_type);
-        auto intrinsic_name = ir_intrinsic->intrinsic_name + "." + pir_operand_type->name;
+        auto intrinsic_name = ir_intrinsic->intrinsic_name + "." + pir_operand_type->Name();
         if (ir_intrinsic->llvm_prefix) {
             intrinsic_name = "llvm." + intrinsic_name;
         }
