@@ -60,7 +60,6 @@ class EachTensorVisitor : public ir::Visitor {
     void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) override {
         this->callback(ir_unary_intrinsic);
     }
-    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override { this->callback(ir_viewer); }
     void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
         this->callback(ir_squeeze_dim_view);
     }

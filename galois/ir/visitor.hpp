@@ -33,7 +33,6 @@ class Indexing;
 namespace view {
 class BitCast;
 class Broadcast;
-class Viewer;
 class SqueezeDim;
 class UnsqueezeDim;
 class Slice;
@@ -74,7 +73,6 @@ class Visitor : public std::enable_shared_from_this<Visitor> {
     virtual void Visit(std::shared_ptr<ir::VectorBroadcast> ir_vector_broadcast) {}
     virtual void Visit(std::shared_ptr<ir::Call> ir_call) {}
     virtual void Visit(std::shared_ptr<ir::UnaryIntrinsic> ir_unary_intrinsic) {}
-    virtual void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) {}
     virtual void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) {}
     virtual void Visit(std::shared_ptr<ir::view::UnsqueezeDim> ir_unsqueeze_dim_view) {}
     virtual void Visit(std::shared_ptr<ir::view::Slice> ir_slice_view) {}

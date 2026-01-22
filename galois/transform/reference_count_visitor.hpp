@@ -53,10 +53,6 @@ class IncreaseVisitor : public ir::Visitor {
         this->IncreaseViewInstruction(ir_select_instruction);
     }
 
-    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {
-        this->IncreaseViewInstruction(ir_viewer);
-    }
-
     void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
         this->IncreaseViewInstruction(ir_squeeze_dim_view);
     }
@@ -167,10 +163,6 @@ class DecreaseVisitor : public ir::Visitor {
 
     void Visit(std::shared_ptr<ir::SelectInstruction> ir_select_instruction) override {
         this->DecreaseViewInstruction(ir_select_instruction);
-    }
-
-    void Visit(std::shared_ptr<ir::view::Viewer> ir_viewer) override {
-        this->DecreaseViewInstruction(ir_viewer);
     }
 
     void Visit(std::shared_ptr<ir::view::SqueezeDim> ir_squeeze_dim_view) override {
